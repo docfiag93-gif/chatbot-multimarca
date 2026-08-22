@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════════
 //  Chatbot — el mensajero  ·  /api/bot
 //
-//  Corre igual en Cloudflare Pages y en Netlify: los envoltorios de cada
-//  plataforma viven en functions/api/ y en netlify/functions/.
+//  Corre sobre Cloudflare Pages. El envoltorio de la plataforma vive en
+//  functions/api/ y es de diez líneas: mudarse a otra es cambiar el enchufe.
 //
 //  Este archivo hace cuatro cosas y ninguna más: recibir, verificar,
 //  preguntar y devolver. Quién contesta y qué pasa si falla es problema de

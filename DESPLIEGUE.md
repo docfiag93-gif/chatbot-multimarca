@@ -90,25 +90,10 @@ RESEND_API_KEY
    update usuarios set rol='superadmin', activo=true where email='doc.fiag93@gmail.com';
    ```
 
-### 6. Hasta entonces, no toques Netlify
+### 6. Verifica que quedó
 
-El chatbot todavía existe dentro de `isa-plataformas`. **Se borra de ahí
-cuando Cloudflare ya esté sirviendo**, no antes: mientras existan los dos,
-volver atrás toma un minuto. Lo que hay que quitar cuando llegue el momento:
-
-- `chatbot/` completo
-- `netlify/functions/bot.mjs` y `netlify/functions/admin.mjs`
-- `functions/` (la carpeta de Cloudflare que quedó en el repo viejo)
-- la reescritura de `/api/*` en `netlify.toml`
-
-## Sobre los créditos de Netlify
-
-**No pude confirmar qué los está consumiendo:** la API de Netlify no expone
-los contadores de consumo. Sacar el chatbot ayuda seguro por una razón
-estructural —dejaba de compartir cuota y despliegues con la app de tus
-pacientes— pero si el gasto real era el ancho de banda de la app médica, el
-consumo va a seguir. Vale la pena mirar Team → Usage antes de darlo por
-resuelto: ya diagnosticamos mal esto una vez.
+`https://chatbot-multimarca.pages.dev/api/bot?ping=1` debe responder
+`listo: true` y los proveedores con llave en `true`.
 
 ## Probarlo en local
 

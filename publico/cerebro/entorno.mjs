@@ -1,10 +1,10 @@
 // ════════════════════════════════════════════════════════════════════════
 //  El entorno — de dónde salen las llaves, sin casarse con un proveedor
 //
-//  El problema: Netlify corre sobre Node y las variables viven en
-//  `process.env`. Cloudflare corre sobre Workers, donde `process` NO EXISTE
-//  y las variables llegan como un objeto por petición. Escribir `process.env`
-//  directo amarra el chatbot a Netlify para siempre.
+//  El problema: Cloudflare corre sobre Workers, donde `process` NO EXISTE y
+//  las variables llegan como un objeto por petición. Las plataformas basadas
+//  en Node, en cambio, las ponen en `process.env`. Escribir cualquiera de las
+//  dos formas directo amarra el chatbot a esa plataforma para siempre.
 //
 //  Este archivo es la traducción. El resto del código pregunta `env('X')` y
 //  no le importa dónde está corriendo. Ese es justo el punto: este producto
@@ -28,7 +28,7 @@ export function ponerEntorno(obj) {
 
 /**
  * Lee una variable. Busca primero lo que puso la plataforma y se cae a
- * process.env, que es lo que existe en Netlify y en Node local.
+ * process.env, que es lo que existe en Node local y en plataformas Node.
  */
 export function env(nombre) {
   if (_entorno && nombre in _entorno) return _entorno[nombre];

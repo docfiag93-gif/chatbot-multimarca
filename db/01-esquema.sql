@@ -9,7 +9,7 @@
 --
 --  QUÉ ESTÁ CIFRADO Y QUÉ NO:
 --    · Las columnas que terminan en `_cifrado` guardan bultos ilegibles.
---      Se cifran en la función de Netlify (AES-256-GCM, llave derivada por
+--      Se cifran en la funcion del servidor (AES-256-GCM, llave derivada por
 --      empresa). La base NUNCA ve la llave ni el texto claro.
 --    · Lo que NO se cifra es lo que el widget muestra a cualquiera que entre
 --      al sitio: colores, saludo, sugerencias. Cifrar eso solo daría trabajo
@@ -177,7 +177,7 @@ create index if not exists bitacora_fecha_idx on public.bitacora (created_at des
 
 -- ----------------------------------------------------------------------------
 -- 7) RLS — todo prendido, todo niega por omisión
---    El widget público NO entra aquí: habla con la función de Netlify, que es
+--    El widget publico NO entra aqui: habla con la funcion del servidor, que es
 --    la única que tiene la llave de servicio. Por eso `anon` no recibe ningún
 --    permiso en ninguna tabla.
 -- ----------------------------------------------------------------------------

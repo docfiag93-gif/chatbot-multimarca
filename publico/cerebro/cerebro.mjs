@@ -5,7 +5,7 @@
 //  navegador para probarlo sin desplegar nada. Si tuviera dentro la llamada
 //  a Gemini, tendría que tener la llave, y la llave NUNCA baja al navegador.
 //  Aquí se decide QUÉ se le pregunta al modelo; quién se lo pregunta y con
-//  qué credenciales es problema de netlify/functions/bot.mjs.
+//  qué credenciales es problema de servidor/bot.mjs.
 // ════════════════════════════════════════════════════════════════════════
 
 import { revisarBanderas } from './seguridad.mjs';

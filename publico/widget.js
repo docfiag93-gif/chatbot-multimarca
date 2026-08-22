@@ -26,8 +26,9 @@
 
   var script   = document.currentScript;
   var MARCA    = (script && script.dataset.marca)    || 'consultorio';
-  // /api/bot funciona igual en Cloudflare (nativo) y en Netlify (por una
-  // reescritura en netlify.toml). Así el widget no sabe dónde está alojado,
+  // /api/bot es la ruta nativa de Cloudflare Pages, y cualquier otra
+  // plataforma se adapta con una reescritura. Así el widget no sabe dónde
+  // está alojado,
   // que es justo lo que permite mudarlo sin tocar los sitios de los clientes.
   var ENDPOINT = (script && script.dataset.endpoint) || '/api/bot';
   var WHATSAPP = (script && script.dataset.whatsapp) || '';   // solo dígitos, con lada
@@ -448,7 +449,7 @@
     guardar();
 
     if (modoLocal) {
-      pintarBot('Estoy en modo local: no hay servidor conectado, así que no puedo responder de verdad. Súbelo a Netlify y aquí sí contesto.');
+      pintarBot('Estoy en modo local: no hay servidor conectado, así que no puedo responder de verdad. Súbelo a Cloudflare y aquí sí contesto.');
       return;
     }
 

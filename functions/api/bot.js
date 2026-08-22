@@ -3,8 +3,8 @@
 // Toda la lógica vive en chatbot/servidor/bot.mjs, que no sabe en qué
 // plataforma corre. Aquí solo se traduce la forma de llamar:
 //
-//   Netlify:    (request, context)              y variables en process.env
-//   Cloudflare: ({ request, env, waitUntil })   y variables en env
+//   Cloudflare:      ({ request, env, waitUntil })  y variables en env
+//   Node (otras):    (request, context)             y variables en process.env
 //
 // Por eso este archivo es de diez líneas y no de cuatrocientas: mudarse de
 // proveedor tiene que ser cambiar el enchufe, no rehacer la instalación.

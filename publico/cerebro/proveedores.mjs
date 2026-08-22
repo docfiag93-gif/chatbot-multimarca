@@ -13,7 +13,8 @@
 //     rotarla se seguía usando el modelo descubierto con la anterior.
 //   · Gemini y Groq hacían JSON.parse crudo mientras los otros dos usaban un
 //     extractor tolerante. Misma respuesta, dos comportamientos.
-//   · El mensaje de error nombraba a Netlify y no decía qué hacer.
+//   · El mensaje de error nombraba una plataforma equivocada y no decía
+//     qué hacer para arreglarlo.
 //
 //  REGLA DURA DE ESTE ARCHIVO: ninguna llave sale de aquí. No se registra,
 //  no se devuelve en errores, no se pone en una URL que pueda quedar en un

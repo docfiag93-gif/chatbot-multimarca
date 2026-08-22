@@ -10,7 +10,8 @@
 //
 //   2. El WIDGET público usa la llave de servicio, que se salta RLS. Es
 //      necesario —quien escribe en el chat no tiene cuenta— y por eso esa
-//      llave vive SOLO en Netlify y solo la toca bot.mjs, que nunca recibe
+//      llave vive SOLO en las variables del servidor y solo la toca bot.mjs,
+//      que nunca recibe
 //      una consulta libre desde afuera: solo hace las tres o cuatro
 //      operaciones que tiene programadas.
 //

@@ -22,7 +22,7 @@ en la misma página, con distinto `data-marca`, levanta dos bots independientes
 | `cerebro/marcas.mjs` | **Aquí se edita el contenido.** Personalidad, colores, base de conocimiento. |
 | `cerebro/cerebro.mjs` | Arma el prompt. No habla con nadie ni tiene llaves. |
 | `cerebro/seguridad.mjs` | Las banderas rojas. |
-| `../netlify/functions/bot.mjs` | El único que ve las API keys y habla con los modelos. |
+| `servidor/bot.mjs` | El único que ve las API keys y habla con los modelos. |
 
 ## Cómo se pega en un sitio
 
@@ -73,7 +73,7 @@ es quien se está ahogando).
 Cuatro proveedores en cadena. Si uno se queda sin cuota, entra el siguiente:
 que Gemini devuelva 429 deja de ser problema del paciente.
 
-| Orden | Variable en Netlify | Nota |
+| Orden | Variable | Nota |
 |---|---|---|
 | 1 | `ANTHROPIC_API_KEY` | Claude Opus 5. El que mejor respeta los límites clínicos. |
 | 2 | `GEMINI_API_KEY` | Ya configurada. |
@@ -86,7 +86,7 @@ Se cambia el orden con `BOT_ORDEN` (ej. `gemini,groq`) sin tocar código.
 toda la conversación y su base de conocimiento antes de escribir, en vez de
 disparar lo primero que se le ocurre —que es justo el bot que se inventa un
 horario. Cuesta unos segundos más y más tokens. Si el volumen lo hace pesar,
-se baja a `medium` desde Netlify.
+se baja a `medium` desde las variables del proyecto.
 
 Otras variables: `CLAUDE_MODELO` (por omisión `claude-opus-5`),
 `OPENAI_MODELO`, y `LEADS_TO` / `RESEND_API_KEY` para el correo de avisos
@@ -99,11 +99,11 @@ python3 -m http.server 8791
 ```
 
 Y abrir `http://127.0.0.1:8791/chatbot/index.html`. Se ve el widget y se pueden
-afinar colores y textos sin gastar un build de Netlify. Lo que **no** funciona
+afinar colores y textos sin gastar un despliegue. Lo que **no** funciona
 en local son las respuestas: para eso hace falta la función desplegada.
 
 Estado del servidor, sin gastar una llamada de IA:
-`/.netlify/functions/bot?ping=1`
+`/api/bot?ping=1`
 
 ## Lo que falta antes de ponerlo frente a un paciente
 
@@ -112,7 +112,7 @@ Estado del servidor, sin gastar una llamada de IA:
    Sin eso el bot contesta correctamente «no tengo ese dato» a todo, que es
    honesto pero inútil. **Este es el trabajo que más rinde, más que cualquier
    modelo:** Opus 5 sin datos tampoco sabe cuánto cuesta la consulta.
-2. **Poner `ANTHROPIC_API_KEY`** en Netlify.
+2. **Poner las llaves de proveedor** en Cloudflare (ver abajo).
 3. **Decidir el aviso de privacidad.** El formulario ya exige que la persona
    marque una casilla, pero esa casilla debería enlazar a un aviso real.
 4. **Probarlo tú mismo con frases de paciente**, no de programador.
@@ -154,8 +154,8 @@ nada hasta que el superadministrador la asigne.
 ## El cifrado
 
 Cifrado en la **función**, no en la base. AES-256-GCM, con una llave derivada
-por empresa (HKDF) a partir de una llave maestra que vive solo en Netlify como
-`CHATBOT_CLAVE`.
+por empresa (HKDF) a partir de una llave maestra que vive solo en las
+variables de Cloudflare como `CHATBOT_CLAVE`.
 
 - **Protege contra:** respaldo robado, base mal configurada, alguien mirando
   las tablas. Lo que sale es ilegible.
@@ -200,7 +200,7 @@ lento nunca retrase un "llama al 911".
 El asunto del correo nunca lleva nombre, teléfono ni síntoma: ese texto se ve
 en la pantalla bloqueada del celular.
 
-## Variables que faltan en Netlify
+## Variables que necesita Cloudflare
 
 ```
 CHATBOT_CLAVE          # generar en Herramientas → Generar llave
@@ -223,7 +223,7 @@ configuración.
 1. **Crear tu cuenta y volverte superadmin.** Regístrate en el panel; nace
    `pendiente`. Después hay que ponerte `superadmin` a mano una sola vez:
    `update usuarios set rol='superadmin', activo=true where email='...';`
-2. **Las variables de Netlify** de arriba.
+2. **Las variables de Cloudflare** de arriba.
 3. **Llenar los datos reales.** Sigue siendo lo que más rinde.
 4. **Aviso de privacidad de verdad**, enlazado desde la casilla del formulario.
 

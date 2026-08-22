@@ -42,8 +42,8 @@ const SECRETOS = {
 
 export async function manejar(req, context) {
   if (req.method !== 'POST') return json({ error: 'Usa POST' }, 405);
-  if (!URL_SB || !ANON)  return json({ error: 'Falta SUPABASE_URL o SUPABASE_ANON_KEY en Netlify' }, 500);
-  if (!MAESTRA)          return json({ error: 'Falta CHATBOT_CLAVE en Netlify' }, 500);
+  if (!URL_SB || !ANON)  return json({ error: 'Falta SUPABASE_URL o SUPABASE_ANON_KEY en las variables del proyecto' }, 500);
+  if (!MAESTRA)          return json({ error: 'Falta CHATBOT_CLAVE en las variables del proyecto' }, 500);
 
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   const cuenta = await usuarioDelToken(URL_SB, ANON, token);

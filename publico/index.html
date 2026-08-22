@@ -169,7 +169,7 @@
         <h2>Configurar <span id="ed-nombre"></span></h2>
         <div class="aviso ojo">Lo de abajo viaja <b>cifrado</b> a la base. Ni Supabase
         ni un respaldo filtrado pueden leerlo: solo esta consola, y solo si la
-        llave maestra sigue en Netlify.</div>
+        llave maestra sigue en Cloudflare.</div>
         <div class="rejilla">
           <div><label>Nombre visible</label><input id="ed-titulo"></div>
           <div><label>Saludo</label><input id="ed-saludo"></div>
@@ -249,7 +249,7 @@
     <div class="tarjeta">
       <h2>Llave maestra</h2>
       <p class="nota">Se genera <b>aquí en tu navegador</b> y no viaja a ningún lado.
-      Cópiala a Netlify como <code>CHATBOT_CLAVE</code>. Si la pierdes, los datos
+      Cópiala a Cloudflare como <code>CHATBOT_CLAVE</code>. Si la pierdes, los datos
       cifrados se pierden con ella: no hay puerta trasera, y ese es el punto.</p>
       <div class="fila"><button class="accion" id="btn-llave">Generar llave</button></div>
       <div id="salida-llave"></div>
@@ -264,7 +264,7 @@
     </div>
 
     <div class="tarjeta">
-      <h2>Variables que necesita Netlify</h2>
+      <h2>Variables que necesita Cloudflare</h2>
       <pre>CHATBOT_CLAVE          # la de arriba
 SUPABASE_URL           = https://gnhndbqbgvtoxhelikcy.supabase.co
 SUPABASE_ANON_KEY      # llave publicable del proyecto
@@ -316,7 +316,7 @@ $$('#marcas-botones button').forEach(b => {
 import('./cerebro/marcas.mjs').then(mod => {
   // Vista previa local: se responde la petición de config del widget con
   // marcas.mjs, la MISMA fuente que usa el servidor. Así se afinan colores y
-  // textos sin gastar un build de Netlify. Solo vive en esta página.
+  // textos sin gastar un despliegue. Solo vive en esta página.
   const real = window.fetch;
   window.fetch = function (url) {
     const u = String(url);
@@ -642,7 +642,7 @@ $('#btn-llave').addEventListener('click', async () => {
   $('#salida-llave').innerHTML =
     `<pre style="white-space:pre-wrap;word-break:break-all">${esc(llave)}</pre>
      <div class="aviso ojo">Cópiala ahora. No se guarda en ningún lado: si recargas
-     esta página, se va. Va en Netlify como <code>CHATBOT_CLAVE</code>.</div>`;
+     esta página, se va. Va en Cloudflare como <code>CHATBOT_CLAVE</code>.</div>`;
 });
 
 $('#btn-probar-cifrado').addEventListener('click', async () => {

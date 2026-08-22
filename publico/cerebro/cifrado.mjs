@@ -9,7 +9,7 @@
 //
 //  ❌ NO protege contra: alguien que tenga la llave maestra. Si CHATBOT_CLAVE
 //     se filtra, el cifrado no sirvió de nada. La llave vive SOLO como
-//     variable de entorno en Netlify: nunca en la base, nunca en el repo,
+//     variable de entorno de la plataforma: nunca en la base, ni en el repo,
 //     nunca en el navegador.
 //
 //  POR QUÉ NO SE USA pgcrypto, que ya está instalado:
@@ -25,7 +25,7 @@
 //     esa empresa. La maestra nunca se usa directo.
 //
 //  Se usa Web Crypto y no node:crypto porque el mismo código corre en
-//  Netlify y en el navegador. Eso permitió PROBARLO, en vez de suponer.
+//  el servidor y en el navegador. Eso permitió PROBARLO, en vez de suponer.
 // ════════════════════════════════════════════════════════════════════════
 
 const cripto = globalThis.crypto;
@@ -135,7 +135,7 @@ export async function descifrar(maestraB64, empresaId, paquete) {
 
 /**
  * Genera una llave maestra. Se corre UNA vez y el resultado se pega en
- * Netlify como CHATBOT_CLAVE. Si se pierde, los datos cifrados se pierden
+ * Cloudflare como CHATBOT_CLAVE. Si se pierde, los datos cifrados se pierden
  * con ella: no hay puerta trasera, y ese es justamente el punto.
  */
 export function generarLlaveMaestra() {

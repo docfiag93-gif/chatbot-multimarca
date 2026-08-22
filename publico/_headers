@@ -1,4 +1,4 @@
-# Cabeceras para Cloudflare Pages (mismo formato que Netlify).
+# Cabeceras para Cloudflare Pages.
 
 /*
   X-Content-Type-Options: nosniff
@@ -16,7 +16,7 @@
 # con código nuevo después de un despliegue. `no-cache` (no `no-store`):
 # el navegador guarda la copia y pregunta; si no cambió, contesta 304 y no
 # se vuelve a bajar. Esa distinción fue justo lo que disparó el consumo en
-# Netlify la vez pasada.
+# el consumo la vez pasada.
 /index.html
   Cache-Control: no-cache, must-revalidate
 
