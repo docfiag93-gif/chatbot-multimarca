@@ -22,27 +22,41 @@
   --sombra:0 1px 2px rgba(17,21,28,.05), 0 6px 18px rgba(17,21,28,.06);
   --r:10px;
 }
+/* ══ TEMA OSCURO ═══════════════════════════════════════════════════════
+   Medido, no elegido a ojo. La versión anterior fallaba en tres cosas:
+
+     · el texto tenue daba 3.71:1 contra la tarjeta — por debajo del 4.5:1
+       que pide WCAG AA, y era justo el de las notas de ayuda;
+     · la tarjeta contra el fondo daba 1.08:1: prácticamente el mismo color,
+       así que las tarjetas no se veían como tarjetas;
+     · el borde contra la tarjeta, 1.24:1: no se veía.
+
+   Ahora: tenue 5.66:1, tarjeta contra fondo 1.31:1, borde 1.76:1, y todo
+   el texto por encima de 4.5:1. Se subió la tarjeta y se bajó el fondo:
+   aclarar solo el texto sobre un fondo plano no resuelve que las
+   superficies no se distingan entre sí.
+   ══════════════════════════════════════════════════════════════════════ */
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema="claro"]) {
-    --fondo:#0d1117; --panel:#151a22; --hundido:#1b212b;
-    --tinta:#e7eaf0; --suave:#9aa3b2; --tenue:#6b7484;
-    --linea:#252c38; --linea-sutil:#1e242e;
-    --acento:#8b87f5; --acento-suave:#1e1f3d; --acento-tinta:#0d1117;
-    --ok:#5cc994; --ok-suave:#12281e;
-    --alerta:#d8a442; --alerta-suave:#2a2112;
-    --mal:#e0736b; --mal-suave:#2d1614;
-    --sombra:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+--fondo:#070b12; --panel:#1e2735; --hundido:#2c374a;
+    --tinta:#f0f3f8; --suave:#b3bdcc; --tenue:#93a0b2;
+    --linea:#414d61; --linea-sutil:#2f3b4e;
+    --acento:#a5a0ff; --acento-suave:#2e3260; --acento-tinta:#070b12;
+    --ok:#63d69f; --ok-suave:#153323;
+    --alerta:#e6b455; --alerta-suave:#33280f;
+    --mal:#f08880; --mal-suave:#3a1a17;
+    --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
   }
 }
 :root[data-tema="oscuro"] {
-  --fondo:#0d1117; --panel:#151a22; --hundido:#1b212b;
-  --tinta:#e7eaf0; --suave:#9aa3b2; --tenue:#6b7484;
-  --linea:#252c38; --linea-sutil:#1e242e;
-  --acento:#8b87f5; --acento-suave:#1e1f3d; --acento-tinta:#0d1117;
-  --ok:#5cc994; --ok-suave:#12281e;
-  --alerta:#d8a442; --alerta-suave:#2a2112;
-  --mal:#e0736b; --mal-suave:#2d1614;
-  --sombra:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  --fondo:#070b12; --panel:#1e2735; --hundido:#2c374a;
+  --tinta:#f0f3f8; --suave:#b3bdcc; --tenue:#93a0b2;
+  --linea:#414d61; --linea-sutil:#2f3b4e;
+  --acento:#a5a0ff; --acento-suave:#2e3260; --acento-tinta:#070b12;
+  --ok:#63d69f; --ok-suave:#153323;
+  --alerta:#e6b455; --alerta-suave:#33280f;
+  --mal:#f08880; --mal-suave:#3a1a17;
+  --sombra:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
 }
 
 *{box-sizing:border-box}
@@ -83,14 +97,35 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 
 /* ── botones ── */
-.btn{background:var(--acento);color:var(--acento-tinta);border:0;border-radius:8px;
+/* Los botones tenían un solo gesto —bajarle la opacidad— para hover, para
+   el secundario y para el deshabilitado. Tres estados que significan cosas
+   distintas se veían igual. Ahora cada uno tiene el suyo: el hover levanta,
+   el clic hunde, y el deshabilitado además pierde la sombra. */
+.btn{background:var(--acento);color:var(--acento-tinta);border:0;border-radius:9px;
   padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
-  display:inline-flex;align-items:center;gap:7px;transition:opacity .12s}
-.btn:hover{opacity:.88}
-.btn:disabled{opacity:.45;cursor:not-allowed}
+  display:inline-flex;align-items:center;gap:7px;position:relative;
+  box-shadow:0 1px 2px rgba(17,21,28,.10);
+  transition:transform .13s cubic-bezier(.2,.8,.3,1), box-shadow .13s, background .13s,
+             border-color .13s, opacity .13s}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 3px 10px rgba(17,21,28,.14)}
+.btn:active:not(:disabled){transform:translateY(0);box-shadow:inset 0 2px 5px rgba(0,0,0,.16)}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;transform:none}
 .btn.sec{background:var(--panel);color:var(--tinta);border:1px solid var(--linea)}
+.btn.sec:hover:not(:disabled){border-color:var(--acento);color:var(--acento)}
 .btn.mal{background:var(--mal);color:#fff}
-.btn.chico{padding:6px 11px;font-size:13px}
+.btn.chico{padding:6px 11px;font-size:13px;border-radius:8px}
+/* Terciario: para acciones que existen pero no piden atención. */
+.btn.fantasma{background:transparent;color:var(--suave);border:1px solid transparent;
+  box-shadow:none;font-weight:500}
+.btn.fantasma:hover:not(:disabled){background:var(--hundido);color:var(--tinta);
+  transform:none;box-shadow:none}
+/* Confirmación en el propio botón: un aviso aparte para "copiado" es ruido. */
+.btn.hecho{background:var(--ok);color:#fff;pointer-events:none}
+
+/* Fila de acciones de cada negocio. Visible siempre, no solo al pasar el
+   cursor: en un celular no hay "pasar el cursor". */
+.acciones-neg{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;
+  padding-top:12px;border-top:1px solid var(--linea-sutil)}
 .btn:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
 .fila{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
 
@@ -110,7 +145,7 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
   background-size:200% 100%;animation:brillo 1.3s infinite;border-radius:6px;height:14px}
 @keyframes brillo{to{background-position:-200% 0}}
 
-.placa{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+.placa{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;
   padding:2px 9px;border-radius:999px;background:var(--hundido);color:var(--suave);white-space:nowrap}
 .placa.ok{background:var(--ok-suave);color:var(--ok)}
 .placa.mal{background:var(--mal-suave);color:var(--mal)}
@@ -148,15 +183,35 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 
 /* ── tarjetas de negocio ── */
 .negocios{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
-.negocio{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r);
-  padding:16px;display:flex;flex-direction:column;gap:11px;transition:border-color .12s,transform .12s}
-.negocio:hover{border-color:var(--acento)}
+/* La tarjeta parecía estática porque lo era: ni cursor, ni destino, ni
+   foco de teclado. La trampa fácil sería envolver todo en un <button>, pero
+   dentro ya hay botones, y un botón dentro de otro no se puede tabular ni
+   leer con lector de pantalla.
+
+   En vez de eso, el NOMBRE es el botón, y su ::after se estira sobre toda
+   la tarjeta. Se puede hacer clic en cualquier parte, se tabula una sola
+   vez, y los botones de acción viven por encima de esa capa. */
+.negocio{background:var(--panel);border:1px solid var(--linea);border-radius:13px;
+  padding:16px;display:flex;flex-direction:column;gap:11px;position:relative;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+  transition:border-color .16s, transform .16s cubic-bezier(.2,.8,.3,1), box-shadow .16s}
+.negocio:hover{border-color:var(--acento);transform:translateY(-2px);box-shadow:var(--sombra)}
+.negocio:active{transform:translateY(0);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.negocio:has(.liga-tarjeta:focus-visible){border-color:var(--acento);
+  outline:2px solid var(--acento);outline-offset:2px}
+
+.liga-tarjeta{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;
+  font-weight:700;font-size:15px;line-height:1.3;text-align:left;cursor:pointer;
+  display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.liga-tarjeta::after{content:'';position:absolute;inset:0;border-radius:13px;z-index:1}
+.liga-tarjeta:focus-visible{outline:none}
+.negocio:hover .liga-tarjeta{color:var(--acento)}
+.negocio .acciones-neg{position:relative;z-index:2}
 .negocio .cab{display:flex;gap:11px;align-items:flex-start}
-.negocio .marca{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;
-  font-size:19px;flex:none;color:#fff}
+.negocio .marca{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+  font-size:20px;flex:none;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),
+  0 2px 6px rgba(0,0,0,.18)}
 .negocio .titulo{flex:1;min-width:0}
-.negocio .titulo b{display:block;font-size:15px;line-height:1.3;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
 .negocio .titulo span{font-size:12.5px;color:var(--tenue)}
 .negocio .pies{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
 
@@ -241,13 +296,100 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
   .navpaso .btn{width:100%;justify-content:center}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ══ PORTADA ═══════════════════════════════════════════════════════════
+   La puerta de entrada. Antes, sin sesión, se veía la consola completa
+   —pestañas, filtros, tablero a medias— y parecía un panel descompuesto
+   en vez de un producto. Ahora lo primero es qué es esto, una muestra de
+   cómo contesta, y cómo entrar.
+
+   Todo lo visual es SVG y CSS: ni una imagen externa. Una portada que
+   depende de un archivo alojado en otro lado se ve rota el día que ese
+   lado falle, y además cuesta ancho de banda en cada visita. */
+.portada{padding:8px 0 0}
+
+.heroe{display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center;
+  padding:34px 0 46px;position:relative}
+.heroe::before{content:'';position:absolute;inset:-40px -20% auto -20%;height:420px;
+  background:radial-gradient(60% 70% at 30% 30%, var(--acento-suave) 0%, transparent 70%);
+  opacity:.75;z-index:-1;pointer-events:none;border-radius:50%}
+
+.marbete{display:inline-flex;align-items:center;gap:7px;background:var(--panel);
+  border:1px solid var(--linea);border-radius:999px;padding:5px 12px;font-size:12.5px;
+  color:var(--suave);margin:0 0 18px;box-shadow:var(--sombra)}
+.marbete .punto{width:6px;height:6px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 0 3px var(--ok-suave)}
+
+.lema{font-size:40px;line-height:1.1;letter-spacing:-.025em;margin:0 0 16px;font-weight:600}
+.lema em{font-style:normal;color:var(--acento)}
+.entrada{font-size:17px;color:var(--suave);margin:0 0 26px;max-width:46ch;line-height:1.55}
+.heroe .acciones{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ── La muestra: cómo contesta, no cómo se ve el panel ───────────────── */
+.muestra{background:var(--panel);border:1px solid var(--linea);border-radius:16px;
+  box-shadow:var(--sombra);overflow:hidden}
+.muestra .barra{display:flex;align-items:center;gap:10px;padding:13px 16px;
+  border-bottom:1px solid var(--linea-sutil);background:var(--hundido)}
+.muestra .cara{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  font-size:15px;background:#7c2d12;color:#fff;flex:none}
+.muestra .quien{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.muestra .estado{font-size:11.5px;color:var(--ok);display:flex;align-items:center;gap:5px}
+.muestra .estado::before{content:'';width:6px;height:6px;border-radius:50%;
+  background:var(--ok);box-shadow:0 0 0 3px var(--ok-suave)}
+.muestra .charla{padding:18px 16px;display:flex;flex-direction:column;gap:12px}
+.globo{max-width:82%;padding:10px 13px;font-size:13.5px;line-height:1.5;border-radius:14px}
+.globo.yo{align-self:flex-end;background:var(--acento);color:var(--acento-tinta);
+  border-bottom-right-radius:5px}
+.globo.el{align-self:flex-start;background:var(--hundido);border:1px solid var(--linea-sutil);
+  border-bottom-left-radius:5px}
+.sello{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;
+  background:var(--ok-suave);color:var(--ok);border-radius:999px;padding:4px 11px;
+  font-size:11.5px;font-weight:500}
+.tecleo{align-self:flex-start;display:flex;gap:4px;padding:11px 14px;background:var(--hundido);
+  border:1px solid var(--linea-sutil);border-radius:14px;border-bottom-left-radius:5px}
+.tecleo i{width:6px;height:6px;border-radius:50%;background:var(--tenue);
+  animation:latir 1.3s infinite}
+.tecleo i:nth-child(2){animation-delay:.18s}
+.tecleo i:nth-child(3){animation-delay:.36s}
+@keyframes latir{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+/* ── Las tres razones ────────────────────────────────────────────────── */
+.razones{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 38px}
+.razon{background:var(--panel);border:1px solid var(--linea);border-radius:14px;
+  padding:20px;transition:border-color .18s, transform .18s}
+.razon:hover{border-color:var(--acento);transform:translateY(-2px)}
+.razon .icono{width:36px;height:36px;border-radius:10px;background:var(--acento-suave);
+  color:var(--acento);display:grid;place-items:center;margin:0 0 13px}
+.razon h3{margin:0 0 6px;font-size:14.5px;letter-spacing:-.01em}
+.razon p{margin:0;font-size:13px;color:var(--suave);line-height:1.55}
+
+@media (max-width:900px){
+  .heroe{grid-template-columns:1fr;gap:30px;padding:22px 0 34px}
+  .lema{font-size:30px}
+  .razones{grid-template-columns:1fr}
+}
+@media (max-width:420px){ .lema{font-size:26px} }
+
+/* Enlace de texto dentro de tarjetas: no compite con los botones sólidos. */
+.enlace{background:none;border:0;color:var(--suave);font:inherit;font-size:13px;
+  cursor:pointer;padding:6px 8px;border-radius:7px;text-decoration:underline;
+  text-underline-offset:3px;text-decoration-color:var(--linea)}
+.enlace:hover{color:var(--tinta);background:var(--hundido)}
+
+/* Medidor de contraseña: barra + una frase. La barra sola no dice qué hacer. */
+.fuerza{display:flex;align-items:center;gap:10px;margin:2px 0 16px;min-height:18px}
+.fuerza i{flex:1;height:5px;border-radius:99px;background:var(--linea);
+  position:relative;overflow:hidden}
+.fuerza i::after{content:'';position:absolute;inset:0 auto 0 0;width:var(--w,0%);
+  background:var(--c,var(--tenue));transition:width .2s, background .2s}
+.fuerza span{font-size:12px;color:var(--suave);min-width:9ch}
 </style>
 </head>
 <body>
 <div class="hoja">
 
   <header class="top">
-    <div style="flex:1;min-width:180px">
+    <div style="flex:1;min-width:180px" id="titulo-top">
       <h1>Consola de negocios</h1>
       <p class="sub">Un motor, cualquier giro.</p>
     </div>
@@ -269,6 +411,106 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     <button data-vista="super" role="tab" class="oculto" id="pest-super">Superusuario</button>
   </nav>
 
+
+  <!-- ══════════ PORTADA (sin sesión) ══════════ -->
+  <section id="v-portada" class="portada oculto">
+
+    <div class="heroe">
+      <div>
+        <span class="marbete"><span class="punto"></span>Responde en segundos, todo el día</span>
+        <h2 class="lema">Contesta por ti cuando<br>tú no puedes<em>.</em></h2>
+        <p class="entrada">Un asistente que responde con <b>tus</b> datos —tus precios, tus
+        horarios, tus reglas— y que cuando no sabe algo lo dice, en vez de inventarlo.</p>
+        <div class="acciones">
+          <button class="btn" id="btn-ir-acceso">Entrar a mi panel</button>
+          <button class="btn sec" id="btn-ver-demo">Ver un ejemplo</button>
+        </div>
+      </div>
+
+      <!-- Muestra de una conversación real: el producto es la respuesta. -->
+      <div class="muestra" aria-label="Ejemplo de conversación">
+        <div class="barra">
+          <div class="cara" aria-hidden="true">☕</div>
+          <div style="flex:1">
+            <div class="quien">Café de ejemplo</div>
+            <div class="estado">en línea</div>
+          </div>
+        </div>
+        <div class="charla">
+          <div class="globo yo">¿Cuánto cuesta la bolsa de 250 g?</div>
+          <div class="globo el">Cuesta <b>$180</b>. Es de tueste medio, dulce y sin acidez
+            fuerte. ¿La prefieres en grano o molida?</div>
+          <span class="sello">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5"/></svg>
+            precio verificado contra el catálogo
+          </span>
+          <div class="globo yo">¿Y a qué hora abren el domingo?</div>
+          <div class="tecleo" aria-hidden="true"><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="razones">
+      <div class="razon">
+        <div class="icono" aria-hidden="true">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3>No inventa</h3>
+        <p>Cada precio, hora y teléfono que dice se compara contra lo que tú cargaste.
+        Si no aparece ahí, contesta que no tiene el dato.</p>
+      </div>
+      <div class="razon">
+        <div class="icono" aria-hidden="true">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.3 3.6l-8 13.9A2 2 0 0 0 4 20.5h16a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/>
+            <path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </div>
+        <h3>Reconoce una urgencia</h3>
+        <p>Ciertas frases ni siquiera llegan a la IA: se detienen antes y responden
+        con el protocolo que tú definas.</p>
+      </div>
+      <div class="razon">
+        <div class="icono" aria-hidden="true">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <h3>Cualquier giro</h3>
+        <p>Consultorio, cafetería, tienda, taller, despacho. Se configura desde el
+        panel; no hay que reprogramar nada.</p>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ══════════ CONTRASEÑA NUEVA (al volver del correo) ══════════ -->
+  <section id="v-nueva-clave" class="oculto">
+    <div class="tarjeta acceso">
+      <h2 class="sec" style="text-align:center">Elige tu contraseña nueva</h2>
+      <p class="pista" style="text-align:center;margin-bottom:16px">Entraste desde el
+      enlace del correo. Escribe la contraseña con la que vas a entrar de ahora en adelante.</p>
+
+      <div id="nueva-msg"></div>
+
+      <div class="campo"><label for="nc-clave">Contraseña nueva</label>
+        <input type="password" id="nc-clave" autocomplete="new-password"
+               placeholder="al menos 8 caracteres"></div>
+      <div class="campo"><label for="nc-repetir">Repítela</label>
+        <input type="password" id="nc-repetir" autocomplete="new-password"></div>
+
+      <div class="fuerza" id="nc-fuerza" aria-live="polite"><i></i><span></span></div>
+
+      <button class="btn" id="btn-guardar-clave">Guardar y entrar</button>
+      <div style="text-align:center;margin-top:12px">
+        <button class="enlace" id="btn-cancelar-clave">Mejor no, regresar</button>
+      </div>
+    </div>
+  </section>
   <!-- ══════════ ACCESO ══════════ -->
   <section id="v-acceso" class="oculto">
     <div class="tarjeta acceso">
@@ -294,6 +536,9 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
         <div class="fila">
           <button class="btn" id="btn-entrar" style="flex:1;justify-content:center">Entrar</button>
           <button class="btn sec" id="btn-registrar" style="flex:1;justify-content:center;margin:0">Crear cuenta</button>
+        </div>
+        <div style="text-align:center;margin-top:10px">
+          <button class="enlace" id="btn-olvide">Olvidé mi contraseña</button>
         </div>
       </div>
 
@@ -571,7 +816,7 @@ RESEND_API_KEY         # para los avisos</pre>
     // Se ocultan las pestañas: dejarlas visibles invita a hacer clic en
     // cosas que no van a responder, y eso confunde más que ayudar.
     if (nav) nav.style.display = 'none';
-    ['negocios','alta','probar','herramientas','acceso'].forEach(function (v) {
+    ['portada','negocios','alta','probar','herramientas','acceso'].forEach(function (v) {
       var sec = document.getElementById('v-' + v);
       if (sec) sec.style.display = 'none';
     });
@@ -838,7 +1083,9 @@ function tarjetaNegocio(n) {
   return `<article class="negocio">
     <div class="cab">
       <div class="marca" style="background:${esc(i.primario||NEUTRO.identidad.primario)}">${esc(i.avatar||'💬')}</div>
-      <div class="titulo"><b>${esc(n.nombre)}</b>
+      <div class="titulo">
+        <button class="liga-tarjeta" data-hacer="probar" data-slug="${esc(n.slug)}"
+                title="Probar «${esc(n.nombre)}»">${esc(n.nombre)}</button>
         <span>${esc(n.categoria || 'Sin giro')}</span></div>
     </div>
     <div class="pies">
@@ -847,8 +1094,94 @@ function tarjetaNegocio(n) {
       ${(n.politicas||[]).length?`<span class="placa ojo">${(n.politicas||[]).length} regla(s)</span>`:''}
       <span class="placa"><code>${esc(n.slug)}</code></span>
     </div>
+    <div class="acciones-neg">${accionesDe(n, estado)}</div>
   </article>`;
 }
+
+/**
+ * Qué se puede hacer con un negocio, según quién mira.
+ *
+ * El servidor ya sabía publicar, suspender y duplicar desde hace tiempo; la
+ * tarjeta no lo ofrecía y el único camino era rehacer el asistente de siete
+ * pasos. Un botón que el servidor va a rechazar no se pinta: enseñar una
+ * puerta cerrada es peor que no enseñarla.
+ */
+function accionesDe(n, estado) {
+  const b = [];
+  b.push(`<button class="btn sec chico" data-hacer="probar" data-slug="${esc(n.slug)}">Probar</button>`);
+  b.push(`<button class="btn fantasma chico" data-hacer="copiar" data-slug="${esc(n.slug)}">Copiar código</button>`);
+
+  if (enLinea && n.id && !n.ejemplo) {
+    if (estado !== 'publicado')
+      b.push(`<button class="btn chico" data-hacer="publicar" data-id="${esc(n.id)}">Publicar</button>`);
+    if (yo?.esSuper) {
+      b.push(estado === 'suspendido'
+        ? `<button class="btn sec chico" data-hacer="reactivar" data-id="${esc(n.id)}">Reactivar</button>`
+        : `<button class="btn fantasma chico" data-hacer="suspender" data-id="${esc(n.id)}">Suspender</button>`);
+      b.push(`<button class="btn fantasma chico" data-hacer="duplicar" data-id="${esc(n.id)}">Duplicar</button>`);
+    }
+  }
+  return b.join('');
+}
+
+/** El código para pegar en el sitio del cliente. Absoluto: una ruta que
+ *  empieza con diagonal apunta al dominio DEL CLIENTE, donde no hay nada. */
+function fragmentoDe(slug) {
+  return `<script src="${location.origin}/widget.js" data-marca="${slug}" defer><\/script>`;
+}
+
+async function copiarTexto(texto) {
+  try { await navigator.clipboard.writeText(texto); return true; }
+  catch {
+    // Sin permiso de portapapeles (o sin https) queda el camino viejo.
+    const a = document.createElement('textarea');
+    a.value = texto; a.style.position = 'fixed'; a.style.opacity = '0';
+    document.body.appendChild(a); a.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch {}
+    a.remove(); return ok;
+  }
+}
+
+/* Un solo oyente para toda la lista: las tarjetas se repintan seguido y
+   volver a enganchar oyentes en cada repintado los deja duplicados. */
+$('#lista-negocios').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-hacer]');
+  if (!b) return;
+  const { hacer, slug, id } = b.dataset;
+
+  if (hacer === 'probar') { location.search = '?marca=' + encodeURIComponent(slug); return; }
+
+  if (hacer === 'copiar') {
+    const ok = await copiarTexto(fragmentoDe(slug));
+    const antes = b.textContent;
+    b.classList.toggle('hecho', ok);
+    b.textContent = ok ? '✓ Copiado' : 'No se pudo copiar';
+    setTimeout(() => { b.classList.remove('hecho'); b.textContent = antes; }, 1600);
+    return;
+  }
+
+  const llamadas = {
+    publicar:  ['empresas.publicar',  { id }],
+    suspender: ['empresas.suspender', { id, activa: false }],
+    reactivar: ['empresas.suspender', { id, activa: true }],
+    duplicar:  ['empresas.duplicar',  { id }],
+  };
+  if (!llamadas[hacer]) return;
+
+  const antes = b.textContent;
+  b.disabled = true; b.textContent = '…';
+  try {
+    await api(...llamadas[hacer]);
+    await cargarNegocios();
+    await cargarTablero();
+  } catch (e) {
+    b.disabled = false; b.textContent = antes;
+    // "Faltan datos para publicar" es la respuesta útil del servidor: dice
+    // que el negocio está incompleto, no que la acción haya fallado.
+    alert(traducirError(e.message));
+  }
+});
 
 function pintarNegocios() {
   const q = $('#busca').value.toLowerCase().trim();
@@ -913,7 +1246,7 @@ function pintarBotonesMarca() {
     || '<span class="pista">Da de alta un negocio para probarlo.</span>';
   $$('#botones-marca button').forEach(b => b.addEventListener('click',
     () => { location.search = '?marca=' + b.dataset.m; }));
-  $('#fragmento').textContent = `<script src="/widget.js" data-marca="${marcaURL}" defer><\/script>`;
+  $('#fragmento').textContent = fragmentoDe(marcaURL);
 }
 
 const marcaActiva = new URLSearchParams(location.search).get('marca');
@@ -993,6 +1326,15 @@ function traducirError(mensaje) {
     return 'Demasiados intentos seguidos. Espera unos minutos.';
   if (/provider is not enabled/i.test(m))
     return 'Ese método de entrada no está activado en el proyecto.';
+  // Los enlaces del correo son de un solo uso y caducan. Cuando eso pasa,
+  // Supabase contesta con el detalle interno del token; a quien solo quiere
+  // recuperar su contraseña eso no le dice nada ni le indica qué hacer.
+  if (/invalid jwt|token is malformed|jwt expired|bad_jwt|invalid claim/i.test(m))
+    return 'Ese enlace ya venció o se usó. Pide otro desde «Olvidé mi contraseña».';
+  if (/new password should be different|same.*password/i.test(m))
+    return 'Esa ya es tu contraseña actual. Escribe una diferente.';
+  if (/failed to fetch|networkerror/i.test(m))
+    return 'No hubo conexión. Revisa tu internet y vuelve a intentarlo.';
   return m;
 }
 
@@ -1071,6 +1413,85 @@ $('#btn-enlace').addEventListener('click', async () => {
   b.disabled = false; b.textContent = 'Enviarme un enlace para entrar';
 });
 
+/* ══════════════════════════════════════════════════════════════════════
+   RECUPERAR LA CONTRASEÑA
+   Vale igual para un dueño y para el superusuario: aquí el superusuario no
+   es otra cuenta, es la misma con un rol distinto en la base. Por eso no
+   hay —ni debe haber— una puerta trasera aparte para administradores: una
+   segunda puerta es una segunda cerradura que forzar.
+   ══════════════════════════════════════════════════════════════════════ */
+$('#btn-olvide').addEventListener('click', async () => {
+  const falta = validarAcceso(false);
+  if (falta) { $('#acceso-msg').innerHTML = `<div class="aviso ojo">${esc(falta)}</div>`; return; }
+  const correo = $('#ac-correo').value.trim();
+  const b = $('#btn-olvide'); b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    await auth('recover?redirect_to=' + encodeURIComponent(location.origin + location.pathname),
+               { email: correo });
+    // Se contesta lo mismo exista o no la cuenta: decir "ese correo no está
+    // registrado" le regala a cualquiera una lista de quién tiene cuenta.
+    $('#acceso-msg').innerHTML = `<div class="aviso ok">Si <b>${esc(correo)}</b> tiene
+      cuenta, ya va en camino un enlace para cambiar la contraseña. Revisa también
+      la carpeta de spam.</div>`;
+  } catch (e) {
+    $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
+  }
+  b.disabled = false; b.textContent = 'Olvidé mi contraseña';
+});
+
+/** Qué tan buena es una contraseña, en términos que sirvan para corregirla. */
+function medirClave(c) {
+  if (!c) return { pct: 0, color: 'var(--tenue)', dice: '' };
+  let p = 0;
+  if (c.length >= 8) p++;
+  if (c.length >= 12) p++;
+  if (/[a-z]/.test(c) && /[A-Z]/.test(c)) p++;
+  if (/\d/.test(c)) p++;
+  if (/[^\w\s]/.test(c)) p++;
+  if (c.length < 8)          return { pct: 20, color:'var(--mal)',    dice:'muy corta' };
+  if (p <= 2)                return { pct: 45, color:'var(--alerta)', dice:'débil' };
+  if (p === 3 || p === 4)    return { pct: 75, color:'var(--acento)', dice:'buena' };
+  return                            { pct:100, color:'var(--ok)',     dice:'fuerte' };
+}
+$('#nc-clave').addEventListener('input', () => {
+  const m = medirClave($('#nc-clave').value);
+  const barra = $('#nc-fuerza i');
+  barra.style.setProperty('--w', m.pct + '%');
+  barra.style.setProperty('--c', m.color);
+  $('#nc-fuerza span').textContent = m.dice;
+});
+
+$('#btn-cancelar-clave').addEventListener('click', () => {
+  token = null; sessionStorage.removeItem('consola:token');
+  $('#v-nueva-clave').classList.add('oculto');
+  modoPortada();
+});
+
+$('#btn-guardar-clave').addEventListener('click', async () => {
+  const clave = $('#nc-clave').value, repetida = $('#nc-repetir').value;
+  const aviso = t => { $('#nueva-msg').innerHTML = `<div class="aviso ojo">${esc(t)}</div>`; };
+
+  if (clave.length < 8)   { $('#nc-clave').focus();   return aviso('Usa al menos 8 caracteres.'); }
+  if (clave !== repetida) { $('#nc-repetir').focus(); return aviso('Las dos contraseñas no son iguales.'); }
+
+  const b = $('#btn-guardar-clave'); b.disabled = true; b.textContent = 'Guardando…';
+  try {
+    const r = await fetchReal(`${SB_URL}/auth/v1/user`, {
+      method:'PUT',
+      headers:{ apikey: SB_ANON, Authorization:'Bearer '+token, 'content-type':'application/json' },
+      body: JSON.stringify({ password: clave }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error_description || d.msg || d.message || 'No se pudo');
+
+    sessionStorage.setItem('consola:token', token);
+    $('#v-nueva-clave').classList.add('oculto');
+    await arrancar();
+  } catch (e) {
+    $('#nueva-msg').innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
+    b.disabled = false; b.textContent = 'Guardar y entrar';
+  }
+});
+
 $('#btn-google').addEventListener('click', () => {
   const volverA = location.origin + location.pathname;
   const url = `${SB_URL}/auth/v1/authorize?provider=google` +
@@ -1083,20 +1504,31 @@ $('#btn-google').addEventListener('click', () => {
  * #). Se recoge, se guarda y se limpia la barra de direcciones: dejar un
  * token a la vista invita a que alguien lo copie de la pantalla.
  */
-(function recogerSesionDeGoogle() {
-  if (!location.hash.includes('access_token')) return;
+let veniaARecuperar = false;
+
+(function recogerSesionDelCorreo() {
+  if (!location.hash || location.hash.length < 2) return;
   const p = new URLSearchParams(location.hash.slice(1));
   const t = p.get('access_token');
-  const err = p.get('error_description');
+  const tipo = p.get('type');
+  const err = p.get('error_description') || p.get('error');
 
   history.replaceState(null, '', location.pathname + location.search);
 
   if (err) {
-    $('#google-msg').innerHTML = `<div class="aviso mal">${esc(err)}</div>`;
-    $('#v-acceso').classList.remove('oculto');
+    const caducado = /expired|invalid/i.test(err);
+    $('#google-msg').innerHTML = `<div class="aviso mal">${esc(caducado
+      ? 'Ese enlace ya venció o se usó. Pide otro: son de un solo uso.'
+      : err)}</div>`;
     return;
   }
-  if (t) { token = t; sessionStorage.setItem('consola:token', t); }
+  if (!t) return;
+
+  token = t;
+  // En una recuperación NO se guarda todavía: si cierra la pestaña a medias,
+  // mejor que no quede una sesión abierta con la contraseña vieja aún válida.
+  if (tipo === 'recovery') veniaARecuperar = true;
+  else sessionStorage.setItem('consola:token', t);
 })();
 
 $('#btn-salir').addEventListener('click', () => {
@@ -1111,9 +1543,11 @@ async function arrancar() {
       const { yo: perfil } = await api('sesion');
       yo = perfil; enLinea = true;
       $('#btn-salir').classList.remove('oculto');
-      $('#v-acceso').classList.add('oculto');
-      $('#banda-acceso').classList.add('oculto');
-    } catch (e) { token = null; sessionStorage.removeItem('consola:token'); }
+      modoConsola();
+    } catch (e) {
+      // El testigo caducó: no dejarlo en una consola que ya no es suya.
+      token = null; sessionStorage.removeItem('consola:token'); modoPortada();
+    }
   }
   await cargarNegocios();
   await cargarTablero();
@@ -1354,16 +1788,67 @@ async function ajustarMetodosDeEntrada() {
   } catch (e) { /* si no se puede preguntar, se deja como está */ }
 }
 
-/* ── arranque ─────────────────────────────────────────────────────── */
-if (!token) $('#banda-acceso').classList.remove('oculto');
-$('#btn-mostrar-acceso').addEventListener('click', () => {
-  const c = $('#v-acceso');
-  c.classList.toggle('oculto');
-  if (!c.classList.contains('oculto')) $('#ac-correo').focus();
+/* ── portada vs. consola ──────────────────────────────────────────────
+   Dos estados, uno solo a la vez. Sin sesión se ve la portada: qué es esto
+   y cómo entrar. La consola con ejemplos sigue disponible, pero se pide
+   —antes se ofrecía sola, y una consola con el tablero en blanco y filtros
+   que no filtran nada se lee como un panel roto, no como una demostración.
+   ────────────────────────────────────────────────────────────────────── */
+const SECCIONES_CONSOLA = ['negocios','alta','probar','herramientas','super'];
+
+function modoPortada() {
+  $('#pestanas').classList.add('oculto');
+  $('#banda-acceso').classList.add('oculto');
+  SECCIONES_CONSOLA.forEach(v => $('#v-'+v)?.classList.add('oculto'));
+  $('#v-portada').classList.remove('oculto');
+  $('#v-acceso').classList.remove('oculto');
+}
+
+function modoConsola({ demostracion = false } = {}) {
+  $('#pestanas').classList.remove('oculto');
+  $('#v-portada').classList.add('oculto');
+  $('#v-acceso').classList.add('oculto');
+  $('#banda-acceso').classList.toggle('oculto', !demostracion);
+  // Se vuelve a la pestaña que esté marcada; si ninguna, a Negocios.
+  const activa = $('#pestanas button[data-on]')?.dataset.vista || 'negocios';
+  SECCIONES_CONSOLA.forEach(v => $('#v-'+v)?.classList.toggle('oculto', v !== activa));
+}
+
+// Desde la portada: bajar a la tarjeta de acceso.
+$('#btn-ir-acceso').addEventListener('click', () => {
+  $('#v-acceso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => $('#ac-correo').focus(), 320);
 });
+
+// Desde la portada: entrar a mirar sin cuenta.
+$('#btn-ver-demo').addEventListener('click', () => {
+  modoConsola({ demostracion: true });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+// Desde la banda de la demostración: regresar a la portada a iniciar sesión.
+$('#btn-mostrar-acceso').addEventListener('click', () => {
+  modoPortada();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  $('#ac-correo').focus();
+});
+
+function modoRecuperar() {
+  $('#pestanas').classList.add('oculto');
+  $('#banda-acceso').classList.add('oculto');
+  $('#v-portada').classList.add('oculto');
+  $('#v-acceso').classList.add('oculto');
+  SECCIONES_CONSOLA.forEach(v => $('#v-'+v)?.classList.add('oculto'));
+  $('#v-nueva-clave').classList.remove('oculto');
+  $('#nc-clave').focus();
+}
+
+/* ── arranque ─────────────────────────────────────────────────────── */
+if (veniaARecuperar) modoRecuperar();
+else if (!token) modoPortada();
 refrescarPrevio();
 ajustarMetodosDeEntrada();
-arrancar();
+if (!veniaARecuperar) arrancar();
 </script>
 </body>
 </html>
