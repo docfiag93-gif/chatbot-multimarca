@@ -44,6 +44,13 @@ import {
 import { revisarEntorno, explicarFallo } from '../publico/cerebro/diagnostico.mjs';
 import { respuestaInmediata } from '../publico/cerebro/cerebro.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
+import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
+import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
+import { POLITICAS, interceptar, aportesDePoliticas, catalogoDePoliticas } from '../publico/cerebro/politicas.mjs';
+import { accionesDisponibles, accionPermitida, fragmentoDeAcciones } from '../publico/cerebro/acciones.mjs';
+import { construirPrompt, accionValida } from '../publico/cerebro/cerebro.mjs';
+import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
+import { obtenerMarca } from '../publico/cerebro/marcas.mjs';
 
 /* ── mini marco de pruebas ─────────────────────────────────────────── */
 const suites = [];
@@ -323,15 +330,24 @@ suite('Lectura de la respuesta', () => {
    9 · BANDERAS ROJAS  (no deben depender del proveedor)
    ══════════════════════════════════════════════════════════════════════ */
 suite('Banderas rojas', () => {
-  const clinica  = { dominio: 'clinico' };
-  const comercio = { dominio: 'comercial' };
-  ok('dolor de pecho dispara en marca clínica', !!respuestaInmediata(clinica, 'me duele el pecho'));
-  ok('no puedo respirar dispara', !!respuestaInmediata(clinica, 'no puedo respirar'));
-  ok('la misma frase NO dispara en marca comercial', respuestaInmediata(comercio, 'me duele el pecho') === null);
-  ok('una consulta normal no dispara', respuestaInmediata(clinica, 'cuánto cuesta la consulta') === null);
-  const r = respuestaInmediata(clinica, 'me duele el pecho');
-  ok('la respuesta de urgencia no pasa por ningún proveedor', r.via === 'filtro-local');
+  // CAMBIO DE CONTRATO: antes bastaba con marcar el negocio como 'clinico'.
+  // Ahora la política se ENCIENDE por nombre. Un negocio de salud que solo
+  // agenda citas puede no quererla, y ninguno la hereda por su rubro.
+  const conPolitica = { politicas: ['urgencias-clinicas'] };
+  const sinPolitica = { politicas: [] };
+  const rubroSaludSinPolitica = { categoria: 'Salud y bienestar', politicas: [] };
+
+  ok('dolor de pecho dispara con la política encendida', !!respuestaInmediata(conPolitica, 'me duele el pecho'));
+  ok('no puedo respirar dispara', !!respuestaInmediata(conPolitica, 'no puedo respirar'));
+  ok('sin política, la misma frase NO dispara', respuestaInmediata(sinPolitica, 'me duele el pecho') === null);
+  ok('la categoría de salud por sí sola NO enciende nada',
+     respuestaInmediata(rubroSaludSinPolitica, 'me duele el pecho') === null);
+  ok('una consulta normal no dispara', respuestaInmediata(conPolitica, 'cuánto cuesta la consulta') === null);
+
+  const r = respuestaInmediata(conPolitica, 'me duele el pecho');
+  ok('la respuesta de urgencia no pasa por ningún proveedor', r.via === 'politica:urgencias-clinicas');
   ok('la respuesta de urgencia manda al 911', /911/.test(r.texto));
+  ok('la respuesta dice qué política la produjo', r.politica === 'urgencias-clinicas');
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -349,6 +365,219 @@ await suite('Cifrado por marca', async () => {
   ok('mismo dato, cifrado distinto', c !== await cifrar(maestra, A, dato));
   ok('la marca B no puede abrir lo de A', !!(await lanza(() => descifrar(maestra, B, c))));
   ok('otra llave maestra no abre', !!(await lanza(() => descifrar(generarLlaveMaestra(), A, c))));
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   11 · ALTA DE UN NEGOCIO CUALQUIERA
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Alta de un negocio cualquiera', () => {
+  // Rubros que NO existían en el sistema anterior. Ninguno debe requerir
+  // cambio de código.
+  const rubros = [
+    { nombre: 'Taller Mecánico El Piñón', categoria: 'Taller y reparación' },
+    { nombre: 'Inmobiliaria Sur',         categoria: 'Inmobiliaria' },
+    { nombre: 'Academia de Inglés',       categoria: 'Educación y formación' },
+    { nombre: 'Despacho Contable RM',     categoria: 'Servicios profesionales' },
+    { nombre: 'Refaccionaria Don Beto',   categoria: 'Otro' },
+    { nombre: 'Criadero de Axolotes',     categoria: 'lo que se me ocurra' },
+  ];
+
+  rubros.forEach(r => {
+    const p = normalizarPerfil(r);
+    ok(`se puede dar de alta: ${r.nombre}`, p.nombre === r.nombre && p.categoria === r.categoria);
+  });
+
+  ok('la categoría acepta texto totalmente libre',
+     normalizarPerfil({ categoria: 'venta de aguacates al mayoreo' }).categoria === 'venta de aguacates al mayoreo');
+  ok('"Otro" es una categoría válida', CATEGORIAS_SUGERIDAS.includes('Otro'));
+  ok('la categoría puede quedar vacía', normalizarPerfil({ nombre: 'X' }).categoria === '');
+
+  ok('el slug se genera del nombre', aSlug('Taller Mecánico El Piñón') === 'taller-mecanico-el-pinon');
+  ok('el slug aguanta acentos y símbolos', aSlug('Café & Té · Ñoño!') === 'cafe-te-nono');
+
+  // Campos personalizados: lo que no cupo en ningún campo del esquema
+  const conAtributos = normalizarPerfil({
+    nombre: 'Refaccionaria', atributos: { 'marcas que maneja': 'Nissan, VW', 'garantía': '6 meses' } });
+  ok('acepta atributos personalizados', conAtributos.atributos['garantía'] === '6 meses');
+  ok('los atributos llegan al prompt', construirPrompt(conAtributos, []).includes('garantía: 6 meses'));
+
+  // Catálogo genérico: los tres tipos
+  const conCatalogo = normalizarPerfil({ nombre: 'X', catalogo: [
+    { tipo: 'producto', nombre: 'Filtro de aceite', precio: '$180' },
+    { tipo: 'servicio', nombre: 'Afinación', precio: 'desde $1,200' },
+    { tipo: 'recurso',  nombre: 'Bahía de servicio' },
+  ]});
+  ok('el catálogo acepta producto, servicio y recurso',
+     conCatalogo.catalogo.map(o => o.tipo).join(',') === 'producto,servicio,recurso');
+  ok('el precio admite texto, no solo números',
+     conCatalogo.catalogo[1].precio === 'desde $1,200');
+  ok('un tipo inventado cae a producto',
+     normalizarPerfil({ catalogo: [{ tipo: 'inventado', nombre: 'x' }] }).catalogo[0].tipo === 'producto');
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   12 · DEFAULTS NEUTROS
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Defaults neutros', () => {
+  const vacio = normalizarPerfil({});
+  const texto = JSON.stringify(vacio).toLowerCase();
+
+  ok('un perfil vacío NO dice consultorio', !texto.includes('consultorio'));
+  ok('un perfil vacío NO dice café', !texto.includes('caf'));
+  ok('un perfil vacío NO dice paciente ni médico', !/paciente|médic|medic/.test(texto));
+  ok('el saludo por omisión es neutro', vacio.saludo === NEUTRO.saludo);
+  ok('el color por omisión es gris sobrio, no verde de salud',
+     vacio.identidad.primario === '#334155');
+  ok('sin políticas encendidas por omisión', vacio.politicas.length === 0);
+  ok('sin acciones encendidas por omisión', vacio.acciones.length === 0);
+
+  // Antes, pedir una marca inexistente devolvía el consultorio.
+  const inventada = obtenerMarca('negocio-que-no-existe');
+  ok('una marca inexistente NO devuelve el consultorio', inventada.slug !== 'consultorio');
+  ok('una marca inexistente conserva su propio identificador',
+     inventada.slug === 'negocio-que-no-existe');
+  ok('una marca inexistente no hereda políticas de nadie', inventada.politicas.length === 0);
+
+  const pub = perfilPublico({});
+  ok('lo público no filtra el tono ni el conocimiento',
+     !('tono' in pub) && !('conocimiento' in pub) && !('limites' in pub));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   13 · POLÍTICAS OPT-IN
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Políticas opt-in', () => {
+  const sinPolitica = normalizarPerfil({ nombre: 'Taller', categoria: 'Taller y reparación' });
+  const conPolitica = normalizarPerfil({ nombre: 'Clínica', politicas: ['urgencias-clinicas'] });
+
+  ok('sin política, "me duele el pecho" NO se intercepta',
+     interceptar(sinPolitica, 'me duele el pecho') === null);
+  ok('con la política encendida, SÍ se intercepta',
+     !!interceptar(conPolitica, 'me duele el pecho'));
+  ok('la respuesta interceptada dice de qué política vino',
+     interceptar(conPolitica, 'me duele el pecho').politica === 'urgencias-clinicas');
+  ok('una consulta normal no se intercepta ni con la política puesta',
+     interceptar(conPolitica, 'cuánto cuesta') === null);
+
+  ok('sin políticas, el prompt no trae reglas clínicas',
+     !/diagnóstic|diagnostic/i.test(construirPrompt(sinPolitica, [])));
+  ok('con la política, el prompt SÍ las trae',
+     /diagnóstic/i.test(construirPrompt(conPolitica, [])));
+
+  // Hay más de una política: si solo existiera la clínica, seguiría siendo
+  // un caso especial disfrazado de sistema.
+  ok('hay varias políticas disponibles', catalogoDePoliticas().length >= 3);
+  ok('las políticas no clínicas también aportan al prompt',
+     aportesDePoliticas(normalizarPerfil({ politicas: ['sin-consejo-financiero'] })).limites.length > 0);
+  ok('una política borrada no rompe nada',
+     aportesDePoliticas(normalizarPerfil({ politicas: ['no-existe'] })).prompt.length === 0);
+  ok('cada política declara si intercepta',
+     catalogoDePoliticas().every(p => typeof p.intercepta === 'boolean'));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   14 · ACCIONES SEGÚN EL NEGOCIO
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Acciones según el negocio', () => {
+  const tienda = normalizarPerfil({ nombre: 'Tienda', acciones: ['mostrar_catalogo', 'capturar_contacto'],
+                                    catalogo: [{ nombre: 'algo' }] });
+  const despacho = normalizarPerfil({ nombre: 'Despacho', acciones: ['agendar'] });
+
+  ok('la tienda puede mostrar catálogo', accionPermitida(tienda, 'mostrar_catalogo'));
+  ok('la tienda NO puede agendar citas', !accionPermitida(tienda, 'agendar'));
+  ok('el despacho puede agendar', accionPermitida(despacho, 'agendar'));
+  ok('el despacho NO puede mostrar catálogo', !accionPermitida(despacho, 'mostrar_catalogo'));
+
+  ok('derivar a una persona siempre está disponible',
+     accionesDisponibles(normalizarPerfil({})).includes('derivar_humano'));
+
+  // Ofrecer catálogo sin catálogo hace que el bot prometa una lista vacía.
+  const sinCatalogo = normalizarPerfil({ acciones: ['mostrar_catalogo'] });
+  ok('sin catálogo cargado, la acción de catálogo no se ofrece',
+     !accionesDisponibles(sinCatalogo).includes('mostrar_catalogo'));
+
+  ok('el prompt solo lista las acciones del negocio',
+     fragmentoDeAcciones(despacho).includes('agendar') &&
+     !fragmentoDeAcciones(despacho).includes('mostrar_catalogo'));
+
+  // Si el modelo pide una acción no encendida, se descarta.
+  ok('una acción que el negocio no tiene se descarta',
+     accionValida(tienda, 'agendar') === 'ninguna');
+  ok('una acción válida se conserva',
+     accionValida(tienda, 'mostrar_catalogo') === 'mostrar_catalogo');
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   15 · EL NÚCLEO NO SABE DE RUBROS
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('El núcleo no sabe de rubros', async () => {
+  // Se leen los archivos del núcleo y se busca vocabulario sectorial. Las
+  // semillas, seguridad y políticas quedan fuera a propósito: ahí SÍ debe
+  // haber vocabulario, son ejemplos y módulos opt-in.
+  const NUCLEO = ['perfil.mjs', 'acciones.mjs', 'cerebro.mjs', 'datos.mjs',
+                  'proveedores.mjs', 'diagnostico.mjs', 'entorno.mjs'];
+  const PROHIBIDO = /consultorio|paciente|síntoma|sintoma|receta|café|barista|tueste|inmobiliaria|taller mec/i;
+
+  for (const archivo of NUCLEO) {
+    const src = await (await fetch('../publico/cerebro/' + archivo + '?v=' + Date.now())).text();
+    // Se ignoran los comentarios que EXPLICAN por qué ya no hay rubros.
+    const codigo = src.split('\n')
+      .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join('\n');
+    const hit = codigo.match(PROHIBIDO);
+    ok(`${archivo} no tiene vocabulario de ningún rubro`, !hit, hit ? 'encontró: ' + hit[0] : '');
+  }
+
+  const wid = await (await fetch('../publico/widget.js?v=' + Date.now())).text();
+  const codigoWidget = wid.split('\n').filter(l => !/^\s*(\/\/|\*)/.test(l)).join('\n');
+  ok('el widget no trae textos de ningún rubro', !PROHIBIDO.test(codigoWidget));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   16 · SEMILLAS SEPARADAS DEL NÚCLEO
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Semillas separadas del núcleo', () => {
+  const slugs = Object.keys(SEMILLAS);
+  ok('hay ejemplos de varios rubros distintos', slugs.length >= 4);
+  ok('todas las semillas están marcadas como ejemplo',
+     Object.values(SEMILLAS).every(s => s.ejemplo === true));
+  ok('cada semilla tiene categoría propia',
+     new Set(Object.values(SEMILLAS).map(s => s.categoria)).size >= 3);
+
+  // Solo la de salud enciende la política clínica.
+  const conClinica = Object.entries(SEMILLAS)
+    .filter(([, s]) => (s.politicas || []).includes('urgencias-clinicas')).map(([k]) => k);
+  ok('solo un ejemplo enciende la política clínica', conClinica.length === 1);
+  ok('los demás ejemplos no la heredan',
+     slugs.filter(k => k !== conClinica[0])
+          .every(k => !(SEMILLAS[k].politicas || []).includes('urgencias-clinicas')));
+
+  ok('cada ejemplo declara sus propias acciones',
+     Object.values(SEMILLAS).every(s => Array.isArray(s.acciones) && s.acciones.length));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   17 · REVISIÓN ANTES DE PUBLICAR
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Revisión antes de publicar', () => {
+  const vacio = revisarPerfil({});
+  ok('un perfil vacío no está listo', !vacio.listo);
+  ok('dice exactamente qué falta', vacio.faltan.length > 0 && vacio.faltan.every(f => f.que && f.paso));
+
+  const completo = revisarPerfil({
+    nombre: 'Taller El Piñón', slug: 'taller-pinon',
+    descripcion: 'Mecánica general y afinación.',
+    conocimiento: [{ tema: 'horarios', texto: 'Lunes a viernes de 9 a 6.' }],
+    contactos: { principal: { whatsapp: '5219610000000' } },
+  });
+  ok('un perfil completo sí está listo', completo.listo, JSON.stringify(completo.faltan));
+
+  const sinSalida = revisarPerfil({
+    nombre: 'X', slug: 'x', descripcion: 'y',
+    conocimiento: [{ tema: 'a', texto: 'b' }] });
+  ok('avisa si no hay forma de contactar al negocio',
+     sinSalida.faltan.some(f => f.campo === 'contactos'));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

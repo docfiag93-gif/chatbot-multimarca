@@ -3,693 +3,925 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chatbot — consola</title>
+<title>Consola de negocios</title>
 <style>
-  :root { --tinta:#0f172a; --suave:#64748b; --linea:#e2e8f0; --acento:#0f766e;
-          --fondo:#f8fafc; --alerta:#dc2626; --ok:#16a34a; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
-         color:var(--tinta); background:var(--fondo); line-height:1.6; }
-  .hoja { max-width:1000px; margin:0 auto; padding:28px 20px 140px; }
-  h1 { font-size:24px; margin:0 0 4px; }
-  .sub { color:var(--suave); margin:0 0 22px; font-size:14px; }
-  .tarjeta { background:#fff; border:1px solid var(--linea); border-radius:14px;
-             padding:18px 20px; margin-bottom:16px; }
-  .tarjeta h2 { font-size:13px; margin:0 0 12px; text-transform:uppercase;
-                letter-spacing:.07em; color:var(--suave); }
-  .pestanas { display:flex; gap:8px; margin-bottom:20px; border-bottom:2px solid var(--linea); }
-  .pestanas button { background:none; border:0; border-bottom:3px solid transparent;
-                     padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer;
-                     color:var(--suave); margin-bottom:-2px; }
-  .pestanas button[data-activa] { color:var(--acento); border-bottom-color:var(--acento); }
-  .oculto { display:none !important; }
-  code { background:#f1f5f9; padding:2px 6px; border-radius:5px; font-size:13px; }
-  pre { background:#0f172a; color:#e2e8f0; padding:14px; border-radius:10px;
-        overflow-x:auto; font-size:13px; line-height:1.5; }
-  label { display:block; font-size:12px; font-weight:700; margin:10px 0 3px; }
-  input, select, textarea { width:100%; border:1.5px solid var(--linea); border-radius:9px;
-                            padding:9px 11px; font-size:14px; font-family:inherit;
-                            background:#fff; color:var(--tinta); }
-  textarea { resize:vertical; min-height:90px; font-family:ui-monospace,Menlo,monospace; font-size:13px; }
-  input:focus, textarea:focus, select:focus { outline:0; border-color:var(--acento); }
-  button.accion { background:var(--acento); color:#fff; border:0; border-radius:9px;
-                  padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer; }
-  button.accion.gris { background:#fff; color:var(--tinta); border:1.5px solid var(--linea); }
-  button.accion.roja { background:var(--alerta); }
-  button.accion:disabled { opacity:.5; cursor:not-allowed; }
-  .fila { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .rejilla { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
-  table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--linea); vertical-align:top; }
-  th { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--suave); }
-  .placa { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px;
-           border-radius:999px; background:#f1f5f9; color:var(--suave); }
-  .placa.verde { background:#dcfce7; color:#166534; }
-  .placa.roja  { background:#fee2e2; color:#991b1b; }
-  .placa.ambar { background:#fef3c7; color:#92400e; }
-  .numero { font-size:28px; font-weight:800; line-height:1.1; }
-  .numero small { display:block; font-size:12px; font-weight:600; color:var(--suave);
-                  text-transform:uppercase; letter-spacing:.05em; margin-top:3px; }
-  .aviso { padding:11px 14px; border-radius:10px; font-size:13.5px; margin:10px 0; }
-  .aviso.mal  { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
-  .aviso.bien { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
-  .aviso.ojo  { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
-  .nota { font-size:12.5px; color:var(--suave); }
-  ul { margin:8px 0; padding-left:20px; } li { margin:4px 0; }
-  .desplaza { overflow-x:auto; }
+/* ══════════════════════════════════════════════════════════════════════
+   Paleta deliberadamente NEUTRA: pizarra con acento índigo. Ni verde de
+   consultorio ni café de cafetería. Esta consola la va a usar quien
+   administre una tienda, un taller o un despacho, y no debe parecerle que
+   entró al software de otro rubro.
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --fondo:#f6f7f9; --panel:#ffffff; --hundido:#eef0f4;
+  --tinta:#11151c; --suave:#5a6474; --tenue:#8b93a3;
+  --linea:#e0e4ea; --linea-sutil:#eceff4;
+  --acento:#4f46e5; --acento-suave:#eef2ff; --acento-tinta:#ffffff;
+  --ok:#137a4d; --ok-suave:#e7f5ee;
+  --alerta:#a15c00; --alerta-suave:#fdf3e2;
+  --mal:#b02a25; --mal-suave:#fceceb;
+  --sombra:0 1px 2px rgba(17,21,28,.05), 0 6px 18px rgba(17,21,28,.06);
+  --r:10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --fondo:#0d1117; --panel:#151a22; --hundido:#1b212b;
+    --tinta:#e7eaf0; --suave:#9aa3b2; --tenue:#6b7484;
+    --linea:#252c38; --linea-sutil:#1e242e;
+    --acento:#8b87f5; --acento-suave:#1e1f3d; --acento-tinta:#0d1117;
+    --ok:#5cc994; --ok-suave:#12281e;
+    --alerta:#d8a442; --alerta-suave:#2a2112;
+    --mal:#e0736b; --mal-suave:#2d1614;
+    --sombra:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  }
+}
+:root[data-tema="oscuro"] {
+  --fondo:#0d1117; --panel:#151a22; --hundido:#1b212b;
+  --tinta:#e7eaf0; --suave:#9aa3b2; --tenue:#6b7484;
+  --linea:#252c38; --linea-sutil:#1e242e;
+  --acento:#8b87f5; --acento-suave:#1e1f3d; --acento-tinta:#0d1117;
+  --ok:#5cc994; --ok-suave:#12281e;
+  --alerta:#d8a442; --alerta-suave:#2a2112;
+  --mal:#e0736b; --mal-suave:#2d1614;
+  --sombra:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.hoja{max-width:1120px;margin:0 auto;padding:0 20px 96px}
+
+/* ── cabecera ── */
+.top{display:flex;align-items:center;gap:14px;padding:22px 0 16px;flex-wrap:wrap}
+.top h1{font-size:19px;margin:0;letter-spacing:-.01em;flex:1;min-width:180px}
+.top .sub{color:var(--suave);font-size:13px;margin:2px 0 0;font-weight:400}
+.pest{display:flex;gap:2px;border-bottom:1px solid var(--linea);margin-bottom:24px;overflow-x:auto}
+.pest button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;
+  font-size:14px;font-weight:600;cursor:pointer;color:var(--suave);margin-bottom:-1px;
+  white-space:nowrap;font-family:inherit}
+.pest button[data-on]{color:var(--acento);border-bottom-color:var(--acento)}
+.pest button:hover:not([data-on]){color:var(--tinta)}
+.oculto{display:none !important}
+
+/* ── superficies ── */
+.tarjeta{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r);padding:20px}
+.tarjeta+.tarjeta{margin-top:14px}
+h2.sec{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--tenue);
+  margin:0 0 14px;font-weight:600}
+h3{font-size:15px;margin:0 0 6px;font-weight:600}
+
+/* ── formulario ── */
+label{display:block;font-size:12.5px;font-weight:600;margin:0 0 4px;color:var(--suave)}
+input,select,textarea{width:100%;border:1px solid var(--linea);border-radius:8px;
+  padding:9px 11px;font-size:14.5px;font-family:inherit;background:var(--panel);
+  color:var(--tinta);transition:border-color .12s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--acento);
+  box-shadow:0 0 0 3px var(--acento-suave)}
+textarea{resize:vertical;min-height:88px;line-height:1.55}
+.campo{margin-bottom:14px}
+.pista{font-size:12px;color:var(--tenue);margin:4px 0 0;line-height:1.45}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+
+/* ── botones ── */
+.btn{background:var(--acento);color:var(--acento-tinta);border:0;border-radius:8px;
+  padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:7px;transition:opacity .12s}
+.btn:hover{opacity:.88}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sec{background:var(--panel);color:var(--tinta);border:1px solid var(--linea)}
+.btn.mal{background:var(--mal);color:#fff}
+.btn.chico{padding:6px 11px;font-size:13px}
+.btn:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
+.fila{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+
+/* ── estados ── */
+.aviso{padding:12px 15px;border-radius:9px;font-size:13.8px;margin:12px 0;line-height:1.5}
+.aviso.mal{background:var(--mal-suave);color:var(--mal)}
+.aviso.ok{background:var(--ok-suave);color:var(--ok)}
+.aviso.ojo{background:var(--alerta-suave);color:var(--alerta)}
+.aviso.info{background:var(--acento-suave);color:var(--acento)}
+
+.vacio{text-align:center;padding:44px 20px;color:var(--suave)}
+.vacio .ico{font-size:34px;opacity:.5;display:block;margin-bottom:10px}
+.vacio h3{color:var(--tinta);margin-bottom:4px}
+.vacio p{margin:0 0 16px;font-size:14px;max-width:38ch;margin-inline:auto}
+
+.esqueleto{background:linear-gradient(90deg,var(--hundido) 25%,var(--linea-sutil) 50%,var(--hundido) 75%);
+  background-size:200% 100%;animation:brillo 1.3s infinite;border-radius:6px;height:14px}
+@keyframes brillo{to{background-position:-200% 0}}
+
+.placa{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+  padding:2px 9px;border-radius:999px;background:var(--hundido);color:var(--suave);white-space:nowrap}
+.placa.ok{background:var(--ok-suave);color:var(--ok)}
+.placa.mal{background:var(--mal-suave);color:var(--mal)}
+.placa.ojo{background:var(--alerta-suave);color:var(--alerta)}
+.placa.info{background:var(--acento-suave);color:var(--acento)}
+
+/* ── tarjetas de negocio ── */
+.negocios{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
+.negocio{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r);
+  padding:16px;display:flex;flex-direction:column;gap:11px;transition:border-color .12s,transform .12s}
+.negocio:hover{border-color:var(--acento)}
+.negocio .cab{display:flex;gap:11px;align-items:flex-start}
+.negocio .marca{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;
+  font-size:19px;flex:none;color:#fff}
+.negocio .titulo{flex:1;min-width:0}
+.negocio .titulo b{display:block;font-size:15px;line-height:1.3;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.negocio .titulo span{font-size:12.5px;color:var(--tenue)}
+.negocio .pies{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+
+/* ── asistente de alta ── */
+.pasos{display:flex;gap:5px;overflow-x:auto;padding-bottom:12px;margin-bottom:18px;
+  border-bottom:1px solid var(--linea)}
+.pasos button{background:none;border:0;padding:7px 11px;border-radius:7px;font-size:12.8px;
+  color:var(--tenue);cursor:pointer;white-space:nowrap;font-family:inherit;font-weight:600;
+  display:flex;align-items:center;gap:6px}
+.pasos button[data-on]{background:var(--acento-suave);color:var(--acento)}
+.pasos button[data-listo]{color:var(--ok)}
+.pasos .n{width:18px;height:18px;border-radius:50%;background:var(--hundido);
+  display:grid;place-items:center;font-size:10.5px}
+.pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
+.pasos button[data-listo] .n{background:var(--ok);color:#fff}
+
+.paso{display:none}
+.paso[data-on]{display:block}
+.navpaso{display:flex;justify-content:space-between;gap:10px;margin-top:22px;
+  padding-top:16px;border-top:1px solid var(--linea-sutil)}
+
+/* ── opciones (políticas, acciones) ── */
+.opcion{display:flex;gap:11px;padding:12px;border:1px solid var(--linea);border-radius:9px;
+  margin-bottom:9px;cursor:pointer;align-items:flex-start;background:var(--panel)}
+.opcion:hover{border-color:var(--acento)}
+.opcion input{width:auto;margin:3px 0 0;flex:none}
+.opcion .txt{flex:1}
+.opcion b{display:block;font-size:14px;margin-bottom:2px}
+.opcion small{color:var(--suave);font-size:12.5px;line-height:1.45;display:block}
+.opcion .cuidado{color:var(--alerta);font-size:12px;margin-top:5px;display:block}
+
+/* ── catálogo y pares clave-valor ── */
+.renglon{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:start}
+.renglon.tres{grid-template-columns:110px 1fr 1fr auto}
+.quitar{background:none;border:1px solid var(--linea);border-radius:7px;width:34px;height:34px;
+  cursor:pointer;color:var(--suave);font-size:15px;flex:none}
+.quitar:hover{border-color:var(--mal);color:var(--mal)}
+
+/* ── vista previa ── */
+.previo{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+.marco{background:var(--hundido);border:1px solid var(--linea);border-radius:var(--r);
+  padding:16px;position:sticky;top:16px}
+.marco .rot{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--tenue);margin-bottom:10px;font-weight:600}
+.chat{background:var(--panel);border-radius:12px;overflow:hidden;border:1px solid var(--linea)}
+.chat .barra{padding:11px 13px;display:flex;align-items:center;gap:9px;color:#fff}
+.chat .barra b{font-size:14px}
+.chat .cuerpo{padding:13px;display:flex;flex-direction:column;gap:8px;min-height:130px}
+.chat .bur{padding:9px 12px;border-radius:12px;font-size:13.5px;max-width:88%;line-height:1.45}
+.chat .bur.bot{border-bottom-left-radius:3px;align-self:flex-start}
+.chat .chips{display:flex;gap:5px;flex-wrap:wrap}
+.chat .chips span{border:1px solid;border-radius:999px;padding:4px 10px;font-size:11.5px}
+
+/* ── buscador ── */
+.barra-busq{display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap}
+.barra-busq input{flex:1;min-width:180px}
+.barra-busq select{width:auto;min-width:150px}
+
+/* ── tabla ── */
+.desliza{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13.8px;min-width:520px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--tenue);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--linea)}
+td{padding:11px 10px;border-bottom:1px solid var(--linea-sutil);vertical-align:top}
+tr:last-child td{border-bottom:0}
+
+code{background:var(--hundido);padding:1.5px 5px;border-radius:4px;font-size:12.8px;
+  font-family:ui-monospace,Menlo,monospace}
+pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
+  font-size:12.8px;line-height:1.55;font-family:ui-monospace,Menlo,monospace;margin:10px 0}
+
+.tema{background:none;border:1px solid var(--linea);border-radius:8px;width:34px;height:34px;
+  cursor:pointer;font-size:15px;color:var(--suave);flex:none}
+
+@media (max-width:760px){
+  .previo{grid-template-columns:1fr}
+  .marco{position:static}
+  .renglon,.renglon.tres{grid-template-columns:1fr;gap:6px}
+  .quitar{width:100%}
+  .hoja{padding:0 14px 80px}
+  .navpaso{flex-direction:column-reverse}
+  .navpaso .btn{width:100%;justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div class="hoja">
 
-  <h1>Chatbot — consola</h1>
-  <p class="sub">Un solo programa, varias marcas. Consultorio hoy, café después.</p>
+  <header class="top">
+    <div style="flex:1;min-width:180px">
+      <h1>Consola de negocios</h1>
+      <p class="sub">Un motor, cualquier giro.</p>
+    </div>
+    <button class="tema" id="btn-tema" aria-label="Cambiar entre tema claro y oscuro">◐</button>
+    <button class="btn sec chico oculto" id="btn-salir">Salir</button>
+  </header>
 
-  <div class="pestanas">
-    <button data-vista="pruebas" data-activa>Banco de pruebas</button>
-    <button data-vista="panel">Panel</button>
-    <button data-vista="herramientas">Herramientas</button>
+  <div id="banda-acceso" class="aviso info oculto" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:200px">Estás viendo la consola <b>sin sesión</b>:
+      los negocios de abajo son ejemplos y los cambios no se guardan.</span>
+    <button class="btn chico" id="btn-mostrar-acceso">Iniciar sesión</button>
   </div>
 
-  <!-- ══════════════ BANCO DE PRUEBAS ══════════════ -->
-  <section id="v-pruebas">
-    <div class="tarjeta">
-      <h2>Marca</h2>
-      <div class="fila" id="marcas-botones">
-        <button class="accion gris" data-marca="consultorio">🩺 Consultorio</button>
-        <button class="accion gris" data-marca="cafe">☕ Café</button>
-      </div>
-      <p class="nota" style="margin-bottom:0">Mismo <code>widget.js</code>, sin una línea
-      distinta. Lo único que cambia es <code>data-marca</code>.</p>
-    </div>
+  <nav class="pest" id="pestanas" role="tablist">
+    <button data-vista="negocios" data-on role="tab">Negocios</button>
+    <button data-vista="alta" role="tab">Agregar negocio</button>
+    <button data-vista="probar" role="tab">Probar el widget</button>
+    <button data-vista="herramientas" role="tab">Herramientas</button>
+  </nav>
 
-    <div class="tarjeta">
-      <h2>Estado del servidor</h2>
-      <div id="estado" class="nota">Consultando…</div>
-    </div>
-
-    <div class="tarjeta">
-      <h2>Cómo se pega en un sitio</h2>
-      <pre>&lt;script src="/chatbot/widget.js"
-        data-marca="consultorio"
-        data-whatsapp="521961XXXXXXX"
-        defer&gt;&lt;/script&gt;</pre>
-    </div>
-
-    <div class="tarjeta">
-      <h2>Qué probar</h2>
-      <ul>
-        <li>Pregunta un horario o precio → debe decir que no lo tiene, <b>no inventarlo</b>.</li>
-        <li>Escribe <b>«quiero una cita»</b> → debe salir el formulario.</li>
-        <li>En el consultorio: <b>«me duele el pecho»</b> → bloque rojo de urgencia,
-        y <i>rápido</i>: eso no lo contesta la IA, lo corta el código antes.</li>
-        <li>En el café esa misma frase <b>no</b> dispara nada.</li>
-      </ul>
-    </div>
-  </section>
-
-  <!-- ══════════════ PANEL ══════════════ -->
-  <section id="v-panel" class="oculto">
-
-    <!-- entrar -->
-    <div class="tarjeta" id="caja-acceso">
-      <h2>Acceso</h2>
+  <!-- ══════════ ACCESO ══════════ -->
+  <section id="v-acceso" class="oculto">
+    <div class="tarjeta" style="max-width:420px;margin:0 auto 18px">
+      <h2 class="sec">Acceso</h2>
       <div id="acceso-msg"></div>
-      <label>Correo</label>
-      <input type="email" id="ac-correo" autocomplete="username">
-      <label>Contraseña</label>
-      <input type="password" id="ac-clave" autocomplete="current-password">
-      <div class="fila" style="margin-top:14px">
-        <button class="accion" id="btn-entrar">Entrar</button>
-        <button class="accion gris" id="btn-registrar">Crear cuenta</button>
+      <div class="campo"><label for="ac-correo">Correo</label>
+        <input type="email" id="ac-correo" autocomplete="username"></div>
+      <div class="campo"><label for="ac-clave">Contraseña</label>
+        <input type="password" id="ac-clave" autocomplete="current-password"></div>
+      <div class="fila" style="margin-top:6px">
+        <button class="btn" id="btn-entrar">Entrar</button>
+        <button class="btn sec" id="btn-registrar">Crear cuenta</button>
       </div>
-      <p class="nota" style="margin-top:12px;margin-bottom:0">
-        Una cuenta nueva nace <b>sin permisos</b>: no ve nada hasta que el
-        superadministrador la asigne a una empresa. Es a propósito — si cualquiera
-        que se registra entrara a algo, ahí se filtran los datos entre clientes.</p>
+      <p class="pista" style="margin-top:12px">Una cuenta nueva nace <b>sin permisos</b>:
+      no ve nada hasta que el administrador la asigne a un negocio.</p>
     </div>
+  </section>
 
-    <!-- ya dentro -->
-    <div id="caja-panel" class="oculto">
-      <div class="tarjeta">
-        <div class="fila" style="justify-content:space-between">
-          <div>
-            <b id="yo-nombre"></b> <span class="placa" id="yo-rol"></span>
-            <div class="nota" id="yo-empresa"></div>
-          </div>
-          <button class="accion gris" id="btn-salir">Salir</button>
-        </div>
-      </div>
+  <!-- ══════════ NEGOCIOS ══════════ -->
+  <section id="v-negocios">
+    <div class="barra-busq">
+      <input type="search" id="busca" placeholder="Buscar por nombre o giro…" aria-label="Buscar negocios">
+      <select id="filtro-estado" aria-label="Filtrar por estado">
+        <option value="">Todos los estados</option>
+        <option value="publicado">Publicados</option>
+        <option value="borrador">Borradores</option>
+        <option value="suspendido">Suspendidos</option>
+      </select>
+      <select id="filtro-cat" aria-label="Filtrar por giro">
+        <option value="">Todos los giros</option>
+      </select>
+    </div>
+    <div id="lista-negocios" aria-live="polite"></div>
+  </section>
 
-      <div class="tarjeta">
-        <h2>Números</h2>
-        <div class="rejilla" id="metricas"></div>
-      </div>
+  <!-- ══════════ ALTA (asistente) ══════════ -->
+  <section id="v-alta" class="oculto">
+    <div class="tarjeta">
+      <div class="pasos" id="pasos" role="tablist"></div>
+      <div id="alta-msg"></div>
 
-      <div class="tarjeta" id="caja-empresas">
-        <h2>Empresas</h2>
-        <div class="desplaza"><table id="tabla-empresas"></table></div>
-        <div id="crear-empresa" class="oculto" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--linea)">
-          <div class="rejilla">
-            <div><label>Identificador (data-marca)</label><input id="ne-slug" placeholder="consultorio"></div>
-            <div><label>Nombre</label><input id="ne-nombre" placeholder="Consultorio Dr. Isa"></div>
-            <div><label>Tipo</label><select id="ne-dominio">
-              <option value="comercial">Comercial</option>
-              <option value="clinico">Clínico (activa banderas rojas)</option>
-            </select></div>
-            <div><label>Plan</label><select id="ne-plan">
-              <option value="prueba">Prueba</option><option value="basico">Básico</option><option value="pro">Pro</option>
-            </select></div>
-          </div>
-          <button class="accion" id="btn-crear-empresa" style="margin-top:12px">Crear empresa</button>
-        </div>
-      </div>
-
-      <div class="tarjeta oculto" id="caja-editor">
-        <h2>Configurar <span id="ed-nombre"></span></h2>
-        <div class="aviso ojo">Lo de abajo viaja <b>cifrado</b> a la base. Ni Supabase
-        ni un respaldo filtrado pueden leerlo: solo esta consola, y solo si la
-        llave maestra sigue en Cloudflare.</div>
+      <!-- 1 · básicos -->
+      <div class="paso" data-paso="basicos" data-on>
+        <h3>¿Qué negocio es?</h3>
+        <p class="pista" style="margin-bottom:16px">Cualquier giro. Si el tuyo no está
+        en la lista, elige «Otro» y escríbelo tal cual lo llamas tú.</p>
         <div class="rejilla">
-          <div><label>Nombre visible</label><input id="ed-titulo"></div>
-          <div><label>Saludo</label><input id="ed-saludo"></div>
+          <div class="campo"><label for="f-nombre">Nombre del negocio *</label>
+            <input id="f-nombre" placeholder="Taller El Piñón"></div>
+          <div class="campo"><label for="f-slug">Identificador corto *</label>
+            <input id="f-slug" placeholder="taller-pinon">
+            <p class="pista">Va en la etiqueta que se pega en el sitio.</p></div>
+          <div class="campo"><label for="f-cat">Giro</label>
+            <select id="f-cat"></select></div>
+          <div class="campo oculto" id="campo-cat-otro"><label for="f-cat-otro">Escribe tu giro</label>
+            <input id="f-cat-otro" placeholder="Criadero de axolotes"></div>
+          <div class="campo"><label for="f-idioma">Idioma</label>
+            <select id="f-idioma"></select></div>
         </div>
-        <label>Personalidad (cifrado)</label>
-        <textarea id="ed-persona" placeholder="Eres el asistente de…"></textarea>
-        <label>Base de conocimiento — un tema por renglón: <code>tema | texto</code> (cifrado)</label>
-        <textarea id="ed-conocimiento" placeholder="horarios | Lunes a viernes de 16 a 20 h"></textarea>
-        <label>Lo que NO hace — un límite por renglón (cifrado)</label>
-        <textarea id="ed-limites"></textarea>
-        <label>Descargo (visible para todos)</label>
-        <input id="ed-descargo">
+        <div class="campo"><label for="f-desc">¿A qué se dedica? *</label>
+          <textarea id="f-desc" placeholder="Una o dos frases. El asistente las usa para presentarse."></textarea></div>
+      </div>
 
-        <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--linea)">
-          <h2 style="margin-bottom:6px">Los tres números</h2>
-          <p class="nota" style="margin-top:0">Los de arriba <b>los ve el visitante</b>
-          (son a los que puede escribir). El de abajo es a dónde te llegan
-          los avisos a ti: ese va cifrado y nadie más lo ve.</p>
+      <!-- 2 · identidad -->
+      <div class="paso" data-paso="identidad">
+        <h3>Cómo se ve y cómo habla</h3>
+        <div class="rejilla">
+          <div class="campo"><label for="f-primario">Color principal</label>
+            <input type="color" id="f-primario" value="#4f46e5" style="height:40px;padding:3px"></div>
+          <div class="campo"><label for="f-acento">Color de acento</label>
+            <input type="color" id="f-acento" value="#818cf8" style="height:40px;padding:3px"></div>
+          <div class="campo"><label for="f-avatar">Ícono</label>
+            <input id="f-avatar" placeholder="💬" maxlength="4"></div>
+          <div class="campo"><label for="f-logo">Logo (enlace)</label>
+            <input id="f-logo" placeholder="https://…/logo.png"></div>
+        </div>
+        <div class="campo"><label for="f-saludo">Primer mensaje</label>
+          <input id="f-saludo" placeholder="Hola, ¿en qué te ayudo?"></div>
+        <div class="campo"><label for="f-tono">Tono</label>
+          <textarea id="f-tono" placeholder="Práctico y rápido. La gente quiere saber si hay, cuánto cuesta y si se lo llevan."></textarea></div>
+        <div class="campo"><label for="f-sug">Sugerencias (una por renglón, máximo 3)</label>
+          <textarea id="f-sug" style="min-height:70px"></textarea></div>
+      </div>
 
-          <div class="rejilla">
-            <div><label>WhatsApp del consultorio (público)</label>
-              <input id="ed-wa-consultorio" placeholder="521961XXXXXXX"></div>
-            <div><label>WhatsApp de urgencias (público)</label>
-              <input id="ed-wa-urgencias" placeholder="521961XXXXXXX"></div>
+      <!-- 3 · oferta -->
+      <div class="paso" data-paso="oferta">
+        <h3>Lo que ofrece</h3>
+        <p class="pista" style="margin-bottom:14px">Producto es lo que se vende,
+        servicio lo que se hace, recurso lo que se aparta. El precio es texto libre:
+        «desde $200» o «según proyecto» son respuestas válidas.</p>
+        <div id="catalogo"></div>
+        <button class="btn sec chico" id="btn-mas-oferta">+ Agregar</button>
+      </div>
+
+      <!-- 4 · conocimiento -->
+      <div class="paso" data-paso="conocimiento">
+        <h3>Lo que el asistente sabe</h3>
+        <p class="pista" style="margin-bottom:14px">Horarios, formas de pago, políticas
+        de envío. Lo que no esté aquí, el asistente dirá que no lo sabe — en vez de inventarlo.</p>
+        <div id="conocimiento"></div>
+        <button class="btn sec chico" id="btn-mas-saber">+ Agregar tema</button>
+
+        <h3 style="margin-top:24px">Datos propios de tu giro</h3>
+        <p class="pista" style="margin-bottom:14px">Lo que no cupo en ningún campo:
+        «pedido mínimo», «garantía», «cobertura».</p>
+        <div id="atributos"></div>
+        <button class="btn sec chico" id="btn-mas-atrib">+ Agregar dato</button>
+      </div>
+
+      <!-- 5 · comportamiento -->
+      <div class="paso" data-paso="comportamiento">
+        <h3>Qué puede hacer</h3>
+        <div id="acciones"></div>
+        <h3 style="margin-top:24px">Reglas especiales</h3>
+        <p class="pista" style="margin-bottom:12px">Ninguna viene encendida.
+        Actívalas solo si tu giro las necesita.</p>
+        <div id="politicas"></div>
+        <div class="campo" style="margin-top:18px"><label for="f-contacto">WhatsApp de contacto</label>
+          <input id="f-contacto" placeholder="521961XXXXXXX">
+          <p class="pista">A dónde mandar a quien pida hablar con una persona.</p></div>
+      </div>
+
+      <!-- 6 · proveedores -->
+      <div class="paso" data-paso="proveedores">
+        <h3>Qué modelo responde</h3>
+        <p class="pista" style="margin-bottom:14px">Si dejas esto vacío se usa el orden
+        de la plataforma. Solo cámbialo si este negocio trae su propia cuenta.</p>
+        <div class="campo"><label for="f-orden">Orden de proveedores</label>
+          <select id="f-orden">
+            <option value="">Usar el de la plataforma</option>
+            <option value="gemini,groq">Gemini, luego Groq</option>
+            <option value="groq,gemini">Groq, luego Gemini</option>
+            <option value="gemini">Solo Gemini</option>
+            <option value="groq">Solo Groq</option>
+          </select></div>
+        <div class="aviso ojo">Las llaves de API <b>no se cargan aquí</b>. Van en las
+        variables del proyecto, donde nadie más que el servidor puede leerlas.</div>
+      </div>
+
+      <!-- 7 · vista previa -->
+      <div class="paso" data-paso="previo">
+        <h3>Así se va a ver</h3>
+        <div class="previo">
+          <div>
+            <div id="revision"></div>
+            <div class="desliza"><table id="resumen-alta"></table></div>
           </div>
-
-          <div class="aviso ojo" style="margin-top:14px">
-            El aviso de urgencia <b>no es el plan de atención</b>: al paciente ya
-            se le indicó llamar al 911 en el momento, antes de que salga tu correo.
-            Esto es para que te enteres y des seguimiento.
-          </div>
-
-          <div class="rejilla">
-            <div><label>Correo para urgencias (cifrado)</label>
-              <input id="ed-mail-urgencias" placeholder="tu correo personal"></div>
-            <div><label>Correo para citas (cifrado)</label>
-              <input id="ed-mail-consultorio" placeholder="correo del consultorio"></div>
-            <div><label>Tu teléfono personal (cifrado)</label>
-              <input id="ed-tel-personal" placeholder="para el botón de llamar"></div>
+          <div class="marco">
+            <div class="rot">Vista previa</div>
+            <div class="chat" id="chat-previo"></div>
           </div>
         </div>
-        <div class="fila" style="margin-top:14px">
-          <button class="accion" id="btn-guardar-empresa">Guardar</button>
-          <button class="accion gris" id="btn-cerrar-editor">Cerrar</button>
-          <span id="ed-msg" class="nota"></span>
+      </div>
+
+      <div class="navpaso">
+        <button class="btn sec" id="btn-atras">← Atrás</button>
+        <div class="fila">
+          <button class="btn sec" id="btn-borrador">Guardar borrador</button>
+          <button class="btn" id="btn-siguiente">Siguiente →</button>
         </div>
-      </div>
-
-      <div class="tarjeta" id="caja-avisos">
-        <h2>Avisos</h2>
-        <div class="nota">Lo que el chat detectó y te mandó. Si dice
-        <b>fallido</b>, el aviso no salió — pero el dato sí quedó guardado.</div>
-        <div class="desplaza"><table id="tabla-avisos"></table></div>
-      </div>
-
-      <div class="tarjeta" id="caja-leads">
-        <h2>Datos de contacto recibidos</h2>
-        <div class="nota">Se descifran en el servidor al abrir esta tabla, y queda
-        registrado en la bitácora quién los miró.</div>
-        <div class="desplaza"><table id="tabla-leads"></table></div>
-      </div>
-
-      <div class="tarjeta oculto" id="caja-usuarios">
-        <h2>Usuarios</h2>
-        <div class="desplaza"><table id="tabla-usuarios"></table></div>
-      </div>
-
-      <div class="tarjeta oculto" id="caja-bitacora">
-        <h2>Bitácora</h2>
-        <div class="desplaza"><table id="tabla-bitacora"></table></div>
       </div>
     </div>
   </section>
 
-  <!-- ══════════════ HERRAMIENTAS ══════════════ -->
+  <!-- ══════════ PROBAR ══════════ -->
+  <section id="v-probar" class="oculto">
+    <div class="tarjeta">
+      <h2 class="sec">Widget en vivo</h2>
+      <div class="fila" id="botones-marca"></div>
+      <p class="pista" style="margin-top:12px">El mismo <code>widget.js</code> para todos.
+      Lo único que cambia es <code>data-marca</code>.</p>
+    </div>
+    <div class="tarjeta">
+      <h2 class="sec">Estado del servidor</h2>
+      <div id="estado">Consultando…</div>
+    </div>
+    <div class="tarjeta">
+      <h2 class="sec">Cómo se pega en un sitio</h2>
+      <pre id="fragmento">&lt;script src="/widget.js" data-marca="mi-negocio" defer&gt;&lt;/script&gt;</pre>
+    </div>
+  </section>
+
+  <!-- ══════════ HERRAMIENTAS ══════════ -->
   <section id="v-herramientas" class="oculto">
     <div class="tarjeta">
-      <h2>Llave maestra</h2>
-      <p class="nota">Se genera <b>aquí en tu navegador</b> y no viaja a ningún lado.
+      <h2 class="sec">Llave maestra</h2>
+      <p class="pista">Se genera <b>en tu navegador</b> y no viaja a ningún lado.
       Cópiala a Cloudflare como <code>CHATBOT_CLAVE</code>. Si la pierdes, los datos
       cifrados se pierden con ella: no hay puerta trasera, y ese es el punto.</p>
-      <div class="fila"><button class="accion" id="btn-llave">Generar llave</button></div>
+      <div class="fila" style="margin-top:12px"><button class="btn" id="btn-llave">Generar llave</button></div>
       <div id="salida-llave"></div>
     </div>
-
     <div class="tarjeta">
-      <h2>Probar el cifrado</h2>
-      <p class="nota">Corre las pruebas del módulo de cifrado en vivo: ida y vuelta,
-      aislamiento entre empresas, detección de manipulación y rotación de llave.</p>
-      <div class="fila"><button class="accion" id="btn-probar-cifrado">Correr pruebas</button></div>
+      <h2 class="sec">Probar el cifrado</h2>
+      <p class="pista">Corre las pruebas del módulo en vivo: ida y vuelta, aislamiento
+      entre negocios, detección de manipulación y rotación de llave.</p>
+      <div class="fila" style="margin-top:12px"><button class="btn" id="btn-probar-cifrado">Correr pruebas</button></div>
       <div id="salida-cifrado"></div>
     </div>
-
     <div class="tarjeta">
-      <h2>Variables que necesita Cloudflare</h2>
+      <h2 class="sec">Variables que necesita Cloudflare</h2>
       <pre>CHATBOT_CLAVE          # la de arriba
-SUPABASE_URL           = https://gnhndbqbgvtoxhelikcy.supabase.co
-SUPABASE_ANON_KEY      # llave publicable del proyecto
-SUPABASE_SERVICE_KEY   # llave de servicio (SOLO servidor)
-ANTHROPIC_API_KEY      # opcional pero recomendada</pre>
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_KEY
+GEMINI_API_KEY
+GROQ_API_KEY
+RESEND_API_KEY         # para los avisos</pre>
     </div>
   </section>
 
 </div>
 
 <script type="module">
-/* ══════════════════════════════════════════════════════════════════════════
- *  La consola. Un solo archivo, tres vistas.
- *
- *  El navegador NUNCA habla con Supabase para leer datos: todo pasa por
- *  /api/admin. La razón es concreta — los datos están
- *  cifrados y la llave vive en el servidor. Lo único que sí se hace directo
- *  contra Supabase es iniciar sesión, porque de ahí sale el token.
- * ══════════════════════════════════════════════════════════════════════════ */
+import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO, IDIOMAS, TIPOS_OFERTA }
+  from './cerebro/perfil.mjs';
+import { CATEGORIAS_SUGERIDAS } from './cerebro/catalogos-ui.mjs';
+import { catalogoDePoliticas } from './cerebro/politicas.mjs';
+import { catalogoDeAcciones } from './cerebro/acciones.mjs';
+import { SEMILLAS } from './cerebro/semillas.mjs';
 
-// Estas dos son públicas por diseño: la llave "publicable" está pensada para
-// vivir en el navegador. Lo que protege los datos es RLS, no esconderla.
 const SB_URL  = 'https://gnhndbqbgvtoxhelikcy.supabase.co';
 const SB_ANON = 'sb_publishable_vSDvUv6W2vpbEQACqAewLw_ubYlcU5t';
 const ADMIN   = '/api/admin';
 
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const esc = t => String(t ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const esc = t => String(t ?? '').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
-let token = sessionStorage.getItem('chatbot:token') || null;
-let yo = null, empresas = [], empresaActiva = null;
+let token = sessionStorage.getItem('consola:token') || null;
+let yo = null, negocios = [], enLinea = false;
 
-/* ── pestañas ────────────────────────────────────────────────────────── */
-$$('.pestanas button').forEach(b => b.addEventListener('click', () => {
-  $$('.pestanas button').forEach(x => delete x.dataset.activa);
-  b.dataset.activa = '1';
-  ['pruebas','panel','herramientas'].forEach(v =>
-    $('#v-' + v).classList.toggle('oculto', v !== b.dataset.vista));
+/* ── tema ─────────────────────────────────────────────────────────── */
+const temaGuardado = localStorage.getItem('consola:tema');
+if (temaGuardado) document.documentElement.dataset.tema = temaGuardado;
+$('#btn-tema').addEventListener('click', () => {
+  const actual = document.documentElement.dataset.tema;
+  const nuevo = actual === 'oscuro' ? 'claro' : 'oscuro';
+  document.documentElement.dataset.tema = nuevo;
+  localStorage.setItem('consola:tema', nuevo);
+});
+
+/* ── pestañas ─────────────────────────────────────────────────────── */
+const VISTAS = ['negocios','alta','probar','herramientas'];
+$$('#pestanas button').forEach(b => b.addEventListener('click', () => {
+  $$('#pestanas button').forEach(x => delete x.dataset.on);
+  b.dataset.on = '1';
+  VISTAS.forEach(v => $('#v-'+v).classList.toggle('oculto', v !== b.dataset.vista));
+  if (b.dataset.vista === 'alta') pintarPaso();
 }));
 
-/* ── banco de pruebas: el widget ─────────────────────────────────────── */
-const marcaURL = new URLSearchParams(location.search).get('marca') || 'consultorio';
-$$('#marcas-botones button').forEach(b => {
-  if (b.dataset.marca === marcaURL) b.classList.remove('gris');
-  b.addEventListener('click', () => location.search = '?marca=' + b.dataset.marca);
+/* ══════════════════════════════════════════════════════════════════
+   ASISTENTE DE ALTA
+   ══════════════════════════════════════════════════════════════════ */
+const PASOS = [
+  { id:'basicos',        rot:'Datos básicos' },
+  { id:'identidad',      rot:'Identidad' },
+  { id:'oferta',         rot:'Oferta' },
+  { id:'conocimiento',   rot:'Conocimiento' },
+  { id:'comportamiento', rot:'Comportamiento' },
+  { id:'proveedores',    rot:'Proveedores' },
+  { id:'previo',         rot:'Vista previa' },
+];
+let pasoActual = 0;
+
+// Categorías: la lista es un ATAJO. "Otro" abre un campo libre, y `categoria`
+// nunca se valida contra la lista.
+$('#f-cat').innerHTML = '<option value="">Sin especificar</option>' +
+  CATEGORIAS_SUGERIDAS.map(c => `<option>${esc(c)}</option>`).join('');
+$('#f-idioma').innerHTML = IDIOMAS.map(i => `<option${i==='es-MX'?' selected':''}>${i}</option>`).join('');
+$('#f-cat').addEventListener('change', () => {
+  $('#campo-cat-otro').classList.toggle('oculto', $('#f-cat').value !== 'Otro');
 });
 
-import('./cerebro/marcas.mjs').then(mod => {
-  // Vista previa local: se responde la petición de config del widget con
-  // marcas.mjs, la MISMA fuente que usa el servidor. Así se afinan colores y
-  // textos sin gastar un despliegue. Solo vive en esta página.
-  const real = window.fetch;
-  window.fetch = function (url) {
-    const u = String(url);
-    if (u.indexOf('config=1') > -1) {
-      const id = new URL(u, location.href).searchParams.get('marca');
-      return Promise.resolve(new Response(JSON.stringify(mod.marcaPublica(id)),
-        { status: 200, headers: { 'content-type': 'application/json' } }));
-    }
-    return real.apply(this, arguments);
-  };
-}).catch(() => {}).then(() => {
-  const s = document.createElement('script');
-  s.src = 'widget.js'; s.dataset.marca = marcaURL; s.defer = true;
-  document.body.appendChild(s);
+// El identificador se propone solo, pero se puede escribir a mano.
+let slugTocado = false;
+$('#f-slug').addEventListener('input', () => { slugTocado = true; });
+$('#f-nombre').addEventListener('input', () => {
+  if (!slugTocado) $('#f-slug').value = aSlug($('#f-nombre').value);
+  refrescarPrevio();
+});
+['f-saludo','f-primario','f-acento','f-avatar','f-desc','f-cat','f-cat-otro','f-sug']
+  .forEach(id => $('#'+id)?.addEventListener('input', refrescarPrevio));
+
+$('#pasos').innerHTML = PASOS.map((p,i) =>
+  `<button data-i="${i}" role="tab"><span class="n">${i+1}</span>${esc(p.rot)}</button>`).join('');
+$$('#pasos button').forEach(b => b.addEventListener('click', () => { pasoActual = +b.dataset.i; pintarPaso(); }));
+
+function pintarPaso() {
+  $$('#pasos button').forEach((b,i) => {
+    b.toggleAttribute('data-on', i === pasoActual);
+    b.toggleAttribute('data-listo', i < pasoActual);
+  });
+  $$('.paso').forEach(p => p.toggleAttribute('data-on', p.dataset.paso === PASOS[pasoActual].id));
+  $('#btn-atras').disabled = pasoActual === 0;
+  $('#btn-siguiente').textContent = pasoActual === PASOS.length - 1 ? 'Publicar' : 'Siguiente →';
+  if (PASOS[pasoActual].id === 'previo') refrescarPrevio();
+}
+$('#btn-atras').addEventListener('click', () => { if (pasoActual>0){pasoActual--;pintarPaso();} });
+$('#btn-siguiente').addEventListener('click', () => {
+  if (pasoActual < PASOS.length - 1) { pasoActual++; pintarPaso(); }
+  else publicar();
 });
 
-fetch('/api/bot?ping=1').then(r => r.json()).then(d => {
-  const filas = Object.entries(d.proveedores || {})
-    .map(([n, hay]) => `${hay ? '🟢' : '⚪'} ${n}`).join(' &nbsp; ');
-  $('#estado').innerHTML = filas +
-    `<div style="margin-top:6px">Orden: <code>${esc(d.orden)}</code> · Modelo: <code>${esc(d.modeloClaude)}</code></div>`;
-}).catch(() => {
-  $('#estado').innerHTML = '⚪ Sin servidor. Es lo normal si abriste el archivo ' +
-    'con doble clic o con un servidor estático: el widget se pinta pero no contesta.';
-});
+/* ── listas dinámicas: catálogo, conocimiento, atributos ──────────── */
+function renglonOferta(v = {}) {
+  const d = document.createElement('div');
+  d.className = 'renglon tres';
+  d.innerHTML = `
+    <select class="o-tipo">${TIPOS_OFERTA.map(t=>`<option${t===v.tipo?' selected':''}>${t}</option>`).join('')}</select>
+    <input class="o-nombre" placeholder="Nombre" value="${esc(v.nombre||'')}">
+    <input class="o-precio" placeholder="Precio (texto libre)" value="${esc(v.precio||'')}">
+    <button class="quitar" aria-label="Quitar">✕</button>`;
+  d.querySelector('.quitar').addEventListener('click', () => { d.remove(); refrescarPrevio(); });
+  d.querySelectorAll('input,select').forEach(i => i.addEventListener('input', refrescarPrevio));
+  return d;
+}
+function renglonPar(clase, ph1, ph2, v = {}) {
+  const d = document.createElement('div');
+  d.className = 'renglon';
+  d.innerHTML = `<input class="${clase}-a" placeholder="${ph1}" value="${esc(v.a||'')}">
+    <input class="${clase}-b" placeholder="${ph2}" value="${esc(v.b||'')}">
+    <button class="quitar" aria-label="Quitar">✕</button>`;
+  d.querySelector('.quitar').addEventListener('click', () => { d.remove(); refrescarPrevio(); });
+  d.querySelectorAll('input').forEach(i => i.addEventListener('input', refrescarPrevio));
+  return d;
+}
+$('#btn-mas-oferta').addEventListener('click', () => $('#catalogo').appendChild(renglonOferta()));
+$('#btn-mas-saber').addEventListener('click', () => $('#conocimiento').appendChild(renglonPar('k','Tema (ej. envíos)','Qué debe saber')));
+$('#btn-mas-atrib').addEventListener('click', () => $('#atributos').appendChild(renglonPar('a','Dato (ej. garantía)','Valor')));
+$('#catalogo').appendChild(renglonOferta());
+$('#conocimiento').appendChild(renglonPar('k','Tema (ej. envíos)','Qué debe saber'));
 
-/* ── acceso ──────────────────────────────────────────────────────────── */
-function avisar(donde, texto, tipo = 'mal') {
-  $(donde).innerHTML = `<div class="aviso ${tipo}">${esc(texto)}</div>`;
+/* ── acciones y políticas ─────────────────────────────────────────── */
+$('#acciones').innerHTML = catalogoDeAcciones().map(a => `
+  <label class="opcion"><input type="checkbox" class="ac" value="${esc(a.id)}"
+    ${a.id==='derivar_humano'?'checked disabled':''}>
+    <span class="txt"><b>${esc(a.nombre)}</b><small>${esc(a.resumen)}</small>
+    ${a.requiere?`<small style="color:var(--tenue);margin-top:4px">Necesita que llenes: ${esc(a.requiere)}</small>`:''}
+    </span></label>`).join('');
+$('#politicas').innerHTML = catalogoDePoliticas().map(p => `
+  <label class="opcion"><input type="checkbox" class="po" value="${esc(p.id)}">
+    <span class="txt"><b>${esc(p.nombre)}</b><small>${esc(p.resumen)}</small>
+    ${p.aviso?`<small class="cuidado">⚠ ${esc(p.aviso)}</small>`:''}
+    </span></label>`).join('');
+$$('.ac,.po').forEach(i => i.addEventListener('change', refrescarPrevio));
+
+/* ── juntar el perfil desde el formulario ─────────────────────────── */
+function perfilDelFormulario() {
+  const cat = $('#f-cat').value === 'Otro' ? $('#f-cat-otro').value : $('#f-cat').value;
+  return normalizarPerfil({
+    nombre: $('#f-nombre').value,
+    slug: $('#f-slug').value || aSlug($('#f-nombre').value),
+    categoria: cat,
+    descripcion: $('#f-desc').value,
+    idioma: $('#f-idioma').value,
+    identidad: {
+      primario: $('#f-primario').value, acento: $('#f-acento').value,
+      avatar: $('#f-avatar').value || NEUTRO.identidad.avatar,
+      logo: $('#f-logo').value || null,
+      fondo: NEUTRO.identidad.fondo, texto: NEUTRO.identidad.texto,
+      burbujaIA: NEUTRO.identidad.burbujaIA,
+    },
+    saludo: $('#f-saludo').value,
+    tono: $('#f-tono').value,
+    sugerencias: $('#f-sug').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,3),
+    catalogo: [...$('#catalogo').children].map(d => ({
+      tipo: d.querySelector('.o-tipo').value,
+      nombre: d.querySelector('.o-nombre').value,
+      precio: d.querySelector('.o-precio').value,
+    })).filter(o => o.nombre),
+    conocimiento: [...$('#conocimiento').children].map(d => ({
+      tema: d.querySelector('.k-a').value, texto: d.querySelector('.k-b').value,
+    })).filter(k => k.texto),
+    atributos: Object.fromEntries([...$('#atributos').children]
+      .map(d => [d.querySelector('.a-a').value, d.querySelector('.a-b').value])
+      .filter(([k,v]) => k && v)),
+    acciones: $$('.ac').filter(i=>i.checked||i.disabled).map(i=>i.value),
+    politicas: $$('.po').filter(i=>i.checked).map(i=>i.value),
+    contactos: $('#f-contacto').value
+      ? { principal: { whatsapp: $('#f-contacto').value, etiqueta: 'Escribir por WhatsApp' } } : {},
+    proveedores: $('#f-orden').value ? $('#f-orden').value.split(',') : [],
+    captura: { activa: true, titulo: 'Dejar mis datos',
+      campos: [{id:'nombre',etiqueta:'Tu nombre',tipo:'text',requerido:true},
+               {id:'telefono',etiqueta:'Teléfono',tipo:'tel',requerido:true},
+               {id:'motivo',etiqueta:'¿En qué te ayudamos?',tipo:'textarea',requerido:false}],
+      confirmacion: 'Gracias, ya quedaron tus datos. Te contactamos pronto.' },
+  });
 }
 
-async function auth(ruta, cuerpo) {
-  const r = await fetch(`${SB_URL}/auth/v1/${ruta}`, {
-    method: 'POST',
-    headers: { apikey: SB_ANON, 'content-type': 'application/json' },
-    body: JSON.stringify(cuerpo),
+/* ── vista previa en vivo ─────────────────────────────────────────── */
+function refrescarPrevio() {
+  const p = perfilDelFormulario();
+  const i = p.identidad;
+  $('#chat-previo').innerHTML = `
+    <div class="barra" style="background:${esc(i.primario)}">
+      <span>${esc(i.avatar)}</span><b>${esc(p.nombre)}</b></div>
+    <div class="cuerpo" style="background:${esc(i.fondo)}">
+      <div class="bur bot" style="background:${esc(i.burbujaIA)};color:${esc(i.texto)}">${esc(p.saludo)}</div>
+      ${p.sugerencias.length?`<div class="chips">${p.sugerencias.map(s=>
+        `<span style="border-color:${esc(i.acento)};color:${esc(i.primario)}">${esc(s)}</span>`).join('')}</div>`:''}
+    </div>`;
+
+  const r = revisarPerfil(p);
+  $('#revision').innerHTML = r.listo
+    ? `<div class="aviso ok">Listo para publicar.</div>`
+    : `<div class="aviso ojo"><b>Antes de publicar:</b><ul style="margin:6px 0 0;padding-left:18px">
+       ${r.faltan.map(f=>`<li>${esc(f.que)}</li>`).join('')}</ul></div>`;
+
+  $('#resumen-alta').innerHTML = `
+    <tr><th>Campo</th><th>Valor</th></tr>
+    <tr><td>Giro</td><td>${esc(p.categoria)||'<i>sin especificar</i>'}</td></tr>
+    <tr><td>Identificador</td><td><code>${esc(p.slug)}</code></td></tr>
+    <tr><td>Ofertas</td><td>${p.catalogo.length}</td></tr>
+    <tr><td>Temas que sabe</td><td>${p.conocimiento.length}</td></tr>
+    <tr><td>Datos propios</td><td>${Object.keys(p.atributos).length}</td></tr>
+    <tr><td>Puede hacer</td><td>${p.acciones.map(a=>`<span class="placa">${esc(a)}</span>`).join(' ')}</td></tr>
+    <tr><td>Reglas especiales</td><td>${p.politicas.length
+      ? p.politicas.map(a=>`<span class="placa ojo">${esc(a)}</span>`).join(' ')
+      : '<i>ninguna</i>'}</td></tr>`;
+}
+
+async function publicar() {
+  const p = perfilDelFormulario();
+  const r = revisarPerfil(p);
+  if (!r.listo) {
+    pasoActual = PASOS.findIndex(x => x.id === r.faltan[0].paso);
+    pintarPaso();
+    $('#alta-msg').innerHTML = `<div class="aviso mal">${esc(r.faltan[0].que)}</div>`;
+    return;
+  }
+  if (!enLinea) {
+    $('#alta-msg').innerHTML = `<div class="aviso info">Vista previa sin servidor:
+      el negocio se armó bien, pero hace falta iniciar sesión para guardarlo.</div>`;
+    return;
+  }
+  try {
+    $('#alta-msg').innerHTML = `<div class="aviso info">Guardando…</div>`;
+    const { empresa } = await api('empresas.crear', p);
+    await api('empresas.guardar', { id: empresa.id, ...p, secretos: {
+      persona: p.tono, conocimiento: p.conocimiento, limites: p.limites,
+      perfil: { catalogo: p.catalogo, atributos: p.atributos, horarios: p.horarios,
+                ubicaciones: p.ubicaciones, objetivos: p.objetivos, tono: p.tono },
+    }});
+    await api('empresas.publicar', { id: empresa.id });
+    $('#alta-msg').innerHTML = `<div class="aviso ok">Publicado. Ya puedes pegarlo con
+      <code>data-marca="${esc(p.slug)}"</code>.</div>`;
+    await cargarNegocios();
+  } catch (e) {
+    $('#alta-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
+  }
+}
+$('#btn-borrador').addEventListener('click', async () => {
+  if (!enLinea) { $('#alta-msg').innerHTML = `<div class="aviso info">Hace falta iniciar sesión para guardar.</div>`; return; }
+  try {
+    const p = perfilDelFormulario();
+    await api('empresas.crear', p);
+    $('#alta-msg').innerHTML = `<div class="aviso ok">Borrador guardado. Puedes seguir después.</div>`;
+    await cargarNegocios();
+  } catch (e) { $('#alta-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   LISTA DE NEGOCIOS
+   ══════════════════════════════════════════════════════════════════ */
+function tarjetaNegocio(n) {
+  const i = n.marca || n.identidad || NEUTRO.identidad;
+  const estado = n.estado || (n.activa ? 'publicado' : 'borrador');
+  const placa = { publicado:'ok', borrador:'', suspendido:'mal' }[estado] || '';
+  return `<article class="negocio">
+    <div class="cab">
+      <div class="marca" style="background:${esc(i.primario||NEUTRO.identidad.primario)}">${esc(i.avatar||'💬')}</div>
+      <div class="titulo"><b>${esc(n.nombre)}</b>
+        <span>${esc(n.categoria || 'Sin giro')}</span></div>
+    </div>
+    <div class="pies">
+      <span class="placa ${placa}">${esc(estado)}</span>
+      ${n.ejemplo?'<span class="placa info">ejemplo</span>':''}
+      ${(n.politicas||[]).length?`<span class="placa ojo">${(n.politicas||[]).length} regla(s)</span>`:''}
+      <span class="placa"><code>${esc(n.slug)}</code></span>
+    </div>
+  </article>`;
+}
+
+function pintarNegocios() {
+  const q = $('#busca').value.toLowerCase().trim();
+  const fe = $('#filtro-estado').value, fc = $('#filtro-cat').value;
+  const vis = negocios.filter(n => {
+    const estado = n.estado || (n.activa ? 'publicado' : 'borrador');
+    if (fe && estado !== fe) return false;
+    if (fc && (n.categoria||'') !== fc) return false;
+    if (q && !((n.nombre||'')+' '+(n.categoria||'')+' '+(n.slug||'')).toLowerCase().includes(q)) return false;
+    return true;
   });
+
+  if (!negocios.length) {
+    $('#lista-negocios').innerHTML = `<div class="tarjeta vacio">
+      <span class="ico">◻︎</span><h3>Todavía no hay negocios</h3>
+      <p>Da de alta el primero. Cualquier giro sirve: tienda, taller, despacho, restaurante.</p>
+      <button class="btn" onclick="document.querySelector('[data-vista=alta]').click()">Agregar negocio</button>
+    </div>`;
+    return;
+  }
+  if (!vis.length) {
+    $('#lista-negocios').innerHTML = `<div class="tarjeta vacio">
+      <span class="ico">⌕</span><h3>Nada coincide</h3>
+      <p>Prueba con otro texto o quita los filtros.</p></div>`;
+    return;
+  }
+  $('#lista-negocios').innerHTML = `<div class="negocios">${vis.map(tarjetaNegocio).join('')}</div>`;
+}
+['#busca','#filtro-estado','#filtro-cat'].forEach(s => $(s).addEventListener('input', pintarNegocios));
+
+function cargando() {
+  $('#lista-negocios').innerHTML = `<div class="negocios">${'<div class="negocio">'+
+    '<div class="cab"><div class="esqueleto" style="width:38px;height:38px;border-radius:9px"></div>'+
+    '<div style="flex:1"><div class="esqueleto" style="width:70%"></div>'+
+    '<div class="esqueleto" style="width:45%;margin-top:6px;height:11px"></div></div></div></div>'.repeat(3)}</div>`;
+}
+
+async function cargarNegocios() {
+  if (!enLinea) {
+    // Sin sesión se muestran las semillas, marcadas como ejemplos.
+    negocios = Object.values(SEMILLAS).map(s => ({ ...normalizarPerfil(s), marca: s.identidad, ejemplo: true, estado: 'publicado' }));
+  } else {
+    cargando();
+    const d = await api('empresas.listar');
+    negocios = d.empresas || [];
+  }
+  const cats = [...new Set(negocios.map(n => n.categoria).filter(Boolean))].sort();
+  $('#filtro-cat').innerHTML = '<option value="">Todos los giros</option>' +
+    cats.map(c => `<option>${esc(c)}</option>`).join('');
+  pintarNegocios();
+  pintarBotonesMarca();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PROBAR EL WIDGET
+   ══════════════════════════════════════════════════════════════════ */
+function pintarBotonesMarca() {
+  const marcaURL = new URLSearchParams(location.search).get('marca') || negocios[0]?.slug || 'default';
+  $('#botones-marca').innerHTML = negocios.slice(0, 8).map(n =>
+    `<button class="btn ${n.slug===marcaURL?'':'sec'} chico" data-m="${esc(n.slug)}">
+      ${esc((n.marca||n.identidad||{}).avatar||'💬')} ${esc(n.nombre)}</button>`).join('')
+    || '<span class="pista">Da de alta un negocio para probarlo.</span>';
+  $$('#botones-marca button').forEach(b => b.addEventListener('click',
+    () => { location.search = '?marca=' + b.dataset.m; }));
+  $('#fragmento').textContent = `<script src="/widget.js" data-marca="${marcaURL}" defer><\/script>`;
+}
+
+const marcaActiva = new URLSearchParams(location.search).get('marca');
+// Vista previa local: se responde la petición de configuración con las
+// semillas, para poder afinar sin gastar un despliegue.
+const fetchReal = window.fetch;
+window.fetch = function (url) {
+  const u = String(url);
+  if (u.includes('config=1') && !enLinea) {
+    const id = new URL(u, location.href).searchParams.get('marca');
+    const s = SEMILLAS[id];
+    return Promise.resolve(new Response(JSON.stringify(perfilPublico(s || { slug: id })),
+      { status: 200, headers: { 'content-type': 'application/json' } }));
+  }
+  return fetchReal.apply(this, arguments);
+};
+const sc = document.createElement('script');
+sc.src = 'widget.js'; // Sin marca en la URL se toma el primer ejemplo disponible, no un rubro
+// escrito a mano. Que la consola tenga un giro favorito es justo el defecto
+// que esta pasada vino a quitar.
+sc.dataset.marca = marcaActiva || Object.keys(SEMILLAS)[0] || 'default';
+sc.defer = true;
+document.body.appendChild(sc);
+
+fetchReal('/api/bot?ping=1').then(r=>r.json()).then(d => {
+  const filas = Object.entries(d.proveedores||{}).map(([n,hay]) =>
+    `<span class="placa ${hay?'ok':''}">${hay?'●':'○'} ${esc(n)}</span>`).join(' ');
+  const probs = (d.problemas||[]).map(p =>
+    `<div class="aviso ${p.gravedad==='critico'?'mal':'ojo'}"><b>${esc(p.titulo)}</b><br>
+     ${esc(p.detalle)}<br><small>${esc(p.arreglo)}</small></div>`).join('');
+  $('#estado').innerHTML = filas + (probs || '<div class="aviso ok">Todo configurado.</div>');
+}).catch(() => {
+  $('#estado').innerHTML = `<div class="aviso ojo">Sin servidor. Es lo normal en local:
+    la consola se ve, pero el asistente no responde.</div>`;
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   ACCESO Y API
+   ══════════════════════════════════════════════════════════════════ */
+async function auth(ruta, cuerpo) {
+  const r = await fetchReal(`${SB_URL}/auth/v1/${ruta}`, {
+    method:'POST', headers:{apikey:SB_ANON,'content-type':'application/json'},
+    body: JSON.stringify(cuerpo) });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error_description || d.msg || d.message || 'No se pudo');
   return d;
 }
-
-$('#btn-entrar').addEventListener('click', async () => {
-  try {
-    const d = await auth('token?grant_type=password',
-      { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
-    token = d.access_token;
-    sessionStorage.setItem('chatbot:token', token);
-    await arrancarPanel();
-  } catch (e) { avisar('#acceso-msg', e.message); }
-});
-
-$('#btn-registrar').addEventListener('click', async () => {
-  try {
-    await auth('signup', { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
-    avisar('#acceso-msg', 'Cuenta creada. Si el proyecto pide confirmar el correo, ' +
-      'revisa tu bandeja. Después hay que asignarte a una empresa.', 'bien');
-  } catch (e) { avisar('#acceso-msg', e.message); }
-});
-
-$('#btn-salir').addEventListener('click', () => {
-  token = null; yo = null;
-  sessionStorage.removeItem('chatbot:token');
-  $('#caja-panel').classList.add('oculto');
-  $('#caja-acceso').classList.remove('oculto');
-});
-
-/* ── llamadas al panel ───────────────────────────────────────────────── */
 async function api(accion, datos = {}) {
-  const r = await fetch(ADMIN, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ accion, datos }),
-  });
+  const r = await fetchReal(ADMIN, { method:'POST',
+    headers:{'content-type':'application/json',Authorization:'Bearer '+token},
+    body: JSON.stringify({ accion, datos }) });
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || 'Falló la petición');
   return d;
 }
-
-async function arrancarPanel() {
+$('#btn-entrar').addEventListener('click', async () => {
   try {
-    const { yo: perfil } = await api('sesion');
-    yo = perfil;
-  } catch (e) {
-    avisar('#acceso-msg', e.message);
-    if (String(e.message).includes('Sesión no válida')) {
-      sessionStorage.removeItem('chatbot:token'); token = null;
-    }
-    return;
-  }
-
-  $('#caja-acceso').classList.add('oculto');
-  $('#caja-panel').classList.remove('oculto');
-  $('#yo-nombre').textContent = yo.nombre || yo.email;
-  $('#yo-rol').textContent = yo.rol;
-  $('#yo-rol').className = 'placa ' + (yo.esSuper ? 'verde' : '');
-
-  // Lo que solo ve el superadministrador.
-  $('#crear-empresa').classList.toggle('oculto', !yo.esSuper);
-  $('#caja-usuarios').classList.toggle('oculto', !yo.esSuper);
-  $('#caja-bitacora').classList.toggle('oculto', !yo.esSuper);
-
-  await Promise.all([cargarEmpresas(), cargarMetricas(), cargarLeads(), cargarAvisos()]);
-  if (yo.esSuper) await Promise.all([cargarUsuarios(), cargarBitacora()]);
-}
-
-/* ── empresas ────────────────────────────────────────────────────────── */
-async function cargarEmpresas() {
-  const d = await api('empresas.listar');
-  empresas = d.empresas || [];
-  $('#yo-empresa').textContent = yo.esSuper
-    ? 'Superadministrador de la plataforma · ' + empresas.length + ' empresa(s)'
-    : (empresas[0]?.nombre || '');
-
-  $('#tabla-empresas').innerHTML = empresas.length ? `
-    <tr><th>Marca</th><th>Tipo</th><th>Plan</th><th>Estado</th><th></th></tr>
-    ${empresas.map(e => `
-      <tr>
-        <td><b>${esc(e.nombre)}</b><div class="nota"><code>${esc(e.slug)}</code></div></td>
-        <td><span class="placa ${e.dominio === 'clinico' ? 'ambar' : ''}">${esc(e.dominio)}</span></td>
-        <td>${esc(e.plan)}</td>
-        <td><span class="placa ${e.activa ? 'verde' : 'roja'}">${e.activa ? 'activa' : 'suspendida'}</span></td>
-        <td class="fila">
-          <button class="accion gris" data-editar="${e.id}">Configurar</button>
-          ${yo.esSuper ? `<button class="accion ${e.activa ? 'roja' : 'gris'}"
-             data-suspender="${e.id}" data-activa="${e.activa}">
-             ${e.activa ? 'Suspender' : 'Reactivar'}</button>` : ''}
-        </td>
-      </tr>`).join('')}`
-    : '<tr><td class="nota">Todavía no hay empresas. Crea la primera abajo.</td></tr>';
-
-  $$('[data-editar]').forEach(b => b.addEventListener('click', () => abrirEditor(b.dataset.editar)));
-  $$('[data-suspender]').forEach(b => b.addEventListener('click', async () => {
-    const activa = b.dataset.activa !== 'true';
-    if (!confirm(activa ? '¿Reactivar esta empresa?'
-      : '¿Suspender? Su chatbot deja de contestar de inmediato.')) return;
-    await api('empresas.suspender', { id: b.dataset.suspender, activa });
-    await cargarEmpresas();
-  }));
-}
-
-$('#btn-crear-empresa').addEventListener('click', async () => {
+    const d = await auth('token?grant_type=password',
+      { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
+    token = d.access_token; sessionStorage.setItem('consola:token', token);
+    await arrancar();
+  } catch (e) { $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
+});
+$('#btn-registrar').addEventListener('click', async () => {
   try {
-    await api('empresas.crear', {
-      slug: $('#ne-slug').value, nombre: $('#ne-nombre').value,
-      dominio: $('#ne-dominio').value, plan: $('#ne-plan').value,
-    });
-    $('#ne-slug').value = ''; $('#ne-nombre').value = '';
-    await cargarEmpresas();
-  } catch (e) { alert(e.message); }
+    await auth('signup', { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
+    $('#acceso-msg').innerHTML = `<div class="aviso ok">Cuenta creada. Falta que te asignen a un negocio.</div>`;
+  } catch (e) { $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
+});
+$('#btn-salir').addEventListener('click', () => {
+  token = null; yo = null; enLinea = false;
+  sessionStorage.removeItem('consola:token');
+  location.reload();
 });
 
-/* ── editor de una empresa ───────────────────────────────────────────── */
-async function abrirEditor(id) {
-  const { empresa, secretos } = await api('empresas.detalle', { id });
-  empresaActiva = empresa;
-  $('#caja-editor').classList.remove('oculto');
-  $('#ed-nombre').textContent = empresa.nombre;
-  $('#ed-titulo').value   = empresa.nombre || '';
-  $('#ed-saludo').value   = empresa.saludo || '';
-  $('#ed-descargo').value = empresa.descargo || '';
-  $('#ed-persona').value  = secretos.persona || '';
-  const con = empresa.contactos || {};
-  $('#ed-wa-consultorio').value = con.consultorio?.whatsapp || '';
-  $('#ed-wa-urgencias').value   = con.urgencias?.whatsapp   || '';
-  const des = secretos.destinos || {};
-  $('#ed-mail-urgencias').value   = des.urgencias?.correo   || '';
-  $('#ed-mail-consultorio').value = des.consultorio?.correo || '';
-  $('#ed-tel-personal').value     = des.personal?.telefono  || '';
-  $('#ed-limites').value  = (secretos.limites || []).join('\n');
-  $('#ed-conocimiento').value = (secretos.conocimiento || [])
-    .map(k => `${k.tema} | ${k.texto}`).join('\n');
-  $('#ed-msg').textContent = '';
-  $('#caja-editor').scrollIntoView({ behavior: 'smooth' });
-}
-
-$('#btn-cerrar-editor').addEventListener('click', () => $('#caja-editor').classList.add('oculto'));
-
-$('#btn-guardar-empresa').addEventListener('click', async () => {
-  const btn = $('#btn-guardar-empresa');
-  btn.disabled = true; $('#ed-msg').textContent = 'Cifrando y guardando…';
-  try {
-    await api('empresas.guardar', {
-      id: empresaActiva.id,
-      nombre:   $('#ed-titulo').value,
-      saludo:   $('#ed-saludo').value,
-      descargo: $('#ed-descargo').value,
-      contactos: {
-        consultorio: { whatsapp: $('#ed-wa-consultorio').value.replace(/\D/g, ''),
-                       etiqueta: 'Escribir al consultorio' },
-        urgencias:   { whatsapp: $('#ed-wa-urgencias').value.replace(/\D/g, ''),
-                       etiqueta: 'Escribir a urgencias' },
-      },
-      secretos: {
-        destinos: {
-          urgencias:   { correo: $('#ed-mail-urgencias').value.trim() },
-          consultorio: { correo: $('#ed-mail-consultorio').value.trim() },
-          personal:    { telefono: $('#ed-tel-personal').value.trim() },
-          // A dónde va cada cosa. Una urgencia nunca cae en el buzón de citas.
-          ruteo: { urgencia: 'urgencias', lead: 'consultorio', resumen: 'personal' },
-        },
-        persona: $('#ed-persona').value,
-        limites: $('#ed-limites').value.split('\n').map(s => s.trim()).filter(Boolean),
-        conocimiento: $('#ed-conocimiento').value.split('\n').map(s => s.trim()).filter(Boolean)
-          .map(r => {
-            const i = r.indexOf('|');
-            return i < 0 ? { tema: 'general', texto: r }
-                         : { tema: r.slice(0, i).trim(), texto: r.slice(i + 1).trim() };
-          }),
-      },
-    });
-    $('#ed-msg').textContent = 'Guardado y cifrado.';
-    await cargarEmpresas();
-  } catch (e) { $('#ed-msg').textContent = e.message; }
-  btn.disabled = false;
-});
-
-/* ── métricas, leads, usuarios, bitácora ─────────────────────────────── */
-async function cargarMetricas() {
-  const m = await api('metricas');
-  $('#metricas').innerHTML = `
-    <div class="numero">${m.conversaciones}<small>conversaciones</small></div>
-    <div class="numero" style="color:${m.urgencias ? 'var(--alerta)' : 'inherit'}">
-      ${m.urgencias}<small>urgencias detectadas</small></div>
-    <div class="numero">${m.leads}<small>datos recibidos</small></div>
-    <div class="numero" style="color:${m.leadsSinAtender ? 'var(--alerta)' : 'inherit'}">
-      ${m.leadsSinAtender}<small>sin atender</small></div>`;
-}
-
-async function cargarAvisos() {
-  const { avisos } = await api('avisos.listar');
-  $('#tabla-avisos').innerHTML = avisos.length ? `
-    <tr><th>Cuándo</th><th>Qué</th><th>Salió</th><th>A dónde</th><th></th></tr>
-    ${avisos.map(a => `
-      <tr>
-        <td class="nota">${new Date(a.created_at).toLocaleString('es-MX')}</td>
-        <td><span class="placa ${a.tipo === 'urgencia' ? 'roja' : ''}">${esc(a.tipo)}</span></td>
-        <td><span class="placa ${a.estado === 'enviado' ? 'verde' : 'roja'}">${esc(a.estado)}</span>
-          ${a.estado === 'fallido' ? `<div class="nota">${esc(a.detalle?.nota || '')}</div>` : ''}</td>
-        <td class="nota">${esc(a.destino || '—')}</td>
-        <td>${a.visto_at ? '<span class="placa verde">visto</span>'
-              : `<button class="accion gris" data-visto="${a.id}">Marcar visto</button>`}</td>
-      </tr>`).join('')}`
-    : '<tr><td class="nota">Sin avisos todavía.</td></tr>';
-
-  $$('[data-visto]').forEach(b => b.addEventListener('click', async () => {
-    await api('avisos.visto', { id: b.dataset.visto, visto: true });
-    await cargarAvisos();
-  }));
-}
-
-async function cargarLeads() {
-  const { leads } = await api('leads.listar');
-  $('#tabla-leads').innerHTML = leads.length ? `
-    <tr><th>Cuándo</th><th>Quién</th><th>Contacto</th><th>Qué escribió</th><th></th></tr>
-    ${leads.map(l => `
-      <tr>
-        <td class="nota">${new Date(l.created_at).toLocaleString('es-MX')}</td>
-        <td>${l.error ? '<span class="placa roja">no se pudo descifrar</span>'
-                      : esc(l.datos?.nombre)}</td>
-        <td>${esc(l.datos?.telefono || '')}</td>
-        <td>${esc(l.datos?.motivo || '')}</td>
-        <td><button class="accion gris" data-atendido="${l.id}" data-val="${!l.atendido}">
-          ${l.atendido ? '✓ atendido' : 'marcar'}</button></td>
-      </tr>`).join('')}`
-    : '<tr><td class="nota">Nadie ha dejado sus datos todavía.</td></tr>';
-
-  $$('[data-atendido]').forEach(b => b.addEventListener('click', async () => {
-    await api('leads.atendido', { id: b.dataset.atendido, atendido: b.dataset.val === 'true' });
-    await Promise.all([cargarLeads(), cargarMetricas()]);
-  }));
-}
-
-async function cargarUsuarios() {
-  const { usuarios } = await api('usuarios.listar');
-  const opciones = e => empresas.map(x =>
-    `<option value="${x.id}" ${x.id === e ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
-
-  $('#tabla-usuarios').innerHTML = `
-    <tr><th>Persona</th><th>Rol</th><th>Empresa</th><th>Activo</th><th></th></tr>
-    ${usuarios.map(u => `
-      <tr data-usuario="${u.id}">
-        <td>${esc(u.nombre || '')}<div class="nota">${esc(u.email || '')}</div></td>
-        <td><select class="u-rol">
-          ${['pendiente','staff','dueno','superadmin'].map(r =>
-            `<option value="${r}" ${r === u.rol ? 'selected' : ''}>${r}</option>`).join('')}
-        </select></td>
-        <td><select class="u-empresa"><option value="">— ninguna —</option>${opciones(u.empresa_id)}</select></td>
-        <td><input type="checkbox" class="u-activo" ${u.activo ? 'checked' : ''} style="width:auto"></td>
-        <td><button class="accion gris u-guardar">Guardar</button></td>
-      </tr>`).join('')}`;
-
-  $$('.u-guardar').forEach(b => b.addEventListener('click', async () => {
-    const tr = b.closest('tr');
+async function arrancar() {
+  if (token) {
     try {
-      await api('usuarios.asignar', {
-        id: tr.dataset.usuario,
-        rol: tr.querySelector('.u-rol').value,
-        empresa_id: tr.querySelector('.u-empresa').value || null,
-        activo: tr.querySelector('.u-activo').checked,
-      });
-      b.textContent = '✓';
-      setTimeout(() => { b.textContent = 'Guardar'; }, 1500);
-    } catch (e) { alert(e.message); }
-  }));
+      const { yo: perfil } = await api('sesion');
+      yo = perfil; enLinea = true;
+      $('#btn-salir').classList.remove('oculto');
+      $('#v-acceso').classList.add('oculto');
+      $('#banda-acceso').classList.add('oculto');
+    } catch (e) { token = null; sessionStorage.removeItem('consola:token'); }
+  }
+  await cargarNegocios();
 }
 
-async function cargarBitacora() {
-  const { bitacora } = await api('bitacora.listar');
-  $('#tabla-bitacora').innerHTML = bitacora.length ? `
-    <tr><th>Cuándo</th><th>Acción</th><th>Detalle</th></tr>
-    ${bitacora.map(b => `
-      <tr><td class="nota">${new Date(b.created_at).toLocaleString('es-MX')}</td>
-      <td><code>${esc(b.accion)}</code></td>
-      <td class="nota">${esc(JSON.stringify(b.detalle))}</td></tr>`).join('')}`
-    : '<tr><td class="nota">Sin movimientos todavía.</td></tr>';
-}
-
-/* ── herramientas ────────────────────────────────────────────────────── */
+/* ── herramientas ─────────────────────────────────────────────────── */
 $('#btn-llave').addEventListener('click', async () => {
   const { generarLlaveMaestra } = await import('./cerebro/cifrado.mjs');
   const llave = generarLlaveMaestra();
   $('#salida-llave').innerHTML =
     `<pre style="white-space:pre-wrap;word-break:break-all">${esc(llave)}</pre>
-     <div class="aviso ojo">Cópiala ahora. No se guarda en ningún lado: si recargas
-     esta página, se va. Va en Cloudflare como <code>CHATBOT_CLAVE</code>.</div>`;
+     <div class="aviso ojo">Cópiala ahora. No se guarda en ningún lado.</div>`;
 });
-
 $('#btn-probar-cifrado').addEventListener('click', async () => {
-  const salida = $('#salida-cifrado');
-  salida.innerHTML = '<div class="nota">Corriendo…</div>';
+  const s = $('#salida-cifrado');
+  s.innerHTML = '<p class="pista">Corriendo…</p>';
   try {
     const m = await import('./cerebro/cifrado.mjs');
-    const R = [];
-    const ok = (n, c) => R.push({ n, c });
+    const R = []; const ok = (n,c) => R.push({n,c});
     const falla = async fn => { try { await fn(); return false; } catch { return true; } };
-
     const maestra = m.generarLlaveMaestra();
-    const A = '11111111-1111-1111-1111-111111111111';
-    const B = '22222222-2222-2222-2222-222222222222';
-    const lead = { nombre: 'María Pérez', telefono: '9611234567', motivo: 'dolor de rodilla' };
-
-    const c1 = await m.cifrar(maestra, A, lead);
-    ok('ida y vuelta conserva el dato', JSON.stringify(await m.descifrar(maestra, A, c1)) === JSON.stringify(lead));
-    ok('el cifrado no filtra el nombre', !c1.includes('Mar'));
-    ok('el cifrado no filtra el teléfono', !c1.includes('9611234567'));
-    ok('mismo dato → cifrado distinto (IV único)', c1 !== await m.cifrar(maestra, A, lead));
-    ok('la empresa B no abre los datos de A', await falla(() => m.descifrar(maestra, B, c1)));
-
-    const p = c1.split('.'); const b = atob(p[2]).split('');
-    b[3] = String.fromCharCode(b[3].charCodeAt(0) ^ 1);
-    ok('detecta un byte alterado', await falla(() =>
-      m.descifrar(maestra, A, p[0] + '.' + p[1] + '.' + btoa(b.join('')))));
-    ok('otra llave maestra no descifra', await falla(() => m.descifrar(m.generarLlaveMaestra(), A, c1)));
-    ok('rechaza llave maestra corta', await falla(() => m.cifrar(btoa('poquito'), A, { x: 1 })));
-
-    const m2 = m.generarLlaveMaestra();
-    const cRot = await m.cifrar(maestra, A, { s: 'antes' });
-    await m.cifrar(m2, A, { s: 'despues' });
-    ok('tras rotar, lo viejo ya no abre con la nueva', await falla(() => m.descifrar(m2, A, cRot)));
-    ok('tras rotar, lo viejo sí abre con la vieja', (await m.descifrar(maestra, A, cRot)).s === 'antes');
-
-    const fallos = R.filter(r => !r.c).length;
-    salida.innerHTML =
-      `<div class="aviso ${fallos ? 'mal' : 'bien'}">${fallos ? fallos + ' prueba(s) fallaron' : 'Las ' + R.length + ' pruebas pasan'}</div>
-       <ul>${R.map(r => `<li>${r.c ? '✅' : '❌'} ${esc(r.n)}</li>`).join('')}</ul>`;
-  } catch (e) {
-    salida.innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
-  }
+    const A='11111111-1111-1111-1111-111111111111', B='22222222-2222-2222-2222-222222222222';
+    const dato = { nombre:'María Pérez', telefono:'9611234567' };
+    const c1 = await m.cifrar(maestra, A, dato);
+    ok('ida y vuelta conserva el dato', JSON.stringify(await m.descifrar(maestra,A,c1))===JSON.stringify(dato));
+    ok('el cifrado no filtra el contenido', !c1.includes('Mar') && !c1.includes('9611234567'));
+    ok('mismo dato, cifrado distinto', c1 !== await m.cifrar(maestra,A,dato));
+    ok('el negocio B no abre los datos de A', await falla(()=>m.descifrar(maestra,B,c1)));
+    const p=c1.split('.'); const b=atob(p[2]).split('');
+    b[3]=String.fromCharCode(b[3].charCodeAt(0)^1);
+    ok('detecta un byte alterado', await falla(()=>m.descifrar(maestra,A,p[0]+'.'+p[1]+'.'+btoa(b.join('')))));
+    ok('otra llave maestra no descifra', await falla(()=>m.descifrar(m.generarLlaveMaestra(),A,c1)));
+    ok('rechaza llave maestra corta', await falla(()=>m.cifrar(btoa('poquito'),A,{x:1})));
+    const m2=m.generarLlaveMaestra(); const cR=await m.cifrar(maestra,A,{s:'antes'});
+    await m.cifrar(m2,A,{s:'despues'});
+    ok('tras rotar, lo viejo ya no abre con la nueva', await falla(()=>m.descifrar(m2,A,cR)));
+    ok('tras rotar, lo viejo sí abre con la vieja', (await m.descifrar(maestra,A,cR)).s==='antes');
+    const f = R.filter(r=>!r.c).length;
+    s.innerHTML = `<div class="aviso ${f?'mal':'ok'}">${f?f+' prueba(s) fallaron':'Las '+R.length+' pruebas pasan'}</div>
+      <ul style="padding-left:18px;font-size:14px">${R.map(r=>`<li>${r.c?'✅':'❌'} ${esc(r.n)}</li>`).join('')}</ul>`;
+  } catch (e) { s.innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
 });
 
-/* ── si ya había sesión, entrar directo ──────────────────────────────── */
-if (token) arrancarPanel();
+/* ── arranque ─────────────────────────────────────────────────────── */
+if (!token) $('#banda-acceso').classList.remove('oculto');
+$('#btn-mostrar-acceso').addEventListener('click', () => {
+  const c = $('#v-acceso');
+  c.classList.toggle('oculto');
+  if (!c.classList.contains('oculto')) $('#ac-correo').focus();
+});
+refrescarPrevio();
+arrancar();
 </script>
 </body>
 </html>

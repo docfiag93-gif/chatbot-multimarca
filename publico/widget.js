@@ -1,31 +1,36 @@
-/* ══════════════════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════
  *  El widget — la burbuja de chat que se pega en cualquier sitio
  *
  *  Se usa así, y nada más:
- *      <script src="/chatbot/widget.js" data-marca="consultorio" defer></script>
+ *      <script src="/widget.js" data-marca="mi-negocio" defer></script>
  *
  *  Tres decisiones que explican cómo está escrito:
  *
  *  1) NO es módulo ES. Es un <script> de toda la vida, sin imports. Así se
  *     puede abrir el HTML con doble clic para probarlo: file:// bloquea los
- *     módulos por CORS y la página se quedaría en blanco, que es exactamente
- *     el bug que ya nos mordió con las rutas absolutas.
+ *     módulos por CORS y la página se quedaría en blanco.
  *
- *  2) Vive dentro de un Shadow DOM. El widget va a terminar pegado en el
- *     sitio de la marca personal, en EspecialistaYa y mañana en el del café,
- *     cada uno con su propio CSS. Sin shadow, cualquier `.btn { }` ajeno le
+ *  2) Vive dentro de un Shadow DOM. El widget se pega en sitios ajenos, cada
+ *     uno con su propio CSS. Sin shadow, cualquier `.btn { }` ajeno le
  *     deforma los botones. Adentro del shadow, el CSS de afuera no entra.
  *
- *  3) No sabe NADA de la marca. Los colores, el saludo y los campos se los
- *     pide al servidor. Por eso el mismo archivo, sin tocar una coma, sirve
- *     para el consultorio y para el café.
- * ══════════════════════════════════════════════════════════════════════════ */
+ *  3) No sabe NADA del negocio ni de su rubro. Colores, saludo, sugerencias,
+ *     acciones y contactos se los pide al servidor. Por eso el mismo archivo,
+ *     sin tocar una coma, sirve para una tienda, un taller o un despacho.
+ * ══════════════════════════════════════════════════════════════════════ */
 
 (function () {
   'use strict';
 
   var script   = document.currentScript;
-  var MARCA    = (script && script.dataset.marca)    || 'consultorio';
+  // Sin data-marca no hay negocio que servir. Antes esto caía en
+  // 'consultorio': quien pegara el widget sin especificar marca obtenía la
+  // identidad de un consultorio médico ajeno. Ahora cae en un identificador
+  // neutro y avisa por consola.
+  var MARCA = (script && script.dataset.marca) || 'default';
+  if (script && !script.dataset.marca && typeof console !== 'undefined') {
+    console.warn('[widget] Falta data-marca en la etiqueta <script>. Se usará la configuración neutra.');
+  }
   // /api/bot es la ruta nativa de Cloudflare Pages, y cualquier otra
   // plataforma se adapta con una reescritura. Así el widget no sabe dónde
   // está alojado,
@@ -37,11 +42,16 @@
   // función todavía no está desplegada), el widget NO se rompe: se pinta con
   // esto y avisa que está en modo local. Es feo quedarse sin bot, pero es
   // mucho peor una burbuja que no abre y nadie sabe por qué.
+  // Respaldo NEUTRO. Gris sobrio, sin rubro y sin nombre inventado: un
+  // negocio cuya configuración no cargó debe verse profesional, nunca como
+  // el ejemplo de otro giro. Antes esto era verde de consultorio, y cualquier
+  // sitio con la config caída mostraba identidad médica ajena.
   var RESPALDO = {
-    id: MARCA, nombre: 'Chat', dominio: 'comercial',
-    marca: { primario: '#0f766e', acento: '#14b8a6', fondo: '#fff', texto: '#0f172a', burbujaIA: '#f0fdfa', avatar: '💬' },
+    id: null, slug: MARCA, nombre: 'Asistente',
+    marca: { primario: '#334155', acento: '#64748b', fondo: '#ffffff',
+             texto: '#0f172a', burbujaIA: '#f1f5f9', avatar: '💬' },
     saludo: 'Hola, ¿en qué te ayudo?',
-    sugerencias: [], descargo: '', contactos: {},
+    sugerencias: [], descargo: '', contactos: {}, acciones: [],
     captura: { activa: false, titulo: '', campos: [], confirmacion: '' },
   };
 
@@ -51,6 +61,11 @@
   var ocupado = false;
   var modoLocal = false;
   var raiz, caja, lista, entrada, chips, boton;
+
+  // Las acciones que abren el formulario de captura. Se listan aquí porque
+  // el widget necesita reaccionar sin preguntar; el servidor decide cuáles
+  // están encendidas para cada negocio.
+  var ACCIONES_CON_FORMULARIO = ['capturar_contacto', 'cotizar', 'reservar', 'agendar', 'capturar_cita'];
 
   var CLAVE = 'chatbot:' + MARCA;
 
@@ -111,6 +126,8 @@
   }
   .lanzador:hover { transform: scale(1.06); }
   .lanzador:focus-visible { outline: 3px solid var(--acento); outline-offset: 3px; }
+  .lanzador .logo { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; }
+  .cabecera .logo { width: 24px; height: 24px; object-fit: contain; border-radius: 4px; }
 
   .panel {
     position: fixed; right: 18px; bottom: 88px; z-index: 2147483000;
@@ -254,7 +271,14 @@
     raiz.host.style.setProperty('--burbujaIA', c.burbujaIA);
 
     boton = el('button', 'lanzador');
-    boton.textContent = c.avatar;
+    // Si el negocio subió logo, manda el logo. El emoji es el respaldo.
+    if (c.logo) {
+      var img = document.createElement('img');
+      img.src = c.logo; img.alt = ''; img.className = 'logo';
+      boton.appendChild(img);
+    } else {
+      boton.textContent = c.avatar;
+    }
     boton.setAttribute('aria-label', 'Abrir chat de ' + cfg.nombre);
     boton.setAttribute('aria-expanded', 'false');
     boton.setAttribute('aria-haspopup', 'dialog');
@@ -267,7 +291,13 @@
     caja.setAttribute('aria-label', 'Chat de ' + cfg.nombre);
 
     var cab = el('div', 'cabecera');
-    cab.appendChild(el('span', 'avatar', c.avatar));
+    if (c.logo) {
+      var img2 = document.createElement('img');
+      img2.src = c.logo; img2.alt = ''; img2.className = 'logo';
+      cab.appendChild(img2);
+    } else {
+      cab.appendChild(el('span', 'avatar', c.avatar));
+    }
     cab.appendChild(el('div', 'titulo', cfg.nombre));
     var cerrar = el('button', 'cerrar', '✕');
     cerrar.setAttribute('aria-label', 'Cerrar chat');
@@ -338,7 +368,17 @@
     abierto = !abierto;
     caja.dataset.abierto = abierto ? '1' : '0';
     boton.dataset.abierto = abierto ? '1' : '0';
-    boton.textContent = abierto ? '✕' : cfg.marca.avatar;
+    if (cfg.marca.logo) {
+      boton.textContent = '';
+      if (abierto) { boton.textContent = '✕'; }
+      else {
+        var l = document.createElement('img');
+        l.src = cfg.marca.logo; l.alt = ''; l.className = 'logo';
+        boton.appendChild(l);
+      }
+    } else {
+      boton.textContent = abierto ? '✕' : cfg.marca.avatar;
+    }
     boton.setAttribute('aria-expanded', abierto ? 'true' : 'false');
     boton.setAttribute('aria-label', (abierto ? 'Cerrar' : 'Abrir') + ' chat de ' + cfg.nombre);
     // Al cerrar, el foco vuelve al lanzador: si se queda en un elemento
@@ -449,7 +489,7 @@
     guardar();
 
     if (modoLocal) {
-      pintarBot('Estoy en modo local: no hay servidor conectado, así que no puedo responder de verdad. Súbelo a Cloudflare y aquí sí contesto.');
+      pintarBot('Vista previa: todavía no hay servidor conectado, así que no puedo responder de verdad.');
       return;
     }
 
@@ -485,7 +525,10 @@
           enlaceWhatsapp('urgencia');
           return;
         }
-        if (d.accion === 'capturar_cita' && cfg.captura.activa) formulario();
+        // Cualquier acción que recoja datos abre el formulario. La lista
+        // vive en el servidor: agregar una acción nueva no obliga a tocar
+        // este archivo ni a que los clientes actualicen su widget.
+        if (ACCIONES_CON_FORMULARIO.indexOf(d.accion) > -1 && cfg.captura.activa) formulario();
         else if (d.accion === 'derivar_humano') enlaceWhatsapp('general');
         else pintarChips(d.sugerencias);
       })
@@ -504,16 +547,37 @@
   // El botón manda al número que toca según el caso: no es lo mismo pedir una
   // cita que estar en una urgencia. Los números salen de la configuración de
   // la empresa; data-whatsapp queda como respaldo para sitios sencillos.
+  /**
+   * Elige a qué contacto mandar a la persona.
+   *
+   * Los nombres de los contactos son LIBRES: un negocio puede tener
+   * "ventas" y "soporte", otro "reservaciones", otro "urgencias". Antes esto
+   * estaba clavado a dos nombres de consultorio, así que cualquier otro
+   * rubro se quedaba sin botón.
+   *
+   * La única convención: si existe un contacto llamado "urgencias", se usa
+   * cuando una política marcó la conversación como urgente. Todo lo demás va
+   * al que el negocio haya puesto como "principal", o al primero que haya.
+   */
   function contactoPara(caso) {
     var c = cfg.contactos || {};
-    var elegido = caso === 'urgencia' ? (c.urgencias || c.consultorio)
-                                      : (c.consultorio || c.urgencias);
+    var claves = Object.keys(c);
+    var elegido = null;
+
+    if (caso === 'urgencia' && c.urgencias) {
+      elegido = c.urgencias;
+    } else {
+      var normales = claves.filter(function (k) { return k !== 'urgencias'; });
+      var clave = c.principal ? 'principal' : (normales[0] || claves[0]);
+      elegido = clave ? c[clave] : null;
+    }
+
     var numero = (elegido && (elegido.whatsapp || elegido.telefono)) || WHATSAPP;
     if (!numero) return null;
     return {
       numero: String(numero).replace(/\D/g, ''),
-      etiqueta: (elegido && elegido.etiqueta) ||
-                (caso === 'urgencia' ? 'Escribir a urgencias' : 'Escribir por WhatsApp'),
+      // La etiqueta la pone el negocio. El respaldo es genérico a propósito.
+      etiqueta: (elegido && elegido.etiqueta) || 'Escribir por WhatsApp',
     };
   }
 

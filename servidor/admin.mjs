@@ -20,6 +20,12 @@
 import { env } from '../publico/cerebro/entorno.mjs';
 import { clienteSupabase, usuarioDelToken } from '../publico/cerebro/supabase.mjs';
 import { cifrar, descifrar } from '../publico/cerebro/cifrado.mjs';
+import { normalizarPerfil, revisarPerfil, aSlug, IDIOMAS, TIPOS_OFERTA }
+  from '../publico/cerebro/perfil.mjs';
+import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
+import { catalogoDePoliticas } from '../publico/cerebro/politicas.mjs';
+import { catalogoDeAcciones } from '../publico/cerebro/acciones.mjs';
+import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
 const ANON     = env('SUPABASE_ANON_KEY');
@@ -38,6 +44,9 @@ const SECRETOS = {
   // A dónde te llegan a TI los avisos. Va cifrado porque es tu número
   // personal y a qué hora localizarte: dato personal, no dato del negocio.
   destinos:     'destinos_cifrados',
+  // Catálogo, horarios, ubicaciones, objetivos y atributos propios. Cifrado
+  // porque ahí van precios, márgenes y detalles de operación del cliente.
+  perfil:       'perfil_cifrado',
 };
 
 export async function manejar(req, context) {
@@ -90,28 +99,119 @@ export async function manejar(req, context) {
         // Sin filtro: RLS ya decide. El superadmin ve todas, un dueño ve la
         // suya. No se filtra aquí a propósito — que mande la base.
         const filas = await sb.seleccionar('empresas',
-          'id,slug,nombre,dominio,plan,activa,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,created_at',
+          'id,slug,nombre,categoria,plan,activa,estado,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
           'order=created_at.desc');
         return json({ empresas: filas });
       }
 
+      // Lo que el asistente de alta necesita saber: categorías sugeridas,
+      // políticas disponibles y acciones. Se sirve desde el servidor para que
+      // agregar una política nueva la haga aparecer sola en el panel.
+      case 'catalogos':
+        return json({
+          categorias: CATEGORIAS_SUGERIDAS,
+          idiomas: IDIOMAS,
+          tiposOferta: TIPOS_OFERTA,
+          politicas: catalogoDePoliticas(),
+          acciones: catalogoDeAcciones(),
+          semillas: Object.entries(SEMILLAS).map(([slug, s]) => ({
+            slug, nombre: s.nombre, categoria: s.categoria })),
+        });
+
       case 'empresas.crear': {
         if (!esSuper) return negar();
-        const slug = String(datos.slug || '').trim().toLowerCase();
+        const slug = aSlug(datos.slug || datos.nombre);
         if (!/^[a-z0-9-]{2,40}$/.test(slug)) {
           return json({ error: 'El identificador solo admite minúsculas, números y guiones (2 a 40).' }, 400);
         }
         const filas = await sb.insertar('empresas', [{
           slug,
-          nombre:  String(datos.nombre || slug).slice(0, 120),
-          dominio: datos.dominio === 'clinico' ? 'clinico' : 'comercial',
-          plan:    ['prueba','basico','pro'].includes(datos.plan) ? datos.plan : 'prueba',
-          marca:   datos.marca || {},
-          saludo:  datos.saludo || '¡Hola! ¿En qué te ayudo?',
+          nombre: String(datos.nombre || slug).slice(0, 120),
+          // Categoría LIBRE: cualquier texto, incluido "Otro". No hay lista
+          // cerrada y no debe agregarse una.
+          categoria: String(datos.categoria || '').slice(0, 80),
+          plan: ['prueba','basico','pro'].includes(datos.plan) ? datos.plan : 'prueba',
+          marca: datos.identidad || datos.marca || {},
+          saludo: datos.saludo || 'Hola, ¿en qué te ayudo?',
+          // Nace como BORRADOR: el asistente de alta tiene varios pasos y
+          // nadie debería publicar un negocio a medio llenar.
+          estado: 'borrador',
+          activa: false,
+          politicas: Array.isArray(datos.politicas) ? datos.politicas : [],
+          acciones: Array.isArray(datos.acciones) ? datos.acciones : ['derivar_humano'],
         }]);
         await sb.bitacora({ actor: yo.id, empresa_id: filas[0].id, accion: 'empresa.crear',
-                            detalle: { slug } });
+                            detalle: { slug, categoria: datos.categoria || '' } });
         return json({ empresa: filas[0] });
+      }
+
+      // Duplicar: copia todo menos identidad y datos de personas. Sirve para
+      // dar de alta al segundo cliente parecido sin volver a llenar diez pasos.
+      case 'empresas.duplicar': {
+        if (!esSuper) return negar();
+        const origen = (await sb.seleccionar('empresas', '*', `id=eq.${datos.id}&limit=1`))?.[0];
+        if (!origen) return json({ error: 'No encontré esa empresa.' }, 404);
+        const slug = aSlug(datos.slug || (origen.slug + '-copia'));
+
+        const copia = {
+          slug,
+          nombre: String(datos.nombre || origen.nombre + ' (copia)').slice(0, 120),
+          categoria: origen.categoria, plan: 'prueba',
+          marca: origen.marca, saludo: origen.saludo, sugerencias: origen.sugerencias,
+          descargo: origen.descargo, captura: origen.captura,
+          politicas: origen.politicas, acciones: origen.acciones,
+          estado: 'borrador', activa: false,
+        };
+        const nueva = (await sb.insertar('empresas', [copia]))[0];
+
+        // Lo cifrado se vuelve a cifrar CON LA LLAVE DE LA EMPRESA NUEVA: la
+        // llave se deriva del id, así que copiar el texto cifrado tal cual lo
+        // dejaría ilegible para la copia.
+        for (const [nombre, col] of Object.entries(SECRETOS)) {
+          if (nombre === 'destinos' || nombre === 'llaves') continue;  // no se heredan
+          if (!origen[col]) continue;
+          try {
+            const claro = await descifrar(MAESTRA, origen.id, origen[col]);
+            await sb.actualizar('empresas', `id=eq.${nueva.id}`,
+              { [col]: await cifrar(MAESTRA, nueva.id, claro) });
+          } catch (e) { /* si un campo no se pudo leer, la copia sigue */ }
+        }
+        await sb.bitacora({ actor: yo.id, empresa_id: nueva.id, accion: 'empresa.duplicar',
+                            detalle: { de: origen.slug, a: slug } });
+        return json({ empresa: nueva });
+      }
+
+      // Publicar: revisa que el perfil esté completo antes de encenderlo.
+      case 'empresas.publicar': {
+        if (!esDueno) return negar();
+        const fila = (await sb.seleccionar('empresas', '*', `id=eq.${datos.id}&limit=1`))?.[0];
+        if (!fila) return json({ error: 'No encontré esa empresa.' }, 404);
+
+        let perfilClaro = {};
+        try { perfilClaro = await descifrar(MAESTRA, fila.id, fila.perfil_cifrado) || {}; } catch {}
+        let conocimiento = [];
+        try { conocimiento = await descifrar(MAESTRA, fila.id, fila.conocimiento_cifrado) || []; } catch {}
+
+        const revision = revisarPerfil({ ...perfilClaro, ...fila, conocimiento,
+                                         identidad: fila.marca, contactos: fila.contactos });
+        if (!revision.listo && !datos.forzar) {
+          return json({ error: 'Faltan datos para publicar.', faltan: revision.faltan }, 400);
+        }
+        const g = await sb.actualizar('empresas', `id=eq.${datos.id}`,
+          { estado: 'publicado', activa: true, suspendida_at: null });
+        await sb.bitacora({ actor: yo.id, empresa_id: datos.id, accion: 'empresa.publicar', detalle: {} });
+        return json({ empresa: g[0] });
+      }
+
+      // Borrar los ejemplos. Solo toca lo marcado como semilla: un cliente
+      // real nunca lleva esa bandera, así que no hay forma de barrerlo aquí.
+      case 'empresas.borrarEjemplos': {
+        if (!esSuper) return negar();
+        const borradas = await sb.actualizar('empresas', 'ejemplo=is.true',
+          { activa: false, estado: 'suspendido' });
+        await sb.bitacora({ actor: yo.id, empresa_id: null, accion: 'ejemplos.retirar',
+                            detalle: { cuantas: (borradas || []).length } });
+        return json({ retiradas: (borradas || []).length });
       }
 
       case 'empresas.detalle': {
@@ -137,21 +237,21 @@ export async function manejar(req, context) {
 
         const cambios = {
           nombre:      datos.nombre,
+          categoria:   datos.categoria,          // libre, sin lista cerrada
           saludo:      datos.saludo,
           descargo:    datos.descargo,
-          marca:       datos.marca,
+          marca:       datos.identidad || datos.marca,
           sugerencias: datos.sugerencias,
           captura:     datos.captura,
           contactos:   datos.contactos,
+          politicas:   Array.isArray(datos.politicas) ? datos.politicas : undefined,
+          acciones:    Array.isArray(datos.acciones) ? datos.acciones : undefined,
           updated_at:  new Date().toISOString(),
         };
-        // El plan y el dominio solo los mueve el superadmin: son lo que se
-        // cobra y lo que activa las banderas rojas. Un cliente no se cambia
-        // solo de plan ni se quita las alertas de urgencia.
-        if (esSuper) {
-          if (datos.plan)    cambios.plan = datos.plan;
-          if (datos.dominio) cambios.dominio = datos.dominio;
-        }
+        // El plan solo lo mueve el superadmin: es lo que se cobra. Las
+        // políticas sí las controla el dueño de la marca — son suyas y de su
+        // rubro, no una decisión de la plataforma.
+        if (esSuper && datos.plan) cambios.plan = datos.plan;
         for (const [nombre, col] of Object.entries(SECRETOS)) {
           if (datos.secretos && nombre in datos.secretos) {
             cambios[col] = await cifrar(MAESTRA, id, datos.secretos[nombre]);

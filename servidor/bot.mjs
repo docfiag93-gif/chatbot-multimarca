@@ -15,7 +15,7 @@
 
 import { env } from '../publico/cerebro/entorno.mjs';
 import { MARCAS } from '../publico/cerebro/marcas.mjs';
-import { construirPrompt, respuestaInmediata } from '../publico/cerebro/cerebro.mjs';
+import { construirPrompt, respuestaInmediata, accionValida } from '../publico/cerebro/cerebro.mjs';
 import { preguntar } from '../publico/cerebro/proveedores.mjs';
 import { revisarEntorno, explicarFallo } from '../publico/cerebro/diagnostico.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar }
@@ -171,7 +171,11 @@ export async function manejar(req, context) {
     const salida = {
       texto: String(datos.texto || '').slice(0, 1200),
       sugerencias: Array.isArray(datos.sugerencias) ? datos.sugerencias.slice(0, 3).map(String) : [],
-      accion: ['capturar_cita', 'derivar_humano'].includes(datos.accion) ? datos.accion : 'ninguna',
+      // Que el modelo pida una acción no significa que el negocio la tenga
+      // encendida. Se filtra contra su configuración: una tienda sin
+      // "agendar" nunca va a abrir un formulario de citas por un desliz
+      // del modelo.
+      accion: accionValida(marca, datos.accion),
       via,
     };
 

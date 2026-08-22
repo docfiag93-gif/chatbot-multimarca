@@ -316,3 +316,60 @@ revoke all on function public.es_dueno()      from anon;
 grant execute on function public.mi_empresa()    to authenticated;
 grant execute on function public.es_superadmin() to authenticated;
 grant execute on function public.es_dueno()      to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- 10) DE DOS SECTORES FIJOS A CUALQUIER NEGOCIO
+--     (aplicada como migracion `negocio_generico_sin_sector`)
+--
+--     El esquema de arriba tenia esto:
+--         dominio text check (dominio in ('clinico','comercial'))
+--
+--     O sea: la BASE DE DATOS decidia que solo existian dos tipos de negocio.
+--     Dar de alta una tienda, un taller o una inmobiliaria obligaba a cambiar
+--     el esquema y volver a desplegar. Eso no es un producto multiempresa.
+-- ----------------------------------------------------------------------------
+alter table public.empresas add column if not exists categoria text not null default '';
+alter table public.empresas add column if not exists politicas jsonb not null default '[]'::jsonb;
+alter table public.empresas add column if not exists acciones  jsonb not null default '[]'::jsonb;
+alter table public.empresas add column if not exists perfil_cifrado text;
+alter table public.empresas add column if not exists ejemplo boolean not null default false;
+alter table public.empresas add column if not exists estado text not null default 'borrador';
+
+comment on column public.empresas.categoria is
+  'Texto LIBRE. Cualquier rubro. No hay lista cerrada y no debe agregarse una.';
+comment on column public.empresas.politicas is
+  'Modulos opt-in (ej. urgencias-clinicas). Vacio por omision: ninguna regla se enciende sola.';
+comment on column public.empresas.acciones is
+  'Que puede hacer el bot: mostrar_catalogo, cotizar, reservar, agendar, capturar_contacto...';
+comment on column public.empresas.perfil_cifrado is
+  'Cifrado: catalogo, horarios, ubicaciones, objetivos y atributos personalizados.';
+comment on column public.empresas.ejemplo is
+  'true = semilla de demostracion, borrable en bloque. Nunca para un cliente real.';
+
+-- EL cambio de esta migracion: se quita la restriccion de dos sectores.
+alter table public.empresas drop constraint if exists empresas_dominio_check;
+alter table public.empresas alter column dominio drop not null;
+alter table public.empresas alter column dominio set default null;
+comment on column public.empresas.dominio is
+  'OBSOLETO. Se conserva para no perder datos de filas viejas. Usa categoria y politicas.';
+
+-- Compatibilidad: el dominio viejo se vuelve categoria legible, y SOLO lo que
+-- estaba marcado como clinico conserva su politica. Ningun otro la hereda.
+update public.empresas
+   set categoria = case
+         when categoria <> '' then categoria
+         when dominio = 'clinico'   then 'Salud y bienestar'
+         when dominio = 'comercial' then 'Comercio y tienda'
+         else '' end,
+       politicas = case
+         when politicas <> '[]'::jsonb then politicas
+         when dominio = 'clinico' then '["urgencias-clinicas"]'::jsonb
+         else '[]'::jsonb end,
+       estado = case when activa then 'publicado' else 'suspendido' end;
+
+alter table public.empresas drop constraint if exists empresas_estado_check;
+alter table public.empresas add constraint empresas_estado_check
+  check (estado in ('borrador','publicado','suspendido'));
+
+create index if not exists empresas_categoria_idx on public.empresas (categoria) where activa;
+create index if not exists empresas_ejemplo_idx on public.empresas (ejemplo);

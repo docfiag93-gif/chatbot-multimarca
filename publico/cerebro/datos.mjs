@@ -19,6 +19,7 @@ import { env } from './entorno.mjs';
 import { clienteSupabase } from './supabase.mjs';
 import { descifrar, cifrar } from './cifrado.mjs';
 import { marcaPublica, obtenerMarca } from './marcas.mjs';
+import { normalizarPerfil, perfilPublico } from './perfil.mjs';
 import { enviarAviso, recortar } from './avisos.mjs';
 
 function servicio() {
@@ -56,23 +57,51 @@ export async function empresaPorSlug(slug) {
     catch (e) { return null; }
   };
 
-  return {
+  // `perfil` es el bulto genérico: catálogo, horarios, ubicaciones, atributos
+  // y todo lo que no merece columna propia. Las columnas sueltas siguen
+  // existiendo porque ya hay datos en ellas y porque son las que se consultan.
+  const perfilGuardado = await abrir('perfil_cifrado') || {};
+
+  return normalizarPerfil({
+    ...perfilGuardado,
     id: fila.id,
     slug: fila.slug,
     nombre: fila.nombre,
-    dominio: fila.dominio,
-    marca: fila.marca || {},
+    // categoría LIBRE. Si viene una fila vieja con `dominio`, se traduce a
+    // una categoría legible en vez de perder el dato.
+    categoria: fila.categoria || traducirDominioViejo(fila.dominio),
+    identidad: fila.marca || {},
     saludo: fila.saludo,
     sugerencias: fila.sugerencias || [],
     descargo: fila.descargo,
     captura: fila.captura || {},
     contactos: fila.contactos || {},
-    persona:      await abrir('persona_cifrada')      || '',
-    conocimiento: await abrir('conocimiento_cifrado') || [],
-    limites:      await abrir('limites_cifrados')     || [],
+    // Las políticas se ENCIENDEN a mano. Una fila vieja marcada 'clinico'
+    // conserva su política; ninguna otra la hereda.
+    politicas: Array.isArray(fila.politicas) ? fila.politicas
+             : (fila.dominio === 'clinico' ? ['urgencias-clinicas'] : []),
+    acciones: Array.isArray(fila.acciones) ? fila.acciones : perfilGuardado.acciones,
+    plan: fila.plan,
+    estado: fila.activa === false ? 'suspendido' : 'publicado',
+    tono:         await abrir('persona_cifrada')      || perfilGuardado.tono,
+    conocimiento: await abrir('conocimiento_cifrado') || perfilGuardado.conocimiento || [],
+    limites:      await abrir('limites_cifrados')     || perfilGuardado.limites || [],
     destinos:     await abrir('destinos_cifrados')    || null,
     ...repartirLlaves(await abrir('llaves_cifradas')),
-  };
+  });
+}
+
+/**
+ * Traducción de las dos únicas opciones que existían antes.
+ *
+ * No se borra el dato de las filas viejas: se convierte en una categoría
+ * legible. Que el sistema ya no tenga sectores fijos no significa que un
+ * cliente deba perder lo que había escrito.
+ */
+function traducirDominioViejo(dominio) {
+  if (dominio === 'clinico') return 'Salud y bienestar';
+  if (dominio === 'comercial') return 'Comercio y tienda';
+  return '';
 }
 
 /**
@@ -111,20 +140,14 @@ export async function configPublica(slug) {
   const dela = await empresaPorSlug(slug);
   if (dela?.suspendida) {
     return { id: null, nombre: dela.nombre, suspendida: true,
-             marca: { primario: '#64748b', acento: '#94a3b8', fondo: '#fff',
+             marca: { primario: '#64748b', acento: '#94a3b8', fondo: '#ffffff',
+                      texto: '#0f172a', burbujaIA: '#f1f5f9', avatar: '💬' },
+             identidad: { primario: '#64748b', acento: '#94a3b8', fondo: '#ffffff',
                       texto: '#0f172a', burbujaIA: '#f1f5f9', avatar: '💬' },
              saludo: 'Este chat está fuera de servicio por el momento.',
              sugerencias: [], descargo: '', captura: { activa: false } };
   }
-  if (dela) {
-    return {
-      id: dela.id, nombre: dela.nombre, dominio: dela.dominio, marca: dela.marca,
-      saludo: dela.saludo, sugerencias: dela.sugerencias,
-      descargo: dela.descargo, captura: dela.captura,
-      // Públicos a propósito: son los números a los que el visitante escribe.
-      contactos: dela.contactos || {},
-    };
-  }
+  if (dela) return perfilPublico(dela);
   return marcaPublica(slug);
 }
 

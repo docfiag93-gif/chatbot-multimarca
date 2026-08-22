@@ -3,120 +3,175 @@
 //
 //  Por qué no llama a la IA aquí: este archivo tiene que poder abrirse en el
 //  navegador para probarlo sin desplegar nada. Si tuviera dentro la llamada
-//  a Gemini, tendría que tener la llave, y la llave NUNCA baja al navegador.
-//  Aquí se decide QUÉ se le pregunta al modelo; quién se lo pregunta y con
+//  al proveedor, tendría que tener la llave, y la llave NUNCA baja al
+//  navegador. Aquí se decide QUÉ se le pregunta; quién se lo pregunta y con
 //  qué credenciales es problema de servidor/bot.mjs.
+//
+//  SIN SECTOR. Este archivo no sabe qué es un consultorio, una tienda ni un
+//  taller. Antes tenía un bloque clínico que se encendía con
+//  `dominio === 'clinico'`: eso obligaba a que todo negocio del mundo
+//  eligiera entre dos rubros. Ahora el prompt se arma con lo que el negocio
+//  describió de sí mismo, más lo que aporten las políticas que ENCENDIÓ.
 // ════════════════════════════════════════════════════════════════════════
 
-import { revisarBanderas } from './seguridad.mjs';
+import { normalizarPerfil } from './perfil.mjs';
+import { interceptar, aportesDePoliticas } from './politicas.mjs';
+import { fragmentoDeAcciones, accionPermitida } from './acciones.mjs';
 
 // Cuánta conversación se le manda al modelo. Más turnos = más contexto pero
-// más tokens y más lento. Seis pares alcanzan de sobra para una consulta de
-// horarios o un antojo de café, y mantienen la cuenta gratuita en pie.
+// más tokens y más lento. Seis pares alcanzan de sobra para una consulta
+// normal y mantienen la cuenta gratuita en pie.
 export const TURNOS_MAX = 12;
 
+const DIAS_ES = {
+  lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles', jueves: 'Jueves',
+  viernes: 'Viernes', sabado: 'Sábado', domingo: 'Domingo',
+};
+
+/* ── trozos del prompt, cada uno opcional ────────────────────────────── */
+
+function bloqueIdentidad(p) {
+  const partes = [`Eres el asistente de ${p.nombre}.`];
+  if (p.categoria) partes.push(`Es un negocio de: ${p.categoria}.`);
+  if (p.descripcion) partes.push(p.descripcion);
+  partes.push(p.tono);
+  if (p.objetivos.length) {
+    partes.push(`Lo que el negocio quiere lograr en cada conversación:\n` +
+      p.objetivos.map(o => `- ${o}`).join('\n'));
+  }
+  return partes.join('\n');
+}
+
+function bloqueCatalogo(p) {
+  if (!p.catalogo.length) return '';
+  // Se recorta: un catálogo de doscientas cosas no cabe en un prompt y el
+  // modelo se pierde. Lo disponible primero.
+  const items = p.catalogo.filter(o => o.disponible).slice(0, 60);
+  if (!items.length) return '';
+  const lineas = items.map(o => {
+    const trozos = [`- ${o.nombre}`];
+    if (o.precio) trozos.push(`(${o.precio})`);
+    if (o.descripcion) trozos.push(`— ${o.descripcion}`);
+    if (o.etiquetas.length) trozos.push(`[${o.etiquetas.join(', ')}]`);
+    return trozos.join(' ');
+  });
+  return `LO QUE OFRECE\n${lineas.join('\n')}`;
+}
+
+function bloqueHorarios(p) {
+  const abiertos = Object.entries(p.horarios).filter(([, v]) => !v.cerrado);
+  if (!abiertos.length) return '';
+  const lineas = abiertos.map(([d, v]) => `- ${DIAS_ES[d] || d}: ${v.abre} a ${v.cierra}`);
+  const cerrados = Object.entries(p.horarios).filter(([, v]) => v.cerrado)
+    .map(([d]) => DIAS_ES[d] || d);
+  return `HORARIOS\n${lineas.join('\n')}` +
+    (cerrados.length ? `\nCerrado: ${cerrados.join(', ')}.` : '');
+}
+
+function bloqueUbicaciones(p) {
+  if (!p.ubicaciones.length) return '';
+  const lineas = p.ubicaciones.map(u => {
+    const t = [`- ${u.nombre || 'Sucursal'}: ${u.direccion}`];
+    if (u.referencias) t.push(`Referencias: ${u.referencias}`);
+    return t.join(' ');
+  });
+  return `DÓNDE ESTÁ\n${lineas.join('\n')}`;
+}
+
+function bloqueConocimiento(p) {
+  if (!p.conocimiento.length) return '';
+  return `LO QUE SABES\n` +
+    p.conocimiento.map(k => `### ${k.tema}\n${k.texto}`).join('\n\n');
+}
+
+function bloqueAtributos(p) {
+  const claves = Object.keys(p.atributos || {});
+  if (!claves.length) return '';
+  return `OTROS DATOS DEL NEGOCIO\n` +
+    claves.slice(0, 30).map(k => `- ${k}: ${p.atributos[k]}`).join('\n');
+}
+
+/* ── el prompt completo ──────────────────────────────────────────────── */
+
 /**
- * Arma el prompt completo. Devuelve un string listo para mandarse al modelo.
- *
- * @param {object} marca     - una entrada de MARCAS
+ * @param {object} perfil    - perfil de negocio (cualquier rubro)
  * @param {Array}  mensajes  - [{ rol: 'usuario'|'bot', texto: '...' }]
  */
-export function construirPrompt(marca, mensajes) {
-  const historial = mensajes
+export function construirPrompt(perfil, mensajes) {
+  const p = normalizarPerfil(perfil);
+  const politicas = aportesDePoliticas(p);
+
+  const historial = (Array.isArray(mensajes) ? mensajes : [])
     .slice(-TURNOS_MAX)
     .map(m => `${m.rol === 'usuario' ? 'PERSONA' : 'TÚ'}: ${m.texto}`)
     .join('\n');
 
-  const base = marca.conocimiento
-    .map(k => `### ${k.tema}\n${k.texto}`)
-    .join('\n\n');
+  // Los límites propios del negocio y los que aportan sus políticas se juntan
+  // en una sola lista: al modelo no le sirve saber de dónde salió cada uno.
+  const limites = [...politicas.limites, ...p.limites];
 
-  const limites = marca.limites.map(l => `- ${l}`).join('\n');
+  const secciones = [
+    bloqueIdentidad(p),
+    // Las políticas van ARRIBA de todo lo demás: si una dice "no
+    // diagnostiques", esa instrucción no puede quedar sepultada bajo un
+    // catálogo de sesenta renglones.
+    politicas.prompt.join('\n\n'),
+    bloqueConocimiento(p),
+    bloqueCatalogo(p),
+    bloqueHorarios(p),
+    bloqueUbicaciones(p),
+    bloqueAtributos(p),
 
-  // El bloque clínico solo aparece en las marcas médicas. La marca de café
-  // no carga con reglas que no le tocan: menos prompt, menos costo, menos
-  // oportunidad de que el modelo se confunda.
-  const bloqueClinico = marca.dominio === 'clinico' ? `
-REGLA CLÍNICA QUE MANDA SOBRE TODAS LAS DEMÁS
-Estás hablando con alguien de quien NO tienes expediente, NO tienes signos
-vitales y NO has explorado. Cualquier cosa que suene a diagnóstico es una
-mentira con bata. Puedes explicar qué es una enfermedad en general, qué hace
-un estudio o cómo prepararse para una consulta. NO puedes decirle a esta
-persona qué tiene ni qué tomar.
+    limites.length ? `LO QUE NO HACES\n${limites.map(l => `- ${l}`).join('\n')}` : '',
 
-Si la persona describe un síntoma, tu respuesta tiene tres partes, en este orden:
-1. Reconoces lo que siente en una frase. Sin dramatizar y sin minimizar.
-2. Explicas en general, sin apuntarle a un diagnóstico.
-3. Cierras con lo que sigue: agendar consulta, o ir a urgencias si empeora.
-   Di explícitamente qué señales serían para no esperar.
-` : '';
-
-  return `${marca.persona}
-
-${bloqueClinico}
-LO QUE SABES
-Solo puedes afirmar como cierto lo que está aquí abajo. Si algo trae la marca
-«POR LLENAR», significa que ese dato TODAVÍA NO EXISTE: no te lo inventes,
-dilo con naturalidad ("ese dato no lo tengo a la mano") y ofrece el contacto.
-
-${base}
-
-LO QUE NO HACES
-${limites}
-
-ANTES DE ESCRIBIR, LEE
+    `ANTES DE ESCRIBIR, LEE
 No contestes con lo primero que se te ocurra. En orden, cada vez:
-1. Lee TODA la conversación de arriba, no nada más el último mensaje. Muchas
-   veces la persona ya dijo algo importante tres mensajes antes y preguntar de
-   nuevo la hace sentir que no la escuchaste.
-2. Busca la respuesta en LO QUE SABES. Si está, úsala tal cual, sin adornarla.
-3. Si NO está ahí, no la deduzcas ni la aproximes. Dilo y ofrece el contacto.
-   Un horario inventado hace que alguien llegue a una puerta cerrada.
-4. Pregúntate qué quiere de verdad. Quien pregunta "¿cuánto cuestan?" casi
-   siempre está decidiendo si venir, no haciendo un estudio de mercado.
+1. Lee TODA la conversación, no solo el último mensaje. Muchas veces la
+   persona ya dijo algo importante tres mensajes antes, y preguntar de nuevo
+   la hace sentir que no la escuchaste.
+2. Busca la respuesta en lo que sabes del negocio. Si está, úsala tal cual.
+3. Si NO está, no la deduzcas ni la aproximes. Dilo y ofrece el contacto.
+   Un dato inventado manda a alguien a una puerta cerrada.
+4. Pregúntate qué quiere de verdad. Quien pregunta "¿cuánto cuesta?" casi
+   siempre está decidiendo si viene, no haciendo un estudio de mercado.`,
 
-CÓMO ESCRIBES
+    `CÓMO ESCRIBES
 - Máximo 70 palabras. Esto es un chat, no un folleto.
 - Sin listas largas ni encabezados. Habla como persona.
 - Una sola pregunta al final, si hace falta. Nunca dos.
 - Nada de "como asistente de IA" ni "estoy aquí para ayudarte".
+- Responde en ${p.idioma.startsWith('en') ? 'inglés' : p.idioma.startsWith('pt') ? 'portugués' : 'español'}.`,
 
-CONVERSACIÓN HASTA AHORA
-${historial}
+    fragmentoDeAcciones(p),
 
-Responde SOLO con este JSON:
+    `CONVERSACIÓN HASTA AHORA\n${historial}`,
+
+    `Responde SOLO con este JSON:
 {
   "texto": "tu respuesta, máximo 70 palabras",
-  "sugerencias": ["máximo 3 respuestas cortas que la persona podría querer tocar en seguida, de máximo 5 palabras cada una"],
-  "accion": "ninguna" | "capturar_cita" | "derivar_humano"
-}
+  "sugerencias": ["hasta 3 respuestas cortas que la persona podría querer tocar en seguida, máximo 5 palabras cada una"],
+  "accion": "una de las acciones disponibles, o \\"ninguna\\""
+}`,
+  ];
 
-Cuándo usar cada acción:
-- "capturar_cita": la persona quiere una cita, un precio con nombre y apellido, o pidió que le llamen. ${marca.dominio === 'comercial' ? 'También si quiere comprar o cotizar.' : ''}
-- "derivar_humano": te preguntaron algo que no está en lo que sabes, o la persona está molesta.
-- "ninguna": todo lo demás.`;
+  return secciones.filter(Boolean).join('\n\n');
 }
 
 /**
- * El paso previo a todo. Devuelve una respuesta YA HECHA cuando no hace falta
- * (ni conviene) molestar al modelo. Si devuelve null, entonces sí se llama a la IA.
+ * El paso previo a todo: si alguna política del negocio intercepta, devuelve
+ * una respuesta YA HECHA sin gastar una llamada de IA. Si devuelve null,
+ * entonces sí se le pregunta al modelo.
  *
- * Esto vive aquí y no en el widget para que corra igual en el navegador y en
- * el servidor: una sola fuente de verdad, imposible de saltarse desde la consola.
+ * Vive aquí y no en el widget para que corra igual en el navegador y en el
+ * servidor: una sola fuente de verdad, imposible de saltarse desde la consola.
+ *
+ * Un negocio sin políticas encendidas nunca entra a este camino.
  */
-export function respuestaInmediata(marca, texto) {
-  if (marca.dominio === 'clinico') {
-    const bandera = revisarBanderas(texto);
-    if (bandera) {
-      return {
-        texto: bandera.mensaje,
-        sugerencias: [],
-        accion: 'derivar_humano',
-        urgencia: true,
-        motivo: bandera.motivo,
-        via: 'filtro-local',
-      };
-    }
-  }
-  return null;
+export function respuestaInmediata(perfil, texto) {
+  return interceptar(perfil, texto);
+}
+
+/** Filtra lo que devolvió el modelo contra lo que el negocio permite. */
+export function accionValida(perfil, accion) {
+  return accionPermitida(normalizarPerfil(perfil), accion) ? accion : 'ninguna';
 }

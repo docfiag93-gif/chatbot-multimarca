@@ -278,3 +278,58 @@ python3 -m http.server 8796
 `docs/arquitectura-multimarca.html` es el informe de diseño de la plataforma.
 Vive fuera de `publico/`, así que **no se despliega**: es documentación
 interna, no parte del producto.
+
+
+---
+
+# Cualquier negocio, sin tocar código
+
+## Qué cambió
+
+Antes el sistema solo conocía dos cosas: `clinico` y `comercial`. Estaba metido
+hasta en la restricción de la base de datos, así que dar de alta una tienda, un
+taller o una inmobiliaria exigía cambiar el esquema y volver a desplegar.
+
+Ahora un negocio se describe con **categoría libre** y **políticas opt-in**:
+
+| Antes | Ahora |
+|---|---|
+| `dominio: 'clinico' \| 'comercial'` | `categoria` — texto libre, «Otro» incluido |
+| Las reglas clínicas se encendían solas | `politicas: []` — ninguna por omisión |
+| Solo existía «capturar_cita» | `acciones` — cotizar, reservar, agendar, mostrar catálogo… |
+| Campos fijos | `atributos` — lo que no cupo, sin tocar el esquema |
+
+## Los archivos
+
+| Archivo | Qué es |
+|---|---|
+| `cerebro/perfil.mjs` | El modelo. **No conoce ningún rubro.** |
+| `cerebro/politicas.mjs` | Módulos opt-in. Ninguno se enciende solo. |
+| `cerebro/acciones.mjs` | Qué puede hacer el bot en cada negocio. |
+| `cerebro/catalogos-ui.mjs` | Sugerencias de la interfaz. No validan nada. |
+| `cerebro/semillas.mjs` | **Ejemplos borrables.** Cuatro giros distintos. |
+| `cerebro/marcas.mjs` | Capa de compatibilidad. Se borra cuando ya nadie la use. |
+
+## Las semillas son ejemplos, no el producto
+
+`semillas.mjs` se puede **borrar entero** y el sistema sigue funcionando. Hay una
+prueba que lo verifica leyendo el código del núcleo y buscando vocabulario de
+cualquier rubro: si aparece, la prueba falla.
+
+Desde el panel, «borrar ejemplos» solo toca lo marcado con `ejemplo: true`. Un
+cliente real nunca lleva esa bandera.
+
+## El asistente de alta
+
+Siete pasos: Datos básicos → Identidad → Oferta → Conocimiento → Comportamiento
+→ Proveedores → Vista previa. Permite categoría «Otro», campos personalizados,
+guardar borrador y duplicar un negocio existente.
+
+Antes de publicar, revisa el perfil y dice **exactamente qué falta** — no un
+«no está listo» que obliga a adivinar.
+
+## Compatibilidad
+
+Las filas que ya existan con `dominio` no pierden nada: se traduce a categoría
+legible, y **solo** las marcadas como clínicas conservan su política. Ninguna
+otra la hereda por su giro.
