@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "description": "Solo /api/* despierta una funcion. Todo lo demas se sirve como archivo estatico, que en Cloudflare es gratis e ilimitado. Sin esto, cada carga de una imagen o del widget contaria contra el limite de 100 mil invocaciones diarias.",
+  "include": ["/api/*"],
+  "exclude": []
+}

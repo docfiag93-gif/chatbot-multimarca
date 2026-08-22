@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chatbot — consola</title>
+<style>
+  :root { --tinta:#0f172a; --suave:#64748b; --linea:#e2e8f0; --acento:#0f766e;
+          --fondo:#f8fafc; --alerta:#dc2626; --ok:#16a34a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+         color:var(--tinta); background:var(--fondo); line-height:1.6; }
+  .hoja { max-width:1000px; margin:0 auto; padding:28px 20px 140px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  .sub { color:var(--suave); margin:0 0 22px; font-size:14px; }
+  .tarjeta { background:#fff; border:1px solid var(--linea); border-radius:14px;
+             padding:18px 20px; margin-bottom:16px; }
+  .tarjeta h2 { font-size:13px; margin:0 0 12px; text-transform:uppercase;
+                letter-spacing:.07em; color:var(--suave); }
+  .pestanas { display:flex; gap:8px; margin-bottom:20px; border-bottom:2px solid var(--linea); }
+  .pestanas button { background:none; border:0; border-bottom:3px solid transparent;
+                     padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer;
+                     color:var(--suave); margin-bottom:-2px; }
+  .pestanas button[data-activa] { color:var(--acento); border-bottom-color:var(--acento); }
+  .oculto { display:none !important; }
+  code { background:#f1f5f9; padding:2px 6px; border-radius:5px; font-size:13px; }
+  pre { background:#0f172a; color:#e2e8f0; padding:14px; border-radius:10px;
+        overflow-x:auto; font-size:13px; line-height:1.5; }
+  label { display:block; font-size:12px; font-weight:700; margin:10px 0 3px; }
+  input, select, textarea { width:100%; border:1.5px solid var(--linea); border-radius:9px;
+                            padding:9px 11px; font-size:14px; font-family:inherit;
+                            background:#fff; color:var(--tinta); }
+  textarea { resize:vertical; min-height:90px; font-family:ui-monospace,Menlo,monospace; font-size:13px; }
+  input:focus, textarea:focus, select:focus { outline:0; border-color:var(--acento); }
+  button.accion { background:var(--acento); color:#fff; border:0; border-radius:9px;
+                  padding:10px 16px; font-size:14px; font-weight:600; cursor:pointer; }
+  button.accion.gris { background:#fff; color:var(--tinta); border:1.5px solid var(--linea); }
+  button.accion.roja { background:var(--alerta); }
+  button.accion:disabled { opacity:.5; cursor:not-allowed; }
+  .fila { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .rejilla { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--linea); vertical-align:top; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--suave); }
+  .placa { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px;
+           border-radius:999px; background:#f1f5f9; color:var(--suave); }
+  .placa.verde { background:#dcfce7; color:#166534; }
+  .placa.roja  { background:#fee2e2; color:#991b1b; }
+  .placa.ambar { background:#fef3c7; color:#92400e; }
+  .numero { font-size:28px; font-weight:800; line-height:1.1; }
+  .numero small { display:block; font-size:12px; font-weight:600; color:var(--suave);
+                  text-transform:uppercase; letter-spacing:.05em; margin-top:3px; }
+  .aviso { padding:11px 14px; border-radius:10px; font-size:13.5px; margin:10px 0; }
+  .aviso.mal  { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+  .aviso.bien { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+  .aviso.ojo  { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+  .nota { font-size:12.5px; color:var(--suave); }
+  ul { margin:8px 0; padding-left:20px; } li { margin:4px 0; }
+  .desplaza { overflow-x:auto; }
+</style>
+</head>
+<body>
+<div class="hoja">
+
+  <h1>Chatbot — consola</h1>
+  <p class="sub">Un solo programa, varias marcas. Consultorio hoy, café después.</p>
+
+  <div class="pestanas">
+    <button data-vista="pruebas" data-activa>Banco de pruebas</button>
+    <button data-vista="panel">Panel</button>
+    <button data-vista="herramientas">Herramientas</button>
+  </div>
+
+  <!-- ══════════════ BANCO DE PRUEBAS ══════════════ -->
+  <section id="v-pruebas">
+    <div class="tarjeta">
+      <h2>Marca</h2>
+      <div class="fila" id="marcas-botones">
+        <button class="accion gris" data-marca="consultorio">🩺 Consultorio</button>
+        <button class="accion gris" data-marca="cafe">☕ Café</button>
+      </div>
+      <p class="nota" style="margin-bottom:0">Mismo <code>widget.js</code>, sin una línea
+      distinta. Lo único que cambia es <code>data-marca</code>.</p>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Estado del servidor</h2>
+      <div id="estado" class="nota">Consultando…</div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Cómo se pega en un sitio</h2>
+      <pre>&lt;script src="/chatbot/widget.js"
+        data-marca="consultorio"
+        data-whatsapp="521961XXXXXXX"
+        defer&gt;&lt;/script&gt;</pre>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Qué probar</h2>
+      <ul>
+        <li>Pregunta un horario o precio → debe decir que no lo tiene, <b>no inventarlo</b>.</li>
+        <li>Escribe <b>«quiero una cita»</b> → debe salir el formulario.</li>
+        <li>En el consultorio: <b>«me duele el pecho»</b> → bloque rojo de urgencia,
+        y <i>rápido</i>: eso no lo contesta la IA, lo corta el código antes.</li>
+        <li>En el café esa misma frase <b>no</b> dispara nada.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ══════════════ PANEL ══════════════ -->
+  <section id="v-panel" class="oculto">
+
+    <!-- entrar -->
+    <div class="tarjeta" id="caja-acceso">
+      <h2>Acceso</h2>
+      <div id="acceso-msg"></div>
+      <label>Correo</label>
+      <input type="email" id="ac-correo" autocomplete="username">
+      <label>Contraseña</label>
+      <input type="password" id="ac-clave" autocomplete="current-password">
+      <div class="fila" style="margin-top:14px">
+        <button class="accion" id="btn-entrar">Entrar</button>
+        <button class="accion gris" id="btn-registrar">Crear cuenta</button>
+      </div>
+      <p class="nota" style="margin-top:12px;margin-bottom:0">
+        Una cuenta nueva nace <b>sin permisos</b>: no ve nada hasta que el
+        superadministrador la asigne a una empresa. Es a propósito — si cualquiera
+        que se registra entrara a algo, ahí se filtran los datos entre clientes.</p>
+    </div>
+
+    <!-- ya dentro -->
+    <div id="caja-panel" class="oculto">
+      <div class="tarjeta">
+        <div class="fila" style="justify-content:space-between">
+          <div>
+            <b id="yo-nombre"></b> <span class="placa" id="yo-rol"></span>
+            <div class="nota" id="yo-empresa"></div>
+          </div>
+          <button class="accion gris" id="btn-salir">Salir</button>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Números</h2>
+        <div class="rejilla" id="metricas"></div>
+      </div>
+
+      <div class="tarjeta" id="caja-empresas">
+        <h2>Empresas</h2>
+        <div class="desplaza"><table id="tabla-empresas"></table></div>
+        <div id="crear-empresa" class="oculto" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--linea)">
+          <div class="rejilla">
+            <div><label>Identificador (data-marca)</label><input id="ne-slug" placeholder="consultorio"></div>
+            <div><label>Nombre</label><input id="ne-nombre" placeholder="Consultorio Dr. Isa"></div>
+            <div><label>Tipo</label><select id="ne-dominio">
+              <option value="comercial">Comercial</option>
+              <option value="clinico">Clínico (activa banderas rojas)</option>
+            </select></div>
+            <div><label>Plan</label><select id="ne-plan">
+              <option value="prueba">Prueba</option><option value="basico">Básico</option><option value="pro">Pro</option>
+            </select></div>
+          </div>
+          <button class="accion" id="btn-crear-empresa" style="margin-top:12px">Crear empresa</button>
+        </div>
+      </div>
+
+      <div class="tarjeta oculto" id="caja-editor">
+        <h2>Configurar <span id="ed-nombre"></span></h2>
+        <div class="aviso ojo">Lo de abajo viaja <b>cifrado</b> a la base. Ni Supabase
+        ni un respaldo filtrado pueden leerlo: solo esta consola, y solo si la
+        llave maestra sigue en Netlify.</div>
+        <div class="rejilla">
+          <div><label>Nombre visible</label><input id="ed-titulo"></div>
+          <div><label>Saludo</label><input id="ed-saludo"></div>
+        </div>
+        <label>Personalidad (cifrado)</label>
+        <textarea id="ed-persona" placeholder="Eres el asistente de…"></textarea>
+        <label>Base de conocimiento — un tema por renglón: <code>tema | texto</code> (cifrado)</label>
+        <textarea id="ed-conocimiento" placeholder="horarios | Lunes a viernes de 16 a 20 h"></textarea>
+        <label>Lo que NO hace — un límite por renglón (cifrado)</label>
+        <textarea id="ed-limites"></textarea>
+        <label>Descargo (visible para todos)</label>
+        <input id="ed-descargo">
+
+        <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--linea)">
+          <h2 style="margin-bottom:6px">Los tres números</h2>
+          <p class="nota" style="margin-top:0">Los de arriba <b>los ve el visitante</b>
+          (son a los que puede escribir). El de abajo es a dónde te llegan
+          los avisos a ti: ese va cifrado y nadie más lo ve.</p>
+
+          <div class="rejilla">
+            <div><label>WhatsApp del consultorio (público)</label>
+              <input id="ed-wa-consultorio" placeholder="521961XXXXXXX"></div>
+            <div><label>WhatsApp de urgencias (público)</label>
+              <input id="ed-wa-urgencias" placeholder="521961XXXXXXX"></div>
+          </div>
+
+          <div class="aviso ojo" style="margin-top:14px">
+            El aviso de urgencia <b>no es el plan de atención</b>: al paciente ya
+            se le indicó llamar al 911 en el momento, antes de que salga tu correo.
+            Esto es para que te enteres y des seguimiento.
+          </div>
+
+          <div class="rejilla">
+            <div><label>Correo para urgencias (cifrado)</label>
+              <input id="ed-mail-urgencias" placeholder="tu correo personal"></div>
+            <div><label>Correo para citas (cifrado)</label>
+              <input id="ed-mail-consultorio" placeholder="correo del consultorio"></div>
+            <div><label>Tu teléfono personal (cifrado)</label>
+              <input id="ed-tel-personal" placeholder="para el botón de llamar"></div>
+          </div>
+        </div>
+        <div class="fila" style="margin-top:14px">
+          <button class="accion" id="btn-guardar-empresa">Guardar</button>
+          <button class="accion gris" id="btn-cerrar-editor">Cerrar</button>
+          <span id="ed-msg" class="nota"></span>
+        </div>
+      </div>
+
+      <div class="tarjeta" id="caja-avisos">
+        <h2>Avisos</h2>
+        <div class="nota">Lo que el chat detectó y te mandó. Si dice
+        <b>fallido</b>, el aviso no salió — pero el dato sí quedó guardado.</div>
+        <div class="desplaza"><table id="tabla-avisos"></table></div>
+      </div>
+
+      <div class="tarjeta" id="caja-leads">
+        <h2>Datos de contacto recibidos</h2>
+        <div class="nota">Se descifran en el servidor al abrir esta tabla, y queda
+        registrado en la bitácora quién los miró.</div>
+        <div class="desplaza"><table id="tabla-leads"></table></div>
+      </div>
+
+      <div class="tarjeta oculto" id="caja-usuarios">
+        <h2>Usuarios</h2>
+        <div class="desplaza"><table id="tabla-usuarios"></table></div>
+      </div>
+
+      <div class="tarjeta oculto" id="caja-bitacora">
+        <h2>Bitácora</h2>
+        <div class="desplaza"><table id="tabla-bitacora"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ HERRAMIENTAS ══════════════ -->
+  <section id="v-herramientas" class="oculto">
+    <div class="tarjeta">
+      <h2>Llave maestra</h2>
+      <p class="nota">Se genera <b>aquí en tu navegador</b> y no viaja a ningún lado.
+      Cópiala a Netlify como <code>CHATBOT_CLAVE</code>. Si la pierdes, los datos
+      cifrados se pierden con ella: no hay puerta trasera, y ese es el punto.</p>
+      <div class="fila"><button class="accion" id="btn-llave">Generar llave</button></div>
+      <div id="salida-llave"></div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Probar el cifrado</h2>
+      <p class="nota">Corre las pruebas del módulo de cifrado en vivo: ida y vuelta,
+      aislamiento entre empresas, detección de manipulación y rotación de llave.</p>
+      <div class="fila"><button class="accion" id="btn-probar-cifrado">Correr pruebas</button></div>
+      <div id="salida-cifrado"></div>
+    </div>
+
+    <div class="tarjeta">
+      <h2>Variables que necesita Netlify</h2>
+      <pre>CHATBOT_CLAVE          # la de arriba
+SUPABASE_URL           = https://gnhndbqbgvtoxhelikcy.supabase.co
+SUPABASE_ANON_KEY      # llave publicable del proyecto
+SUPABASE_SERVICE_KEY   # llave de servicio (SOLO servidor)
+ANTHROPIC_API_KEY      # opcional pero recomendada</pre>
+    </div>
+  </section>
+
+</div>
+
+<script type="module">
+/* ══════════════════════════════════════════════════════════════════════════
+ *  La consola. Un solo archivo, tres vistas.
+ *
+ *  El navegador NUNCA habla con Supabase para leer datos: todo pasa por
+ *  /api/admin. La razón es concreta — los datos están
+ *  cifrados y la llave vive en el servidor. Lo único que sí se hace directo
+ *  contra Supabase es iniciar sesión, porque de ahí sale el token.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+// Estas dos son públicas por diseño: la llave "publicable" está pensada para
+// vivir en el navegador. Lo que protege los datos es RLS, no esconderla.
+const SB_URL  = 'https://gnhndbqbgvtoxhelikcy.supabase.co';
+const SB_ANON = 'sb_publishable_vSDvUv6W2vpbEQACqAewLw_ubYlcU5t';
+const ADMIN   = '/api/admin';
+
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = t => String(t ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+let token = sessionStorage.getItem('chatbot:token') || null;
+let yo = null, empresas = [], empresaActiva = null;
+
+/* ── pestañas ────────────────────────────────────────────────────────── */
+$$('.pestanas button').forEach(b => b.addEventListener('click', () => {
+  $$('.pestanas button').forEach(x => delete x.dataset.activa);
+  b.dataset.activa = '1';
+  ['pruebas','panel','herramientas'].forEach(v =>
+    $('#v-' + v).classList.toggle('oculto', v !== b.dataset.vista));
+}));
+
+/* ── banco de pruebas: el widget ─────────────────────────────────────── */
+const marcaURL = new URLSearchParams(location.search).get('marca') || 'consultorio';
+$$('#marcas-botones button').forEach(b => {
+  if (b.dataset.marca === marcaURL) b.classList.remove('gris');
+  b.addEventListener('click', () => location.search = '?marca=' + b.dataset.marca);
+});
+
+import('./cerebro/marcas.mjs').then(mod => {
+  // Vista previa local: se responde la petición de config del widget con
+  // marcas.mjs, la MISMA fuente que usa el servidor. Así se afinan colores y
+  // textos sin gastar un build de Netlify. Solo vive en esta página.
+  const real = window.fetch;
+  window.fetch = function (url) {
+    const u = String(url);
+    if (u.indexOf('config=1') > -1) {
+      const id = new URL(u, location.href).searchParams.get('marca');
+      return Promise.resolve(new Response(JSON.stringify(mod.marcaPublica(id)),
+        { status: 200, headers: { 'content-type': 'application/json' } }));
+    }
+    return real.apply(this, arguments);
+  };
+}).catch(() => {}).then(() => {
+  const s = document.createElement('script');
+  s.src = 'widget.js'; s.dataset.marca = marcaURL; s.defer = true;
+  document.body.appendChild(s);
+});
+
+fetch('/api/bot?ping=1').then(r => r.json()).then(d => {
+  const filas = Object.entries(d.proveedores || {})
+    .map(([n, hay]) => `${hay ? '🟢' : '⚪'} ${n}`).join(' &nbsp; ');
+  $('#estado').innerHTML = filas +
+    `<div style="margin-top:6px">Orden: <code>${esc(d.orden)}</code> · Modelo: <code>${esc(d.modeloClaude)}</code></div>`;
+}).catch(() => {
+  $('#estado').innerHTML = '⚪ Sin servidor. Es lo normal si abriste el archivo ' +
+    'con doble clic o con un servidor estático: el widget se pinta pero no contesta.';
+});
+
+/* ── acceso ──────────────────────────────────────────────────────────── */
+function avisar(donde, texto, tipo = 'mal') {
+  $(donde).innerHTML = `<div class="aviso ${tipo}">${esc(texto)}</div>`;
+}
+
+async function auth(ruta, cuerpo) {
+  const r = await fetch(`${SB_URL}/auth/v1/${ruta}`, {
+    method: 'POST',
+    headers: { apikey: SB_ANON, 'content-type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error_description || d.msg || d.message || 'No se pudo');
+  return d;
+}
+
+$('#btn-entrar').addEventListener('click', async () => {
+  try {
+    const d = await auth('token?grant_type=password',
+      { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
+    token = d.access_token;
+    sessionStorage.setItem('chatbot:token', token);
+    await arrancarPanel();
+  } catch (e) { avisar('#acceso-msg', e.message); }
+});
+
+$('#btn-registrar').addEventListener('click', async () => {
+  try {
+    await auth('signup', { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
+    avisar('#acceso-msg', 'Cuenta creada. Si el proyecto pide confirmar el correo, ' +
+      'revisa tu bandeja. Después hay que asignarte a una empresa.', 'bien');
+  } catch (e) { avisar('#acceso-msg', e.message); }
+});
+
+$('#btn-salir').addEventListener('click', () => {
+  token = null; yo = null;
+  sessionStorage.removeItem('chatbot:token');
+  $('#caja-panel').classList.add('oculto');
+  $('#caja-acceso').classList.remove('oculto');
+});
+
+/* ── llamadas al panel ───────────────────────────────────────────────── */
+async function api(accion, datos = {}) {
+  const r = await fetch(ADMIN, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ accion, datos }),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Falló la petición');
+  return d;
+}
+
+async function arrancarPanel() {
+  try {
+    const { yo: perfil } = await api('sesion');
+    yo = perfil;
+  } catch (e) {
+    avisar('#acceso-msg', e.message);
+    if (String(e.message).includes('Sesión no válida')) {
+      sessionStorage.removeItem('chatbot:token'); token = null;
+    }
+    return;
+  }
+
+  $('#caja-acceso').classList.add('oculto');
+  $('#caja-panel').classList.remove('oculto');
+  $('#yo-nombre').textContent = yo.nombre || yo.email;
+  $('#yo-rol').textContent = yo.rol;
+  $('#yo-rol').className = 'placa ' + (yo.esSuper ? 'verde' : '');
+
+  // Lo que solo ve el superadministrador.
+  $('#crear-empresa').classList.toggle('oculto', !yo.esSuper);
+  $('#caja-usuarios').classList.toggle('oculto', !yo.esSuper);
+  $('#caja-bitacora').classList.toggle('oculto', !yo.esSuper);
+
+  await Promise.all([cargarEmpresas(), cargarMetricas(), cargarLeads(), cargarAvisos()]);
+  if (yo.esSuper) await Promise.all([cargarUsuarios(), cargarBitacora()]);
+}
+
+/* ── empresas ────────────────────────────────────────────────────────── */
+async function cargarEmpresas() {
+  const d = await api('empresas.listar');
+  empresas = d.empresas || [];
+  $('#yo-empresa').textContent = yo.esSuper
+    ? 'Superadministrador de la plataforma · ' + empresas.length + ' empresa(s)'
+    : (empresas[0]?.nombre || '');
+
+  $('#tabla-empresas').innerHTML = empresas.length ? `
+    <tr><th>Marca</th><th>Tipo</th><th>Plan</th><th>Estado</th><th></th></tr>
+    ${empresas.map(e => `
+      <tr>
+        <td><b>${esc(e.nombre)}</b><div class="nota"><code>${esc(e.slug)}</code></div></td>
+        <td><span class="placa ${e.dominio === 'clinico' ? 'ambar' : ''}">${esc(e.dominio)}</span></td>
+        <td>${esc(e.plan)}</td>
+        <td><span class="placa ${e.activa ? 'verde' : 'roja'}">${e.activa ? 'activa' : 'suspendida'}</span></td>
+        <td class="fila">
+          <button class="accion gris" data-editar="${e.id}">Configurar</button>
+          ${yo.esSuper ? `<button class="accion ${e.activa ? 'roja' : 'gris'}"
+             data-suspender="${e.id}" data-activa="${e.activa}">
+             ${e.activa ? 'Suspender' : 'Reactivar'}</button>` : ''}
+        </td>
+      </tr>`).join('')}`
+    : '<tr><td class="nota">Todavía no hay empresas. Crea la primera abajo.</td></tr>';
+
+  $$('[data-editar]').forEach(b => b.addEventListener('click', () => abrirEditor(b.dataset.editar)));
+  $$('[data-suspender]').forEach(b => b.addEventListener('click', async () => {
+    const activa = b.dataset.activa !== 'true';
+    if (!confirm(activa ? '¿Reactivar esta empresa?'
+      : '¿Suspender? Su chatbot deja de contestar de inmediato.')) return;
+    await api('empresas.suspender', { id: b.dataset.suspender, activa });
+    await cargarEmpresas();
+  }));
+}
+
+$('#btn-crear-empresa').addEventListener('click', async () => {
+  try {
+    await api('empresas.crear', {
+      slug: $('#ne-slug').value, nombre: $('#ne-nombre').value,
+      dominio: $('#ne-dominio').value, plan: $('#ne-plan').value,
+    });
+    $('#ne-slug').value = ''; $('#ne-nombre').value = '';
+    await cargarEmpresas();
+  } catch (e) { alert(e.message); }
+});
+
+/* ── editor de una empresa ───────────────────────────────────────────── */
+async function abrirEditor(id) {
+  const { empresa, secretos } = await api('empresas.detalle', { id });
+  empresaActiva = empresa;
+  $('#caja-editor').classList.remove('oculto');
+  $('#ed-nombre').textContent = empresa.nombre;
+  $('#ed-titulo').value   = empresa.nombre || '';
+  $('#ed-saludo').value   = empresa.saludo || '';
+  $('#ed-descargo').value = empresa.descargo || '';
+  $('#ed-persona').value  = secretos.persona || '';
+  const con = empresa.contactos || {};
+  $('#ed-wa-consultorio').value = con.consultorio?.whatsapp || '';
+  $('#ed-wa-urgencias').value   = con.urgencias?.whatsapp   || '';
+  const des = secretos.destinos || {};
+  $('#ed-mail-urgencias').value   = des.urgencias?.correo   || '';
+  $('#ed-mail-consultorio').value = des.consultorio?.correo || '';
+  $('#ed-tel-personal').value     = des.personal?.telefono  || '';
+  $('#ed-limites').value  = (secretos.limites || []).join('\n');
+  $('#ed-conocimiento').value = (secretos.conocimiento || [])
+    .map(k => `${k.tema} | ${k.texto}`).join('\n');
+  $('#ed-msg').textContent = '';
+  $('#caja-editor').scrollIntoView({ behavior: 'smooth' });
+}
+
+$('#btn-cerrar-editor').addEventListener('click', () => $('#caja-editor').classList.add('oculto'));
+
+$('#btn-guardar-empresa').addEventListener('click', async () => {
+  const btn = $('#btn-guardar-empresa');
+  btn.disabled = true; $('#ed-msg').textContent = 'Cifrando y guardando…';
+  try {
+    await api('empresas.guardar', {
+      id: empresaActiva.id,
+      nombre:   $('#ed-titulo').value,
+      saludo:   $('#ed-saludo').value,
+      descargo: $('#ed-descargo').value,
+      contactos: {
+        consultorio: { whatsapp: $('#ed-wa-consultorio').value.replace(/\D/g, ''),
+                       etiqueta: 'Escribir al consultorio' },
+        urgencias:   { whatsapp: $('#ed-wa-urgencias').value.replace(/\D/g, ''),
+                       etiqueta: 'Escribir a urgencias' },
+      },
+      secretos: {
+        destinos: {
+          urgencias:   { correo: $('#ed-mail-urgencias').value.trim() },
+          consultorio: { correo: $('#ed-mail-consultorio').value.trim() },
+          personal:    { telefono: $('#ed-tel-personal').value.trim() },
+          // A dónde va cada cosa. Una urgencia nunca cae en el buzón de citas.
+          ruteo: { urgencia: 'urgencias', lead: 'consultorio', resumen: 'personal' },
+        },
+        persona: $('#ed-persona').value,
+        limites: $('#ed-limites').value.split('\n').map(s => s.trim()).filter(Boolean),
+        conocimiento: $('#ed-conocimiento').value.split('\n').map(s => s.trim()).filter(Boolean)
+          .map(r => {
+            const i = r.indexOf('|');
+            return i < 0 ? { tema: 'general', texto: r }
+                         : { tema: r.slice(0, i).trim(), texto: r.slice(i + 1).trim() };
+          }),
+      },
+    });
+    $('#ed-msg').textContent = 'Guardado y cifrado.';
+    await cargarEmpresas();
+  } catch (e) { $('#ed-msg').textContent = e.message; }
+  btn.disabled = false;
+});
+
+/* ── métricas, leads, usuarios, bitácora ─────────────────────────────── */
+async function cargarMetricas() {
+  const m = await api('metricas');
+  $('#metricas').innerHTML = `
+    <div class="numero">${m.conversaciones}<small>conversaciones</small></div>
+    <div class="numero" style="color:${m.urgencias ? 'var(--alerta)' : 'inherit'}">
+      ${m.urgencias}<small>urgencias detectadas</small></div>
+    <div class="numero">${m.leads}<small>datos recibidos</small></div>
+    <div class="numero" style="color:${m.leadsSinAtender ? 'var(--alerta)' : 'inherit'}">
+      ${m.leadsSinAtender}<small>sin atender</small></div>`;
+}
+
+async function cargarAvisos() {
+  const { avisos } = await api('avisos.listar');
+  $('#tabla-avisos').innerHTML = avisos.length ? `
+    <tr><th>Cuándo</th><th>Qué</th><th>Salió</th><th>A dónde</th><th></th></tr>
+    ${avisos.map(a => `
+      <tr>
+        <td class="nota">${new Date(a.created_at).toLocaleString('es-MX')}</td>
+        <td><span class="placa ${a.tipo === 'urgencia' ? 'roja' : ''}">${esc(a.tipo)}</span></td>
+        <td><span class="placa ${a.estado === 'enviado' ? 'verde' : 'roja'}">${esc(a.estado)}</span>
+          ${a.estado === 'fallido' ? `<div class="nota">${esc(a.detalle?.nota || '')}</div>` : ''}</td>
+        <td class="nota">${esc(a.destino || '—')}</td>
+        <td>${a.visto_at ? '<span class="placa verde">visto</span>'
+              : `<button class="accion gris" data-visto="${a.id}">Marcar visto</button>`}</td>
+      </tr>`).join('')}`
+    : '<tr><td class="nota">Sin avisos todavía.</td></tr>';
+
+  $$('[data-visto]').forEach(b => b.addEventListener('click', async () => {
+    await api('avisos.visto', { id: b.dataset.visto, visto: true });
+    await cargarAvisos();
+  }));
+}
+
+async function cargarLeads() {
+  const { leads } = await api('leads.listar');
+  $('#tabla-leads').innerHTML = leads.length ? `
+    <tr><th>Cuándo</th><th>Quién</th><th>Contacto</th><th>Qué escribió</th><th></th></tr>
+    ${leads.map(l => `
+      <tr>
+        <td class="nota">${new Date(l.created_at).toLocaleString('es-MX')}</td>
+        <td>${l.error ? '<span class="placa roja">no se pudo descifrar</span>'
+                      : esc(l.datos?.nombre)}</td>
+        <td>${esc(l.datos?.telefono || '')}</td>
+        <td>${esc(l.datos?.motivo || '')}</td>
+        <td><button class="accion gris" data-atendido="${l.id}" data-val="${!l.atendido}">
+          ${l.atendido ? '✓ atendido' : 'marcar'}</button></td>
+      </tr>`).join('')}`
+    : '<tr><td class="nota">Nadie ha dejado sus datos todavía.</td></tr>';
+
+  $$('[data-atendido]').forEach(b => b.addEventListener('click', async () => {
+    await api('leads.atendido', { id: b.dataset.atendido, atendido: b.dataset.val === 'true' });
+    await Promise.all([cargarLeads(), cargarMetricas()]);
+  }));
+}
+
+async function cargarUsuarios() {
+  const { usuarios } = await api('usuarios.listar');
+  const opciones = e => empresas.map(x =>
+    `<option value="${x.id}" ${x.id === e ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
+
+  $('#tabla-usuarios').innerHTML = `
+    <tr><th>Persona</th><th>Rol</th><th>Empresa</th><th>Activo</th><th></th></tr>
+    ${usuarios.map(u => `
+      <tr data-usuario="${u.id}">
+        <td>${esc(u.nombre || '')}<div class="nota">${esc(u.email || '')}</div></td>
+        <td><select class="u-rol">
+          ${['pendiente','staff','dueno','superadmin'].map(r =>
+            `<option value="${r}" ${r === u.rol ? 'selected' : ''}>${r}</option>`).join('')}
+        </select></td>
+        <td><select class="u-empresa"><option value="">— ninguna —</option>${opciones(u.empresa_id)}</select></td>
+        <td><input type="checkbox" class="u-activo" ${u.activo ? 'checked' : ''} style="width:auto"></td>
+        <td><button class="accion gris u-guardar">Guardar</button></td>
+      </tr>`).join('')}`;
+
+  $$('.u-guardar').forEach(b => b.addEventListener('click', async () => {
+    const tr = b.closest('tr');
+    try {
+      await api('usuarios.asignar', {
+        id: tr.dataset.usuario,
+        rol: tr.querySelector('.u-rol').value,
+        empresa_id: tr.querySelector('.u-empresa').value || null,
+        activo: tr.querySelector('.u-activo').checked,
+      });
+      b.textContent = '✓';
+      setTimeout(() => { b.textContent = 'Guardar'; }, 1500);
+    } catch (e) { alert(e.message); }
+  }));
+}
+
+async function cargarBitacora() {
+  const { bitacora } = await api('bitacora.listar');
+  $('#tabla-bitacora').innerHTML = bitacora.length ? `
+    <tr><th>Cuándo</th><th>Acción</th><th>Detalle</th></tr>
+    ${bitacora.map(b => `
+      <tr><td class="nota">${new Date(b.created_at).toLocaleString('es-MX')}</td>
+      <td><code>${esc(b.accion)}</code></td>
+      <td class="nota">${esc(JSON.stringify(b.detalle))}</td></tr>`).join('')}`
+    : '<tr><td class="nota">Sin movimientos todavía.</td></tr>';
+}
+
+/* ── herramientas ────────────────────────────────────────────────────── */
+$('#btn-llave').addEventListener('click', async () => {
+  const { generarLlaveMaestra } = await import('./cerebro/cifrado.mjs');
+  const llave = generarLlaveMaestra();
+  $('#salida-llave').innerHTML =
+    `<pre style="white-space:pre-wrap;word-break:break-all">${esc(llave)}</pre>
+     <div class="aviso ojo">Cópiala ahora. No se guarda en ningún lado: si recargas
+     esta página, se va. Va en Netlify como <code>CHATBOT_CLAVE</code>.</div>`;
+});
+
+$('#btn-probar-cifrado').addEventListener('click', async () => {
+  const salida = $('#salida-cifrado');
+  salida.innerHTML = '<div class="nota">Corriendo…</div>';
+  try {
+    const m = await import('./cerebro/cifrado.mjs');
+    const R = [];
+    const ok = (n, c) => R.push({ n, c });
+    const falla = async fn => { try { await fn(); return false; } catch { return true; } };
+
+    const maestra = m.generarLlaveMaestra();
+    const A = '11111111-1111-1111-1111-111111111111';
+    const B = '22222222-2222-2222-2222-222222222222';
+    const lead = { nombre: 'María Pérez', telefono: '9611234567', motivo: 'dolor de rodilla' };
+
+    const c1 = await m.cifrar(maestra, A, lead);
+    ok('ida y vuelta conserva el dato', JSON.stringify(await m.descifrar(maestra, A, c1)) === JSON.stringify(lead));
+    ok('el cifrado no filtra el nombre', !c1.includes('Mar'));
+    ok('el cifrado no filtra el teléfono', !c1.includes('9611234567'));
+    ok('mismo dato → cifrado distinto (IV único)', c1 !== await m.cifrar(maestra, A, lead));
+    ok('la empresa B no abre los datos de A', await falla(() => m.descifrar(maestra, B, c1)));
+
+    const p = c1.split('.'); const b = atob(p[2]).split('');
+    b[3] = String.fromCharCode(b[3].charCodeAt(0) ^ 1);
+    ok('detecta un byte alterado', await falla(() =>
+      m.descifrar(maestra, A, p[0] + '.' + p[1] + '.' + btoa(b.join('')))));
+    ok('otra llave maestra no descifra', await falla(() => m.descifrar(m.generarLlaveMaestra(), A, c1)));
+    ok('rechaza llave maestra corta', await falla(() => m.cifrar(btoa('poquito'), A, { x: 1 })));
+
+    const m2 = m.generarLlaveMaestra();
+    const cRot = await m.cifrar(maestra, A, { s: 'antes' });
+    await m.cifrar(m2, A, { s: 'despues' });
+    ok('tras rotar, lo viejo ya no abre con la nueva', await falla(() => m.descifrar(m2, A, cRot)));
+    ok('tras rotar, lo viejo sí abre con la vieja', (await m.descifrar(maestra, A, cRot)).s === 'antes');
+
+    const fallos = R.filter(r => !r.c).length;
+    salida.innerHTML =
+      `<div class="aviso ${fallos ? 'mal' : 'bien'}">${fallos ? fallos + ' prueba(s) fallaron' : 'Las ' + R.length + ' pruebas pasan'}</div>
+       <ul>${R.map(r => `<li>${r.c ? '✅' : '❌'} ${esc(r.n)}</li>`).join('')}</ul>`;
+  } catch (e) {
+    salida.innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
+  }
+});
+
+/* ── si ya había sesión, entrar directo ──────────────────────────────── */
+if (token) arrancarPanel();
+</script>
+</body>
+</html>

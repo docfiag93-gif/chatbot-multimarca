@@ -1,0 +1,24 @@
+# Cabeceras para Cloudflare Pages (mismo formato que Netlify).
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# El widget lo van a incrustar sitios ajenos (el del consultorio, el del
+# café, y mañana los de los clientes). Sin CORS abierto, el navegador
+# bloquea la carga desde otro dominio y el chat simplemente no aparece.
+/widget.js
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300, must-revalidate
+
+# La consola cambia seguido: se revalida siempre para no mezclar HTML viejo
+# con código nuevo después de un despliegue. `no-cache` (no `no-store`):
+# el navegador guarda la copia y pregunta; si no cambió, contesta 304 y no
+# se vuelve a bajar. Esa distinción fue justo lo que disparó el consumo en
+# Netlify la vez pasada.
+/index.html
+  Cache-Control: no-cache, must-revalidate
+
+/cerebro/*
+  Cache-Control: public, max-age=300, must-revalidate
