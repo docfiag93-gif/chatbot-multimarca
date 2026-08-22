@@ -1,6 +1,6 @@
 // Envoltorio de Cloudflare Pages para el panel. Ver functions/api/bot.js.
 import { manejar } from '../../servidor/admin.mjs';
-import { ponerEntorno } from '../../publico/cerebro/entorno.mjs';
+import { ponerEntorno } from '../../servidor/nucleo/entorno.mjs';
 
 export async function onRequest(context) {
   ponerEntorno(context.env);

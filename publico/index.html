@@ -256,6 +256,9 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--tenue);font-size:12px">
         <span style="flex:1;height:1px;background:var(--linea)"></span>o<span style="flex:1;height:1px;background:var(--linea)"></span>
       </div>
+      <button class="btn sec" id="btn-enlace" style="width:100%;justify-content:center;margin-bottom:9px">
+        ✉︎ Enviarme un enlace para entrar
+      </button>
       <button class="btn sec" id="btn-google" style="width:100%;justify-content:center">
         <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/><path fill="#EA4335" d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.46 14.97.5 12 .5A11 11 0 0 0 2.18 7.05l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
         Continuar con Google
@@ -464,9 +467,9 @@ RESEND_API_KEY         # para los avisos</pre>
 <script type="module">
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO, IDIOMAS, TIPOS_OFERTA }
   from './cerebro/perfil.mjs';
-import { CATEGORIAS_SUGERIDAS } from './cerebro/catalogos-ui.mjs';
-import { catalogoDePoliticas } from './cerebro/politicas.mjs';
-import { catalogoDeAcciones } from './cerebro/acciones.mjs';
+// Solo metadatos: el panel pinta nombres y resúmenes. El texto de los
+// prompts vive en el servidor y nunca baja al navegador.
+import { CATEGORIAS_SUGERIDAS, POLITICAS_UI, ACCIONES_UI } from './cerebro/catalogos-ui.mjs';
 import { SEMILLAS } from './cerebro/semillas.mjs';
 
 const SB_URL  = 'https://gnhndbqbgvtoxhelikcy.supabase.co';
@@ -582,13 +585,13 @@ $('#catalogo').appendChild(renglonOferta());
 $('#conocimiento').appendChild(renglonPar('k','Tema (ej. envíos)','Qué debe saber'));
 
 /* ── acciones y políticas ─────────────────────────────────────────── */
-$('#acciones').innerHTML = catalogoDeAcciones().map(a => `
+$('#acciones').innerHTML = ACCIONES_UI.map(a => `
   <label class="opcion"><input type="checkbox" class="ac" value="${esc(a.id)}"
     ${a.id==='derivar_humano'?'checked disabled':''}>
     <span class="txt"><b>${esc(a.nombre)}</b><small>${esc(a.resumen)}</small>
     ${a.requiere?`<small style="color:var(--tenue);margin-top:4px">Necesita que llenes: ${esc(a.requiere)}</small>`:''}
     </span></label>`).join('');
-$('#politicas').innerHTML = catalogoDePoliticas().map(p => `
+$('#politicas').innerHTML = POLITICAS_UI.map(p => `
   <label class="opcion"><input type="checkbox" class="po" value="${esc(p.id)}">
     <span class="txt"><b>${esc(p.nombre)}</b><small>${esc(p.resumen)}</small>
     ${p.aviso?`<small class="cuidado">⚠ ${esc(p.aviso)}</small>`:''}
@@ -876,6 +879,31 @@ $('#btn-registrar').addEventListener('click', async () => {
  * abierta en su teléfono. Pedirle que invente y recuerde otra contraseña es
  * fricción pura, y las contraseñas que inventa para esto suelen ser malas.
  */
+/**
+ * Enlace mágico: se manda un correo con un enlace de un solo uso.
+ *
+ * Para este público es mejor que la contraseña, y no es una opinión: quien
+ * administra un negocio entra al panel una vez por semana. La contraseña que
+ * inventa para eso la olvida, la anota en un papel, o la repite de otro
+ * servicio. Un enlace al correo elimina las tres.
+ */
+$('#btn-enlace').addEventListener('click', async () => {
+  const correo = $('#ac-correo').value.trim();
+  if (!correo) {
+    $('#google-msg').innerHTML = `<div class="aviso ojo">Escribe tu correo primero.</div>`;
+    $('#ac-correo').focus();
+    return;
+  }
+  try {
+    await auth('otp', { email: correo,
+      options: { email_redirect_to: location.origin + location.pathname } });
+    $('#google-msg').innerHTML = `<div class="aviso ok">Te mandamos un enlace a
+      <b>${esc(correo)}</b>. Ábrelo desde este mismo dispositivo.</div>`;
+  } catch (e) {
+    $('#google-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
+  }
+});
+
 $('#btn-google').addEventListener('click', () => {
   const volverA = location.origin + location.pathname;
   const url = `${SB_URL}/auth/v1/authorize?provider=google` +

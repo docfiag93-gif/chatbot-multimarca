@@ -17,9 +17,9 @@
 
 import { env } from './entorno.mjs';
 import { clienteSupabase } from './supabase.mjs';
-import { descifrar, cifrar } from './cifrado.mjs';
+import { descifrar, cifrar } from '../../publico/cerebro/cifrado.mjs';
 import { marcaPublica, obtenerMarca } from './marcas.mjs';
-import { normalizarPerfil, perfilPublico } from './perfil.mjs';
+import { normalizarPerfil, perfilPublico } from '../../publico/cerebro/perfil.mjs';
 import { enviarAviso, recortar } from './avisos.mjs';
 
 function servicio() {
@@ -87,6 +87,9 @@ export async function empresaPorSlug(slug) {
     conocimiento: await abrir('conocimiento_cifrado') || perfilGuardado.conocimiento || [],
     limites:      await abrir('limites_cifrados')     || perfilGuardado.limites || [],
     destinos:     await abrir('destinos_cifrados')    || null,
+    // El enlace saliente lleva un SECRETO compartido, así que viaja cifrado
+    // como todo lo demás que no debe poder leerse desde la base.
+    enlace:       await abrir('enlace_cifrado')       || null,
     ...repartirLlaves(await abrir('llaves_cifradas')),
   });
 }

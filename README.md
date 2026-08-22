@@ -385,3 +385,53 @@ contraseña es fricción, y la que inventa suele ser mala.
 
 **Falta configurarlo:** en Supabase → Authentication → Providers → Google, con
 un ID de cliente de Google Cloud. El código ya está.
+
+
+---
+
+# Qué se puede descargar del sitio, y qué no
+
+Una app web **no se puede encriptar**. Todo lo que corre en el navegador, el
+navegador lo puede leer; ofuscar el código lo hace feo, no seguro. Lo que sí
+protege un producto es que **lo valioso viva en el servidor**.
+
+## Lo que se publica (y está bien que se publique)
+
+| Archivo | Por qué es público |
+|---|---|
+| `widget.js` | Se incrusta en sitios de clientes. Tiene que bajar. |
+| `perfil.mjs` | Modelo de datos. Sin secretos, sin prompts. |
+| `catalogos-ui.mjs` | Nombres y resúmenes para pintar el panel. |
+| `cifrado.mjs` | El algoritmo. Un cifrado que depende de esconder su algoritmo no es cifrado: lo que protege es la llave, y esa vive en el servidor. |
+| `semillas.mjs` | Ejemplos borrables. |
+
+## Lo que ya NO se publica
+
+`anclaje.mjs`, `cerebro.mjs`, `politicas.mjs`, `acciones.mjs`,
+`proveedores.mjs`, `diagnostico.mjs`, `datos.mjs`, `supabase.mjs`,
+`entorno.mjs`, `enlaces.mjs`, `seguridad.mjs`, `avisos.mjs`, `marcas.mjs`.
+
+Ninguno tenía secretos —las llaves siempre estuvieron en variables de
+entorno— pero sí tenían **el texto de los prompts y la lógica de anclaje**:
+el trabajo real del producto. Quien los leyera podía además estudiar cómo
+saltarse los límites clínicos.
+
+Ahora viven en `servidor/nucleo/`, fuera de la carpeta que se publica.
+
+## El costo de esa separación, y cómo se paga
+
+El panel necesita listar políticas y acciones. Para no publicar los prompts,
+`catalogos-ui.mjs` duplica tres campos: id, nombre y resumen.
+
+Duplicar tiene un riesgo obvio: que se desincronice. Por eso hay **26 pruebas**
+que comparan el catálogo del panel contra el del servidor y fallan si alguien
+agrega una política de un lado y no del otro.
+
+## Cómo verificarlo tú mismo
+
+```bash
+curl -s https://chatbot-multimarca.pages.dev/cerebro/anclaje.mjs | head -3
+```
+
+Debe devolver el HTML de la página principal, no código: eso significa que el
+archivo no existe en el sitio público.

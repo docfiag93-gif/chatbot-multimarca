@@ -14,7 +14,7 @@
 //  describió de sí mismo, más lo que aporten las políticas que ENCENDIÓ.
 // ════════════════════════════════════════════════════════════════════════
 
-import { normalizarPerfil } from './perfil.mjs';
+import { normalizarPerfil } from '../../publico/cerebro/perfil.mjs';
 import { interceptar, aportesDePoliticas } from './politicas.mjs';
 import { fragmentoDeAcciones, accionPermitida } from './acciones.mjs';
 

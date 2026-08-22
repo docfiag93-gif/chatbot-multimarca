@@ -15,8 +15,8 @@
 //  Cuando ya no queden llamadas a estas tres funciones, este archivo se borra.
 // ════════════════════════════════════════════════════════════════════════
 
-import { SEMILLAS } from './semillas.mjs';
-import { normalizarPerfil, perfilPublico, NEUTRO } from './perfil.mjs';
+import { SEMILLAS } from '../../publico/cerebro/semillas.mjs';
+import { normalizarPerfil, perfilPublico, NEUTRO } from '../../publico/cerebro/perfil.mjs';
 
 /** Los ejemplos, ya normalizados. Se mantiene el nombre `MARCAS` por compatibilidad. */
 export const MARCAS = Object.fromEntries(

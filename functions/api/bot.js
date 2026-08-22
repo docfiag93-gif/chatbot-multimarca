@@ -9,7 +9,7 @@
 // Por eso este archivo es de diez líneas y no de cuatrocientas: mudarse de
 // proveedor tiene que ser cambiar el enchufe, no rehacer la instalación.
 import { manejar } from '../../servidor/bot.mjs';
-import { ponerEntorno } from '../../publico/cerebro/entorno.mjs';
+import { ponerEntorno } from '../../servidor/nucleo/entorno.mjs';
 
 export async function onRequest(context) {
   ponerEntorno(context.env);

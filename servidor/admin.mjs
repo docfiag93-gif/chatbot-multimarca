@@ -17,14 +17,14 @@
 //       sigue negando lo que no le toca. Dos cerraduras, no una.
 // ════════════════════════════════════════════════════════════════════════
 
-import { env } from '../publico/cerebro/entorno.mjs';
-import { clienteSupabase, usuarioDelToken } from '../publico/cerebro/supabase.mjs';
+import { env } from './nucleo/entorno.mjs';
+import { clienteSupabase, usuarioDelToken } from './nucleo/supabase.mjs';
 import { cifrar, descifrar } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, revisarPerfil, aSlug, IDIOMAS, TIPOS_OFERTA }
   from '../publico/cerebro/perfil.mjs';
 import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
-import { catalogoDePoliticas } from '../publico/cerebro/politicas.mjs';
-import { catalogoDeAcciones } from '../publico/cerebro/acciones.mjs';
+import { catalogoDePoliticas } from './nucleo/politicas.mjs';
+import { catalogoDeAcciones } from './nucleo/acciones.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -47,6 +47,9 @@ const SECRETOS = {
   // Catálogo, horarios, ubicaciones, objetivos y atributos propios. Cifrado
   // porque ahí van precios, márgenes y detalles de operación del cliente.
   perfil:       'perfil_cifrado',
+  // URL + secreto del sistema al que el bot le avisa. Cifrado: el secreto es
+  // lo que impide que cualquiera invente citas en el sistema del cliente.
+  enlace:       'enlace_cifrado',
 };
 
 export async function manejar(req, context) {

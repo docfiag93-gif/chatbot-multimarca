@@ -13,15 +13,16 @@
 //  con un fetch simulado, sin desplegar y sin gastar una sola llamada real.
 // ════════════════════════════════════════════════════════════════════════
 
-import { env } from '../publico/cerebro/entorno.mjs';
-import { MARCAS } from '../publico/cerebro/marcas.mjs';
-import { construirPrompt, respuestaInmediata, accionValida } from '../publico/cerebro/cerebro.mjs';
-import { preguntar } from '../publico/cerebro/proveedores.mjs';
-import { revisarEntorno, explicarFallo } from '../publico/cerebro/diagnostico.mjs';
+import { env } from './nucleo/entorno.mjs';
+import { MARCAS } from './nucleo/marcas.mjs';
+import { construirPrompt, respuestaInmediata, accionValida } from './nucleo/cerebro.mjs';
+import { preguntar } from './nucleo/proveedores.mjs';
+import { revisarEntorno, explicarFallo } from './nucleo/diagnostico.mjs';
 import { revisarAnclaje, revisarRedaccion, limpiarMuletillas, respuestaSinDato }
-  from '../publico/cerebro/anclaje.mjs';
+  from './nucleo/anclaje.mjs';
+import { enviarEvento } from './nucleo/enlaces.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar }
-  from '../publico/cerebro/datos.mjs';
+  from './nucleo/datos.mjs';
 
 // ── Freno de mano ───────────────────────────────────────────────────────
 // Este endpoint es público y anónimo: cualquiera con la URL puede quemar la
@@ -114,6 +115,20 @@ export async function manejar(req, context) {
         error: 'No pude registrar tu solicitud. Escríbenos directo, por favor.' }, 502);
     }
 
+    // El aviso por correo es para que TÚ te enteres. El enlace saliente es
+    // para que el SISTEMA del negocio se entere: su agenda, su expediente, su
+    // CRM. Un bot que solo avisa por correo obliga a alguien a recapturar
+    // todo a mano, y ahí se pierde la mitad.
+    enSegundoPlano(context, enviarEvento({
+      enlace: marca.enlace,
+      evento: 'contacto.nuevo',
+      empresaId: marca.id,
+      datos: {
+        nombre: lead.nombre, telefono: lead.telefono, motivo: lead.motivo || '',
+        origen: 'chat', sesion: String(sesion || '').slice(0, 64),
+      },
+    }));
+
     enSegundoPlano(context, avisar({
       empresa: marca, tipo: 'lead',
       titulo: 'Alguien quiere que le llamen',
@@ -145,6 +160,11 @@ export async function manejar(req, context) {
       const conversacionId = await guardarConversacion({
         empresa: marca, sesion, mensajes,
         urgencia: true, motivo: inmediata.motivo, via: 'filtro-local',
+      });
+      await enviarEvento({
+        enlace: marca.enlace, evento: 'urgencia.detectada', empresaId: marca.id,
+        datos: { motivo: inmediata.motivo, politica: inmediata.politica,
+                 sesion: String(sesion || '').slice(0, 64) },
       });
       await avisar({
         empresa: marca, tipo: 'urgencia', conversacionId,
