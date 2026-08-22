@@ -69,14 +69,33 @@
 
   var CLAVE = 'chatbot:' + MARCA;
 
-  // Un identificador anónimo por pestaña, solo para agrupar los mensajes de
-  // una misma charla en el panel. No identifica a nadie: se pierde al cerrar.
+  /**
+   * Identificador anónimo de quien escribe. Sirve para que dos visitas de la
+   * misma persona queden juntas en el panel en vez de verse como dos
+   * desconocidos, y para que quien atiende no le pida los mismos datos otra vez.
+   *
+   * VIVE EN DOS LADOS A PROPÓSITO, y esa división es la decisión importante:
+   *
+   *   · el IDENTIFICADOR va en localStorage — sobrevive al cierre del
+   *     navegador, así que la continuidad existe;
+   *   · lo que se DIJO va en sessionStorage (ver guardar/recuperar) — se
+   *     borra al cerrar la pestaña.
+   *
+   * Poner las dos cosas en localStorage sería más cómodo y estaría mal: en
+   * una computadora prestada, en un cibercafé o en la tablet del mostrador,
+   * el siguiente en sentarse abriría el chat y leería la consulta anterior.
+   * Un número al azar no le dice nada a nadie; una conversación sí.
+   */
   function idSesion() {
     var k = CLAVE + ':sesion';
-    var v = sessionStorage.getItem(k);
+    var v = null;
+    try { v = localStorage.getItem(k); } catch (e) {}
     if (!v) {
       v = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      try { sessionStorage.setItem(k, v); } catch (e) {}
+      try { localStorage.setItem(k, v); } catch (e) {
+        // Modo privado o almacenamiento bloqueado: se sigue sin recordar.
+        try { sessionStorage.setItem(k, v); } catch (e2) {}
+      }
     }
     return v;
   }
@@ -103,6 +122,7 @@
     return frag;
   }
 
+  // El contenido de la charla NO pasa a localStorage. Ver idSesion().
   function guardar() {
     try { sessionStorage.setItem(CLAVE, JSON.stringify(mensajes.slice(-20))); } catch (e) {}
   }
@@ -594,14 +614,46 @@
     pedirRespuesta();
   }
 
+  /**
+   * Pasa la conversación a una persona, con el contexto ya escrito.
+   *
+   * Antes el enlace era `wa.me/<numero>` a secas: del otro lado llegaba un
+   * "Hola" sin nada, y quien atiende tenía que volver a preguntar todo lo
+   * que la persona ya había escrito. Eso es justo lo que hace que una
+   * transferencia se sienta como empezar de cero.
+   *
+   * Se manda SOLO lo que la propia persona escribió —su última pregunta—,
+   * no la conversación entera ni lo que contestó el bot. Dos razones: el
+   * mensaje lo va a ver ella en su WhatsApp antes de enviarlo, y un volcado
+   * completo del chat en un cuadro de texto es incómodo de leer y expone
+   * más de lo necesario si presta el teléfono o comparte pantalla.
+   *
+   * En urgencia no se resume nada: ahí lo que importa es que llame ya.
+   */
   function enlaceWhatsapp(caso) {
     if (raiz.querySelector('.wa')) return;
     var c = contactoPara(caso);
     if (!c) return;
+
     var a = el('a', 'wa', c.etiqueta);
-    a.href = 'https://wa.me/' + c.numero;
+    a.href = 'https://wa.me/' + c.numero + colaDeContexto(caso);
     a.target = '_blank'; a.rel = 'noopener';
     lista.appendChild(a); abajo();
+  }
+
+  function colaDeContexto(caso) {
+    if (caso === 'urgencias') return '';
+
+    var ultima = '';
+    for (var i = mensajes.length - 1; i >= 0; i--) {
+      if (mensajes[i].rol === 'usuario') { ultima = String(mensajes[i].texto || ''); break; }
+    }
+    if (!ultima) return '';
+    if (ultima.length > 220) ultima = ultima.slice(0, 217) + '…';
+
+    var texto = 'Hola, vengo del chat de ' + (cfg.nombre || 'su sitio') +
+                '. Mi pregunta fue: "' + ultima + '"';
+    return '?text=' + encodeURIComponent(texto);
   }
 
   /* ── el formulario de contacto ──────────────────────────────────────── */

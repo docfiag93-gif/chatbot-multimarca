@@ -23,6 +23,25 @@ Las seis variables en Cloudflare: `GEMINI_API_KEY`, `GROQ_API_KEY`,
 
 ---
 
+## ✅ Hecho el 22-ago (tarde) — falta hacer commit y desplegar
+
+| Qué | Dónde |
+|---|---|
+| Portada sin sesión (antes se veía la consola a medias) | `publico/index.html` |
+| Tarjetas de negocio clicables + acciones (probar, copiar, publicar, suspender, duplicar) | `publico/index.html` |
+| Paleta oscura medida contra WCAG AA | `publico/index.html` |
+| Recuperación de contraseña (vale para dueño y superadmin) | `publico/index.html` |
+| WhatsApp ahora llega con la pregunta ya escrita | `publico/widget.js` |
+| El visitante se recuerda entre visitas (solo el id, no lo que dijo) | `publico/widget.js` |
+| El código para pegar en el sitio del cliente ya es absoluto | `publico/index.html` |
+
+Todo probado en local. Las 9 pruebas de cifrado siguen pasando.
+**No se ha hecho commit ni despliegue** — eso lo decides tú.
+
+Guía completa: https://claude.ai/code/artifact/a3647cc8-4522-4873-81a3-5b16702e32dd
+
+---
+
 ## ⏳ PASO SIGUIENTE · Dar de alta el primer negocio
 
 La base está vacía a propósito: los cuatro negocios que ves en el sitio
