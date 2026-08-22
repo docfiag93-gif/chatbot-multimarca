@@ -1,0 +1,1041 @@
+<title>Arquitectura Multimarca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --ground:   #FCFCFD;
+    --surface:  #FFFFFF;
+    --sunken:   #F4F5F8;
+    --ink:      #12161F;
+    --muted:    #5D6472;
+    --faint:    #8A91A0;
+    --line:     #E2E5EB;
+    --line-soft:#EDEFF3;
+    --accent:   #2B5F8A;
+    --accent-w: #E8F0F7;
+    --ok:       #1F7A55;
+    --ok-w:     #E6F3EC;
+    --warn:     #A66A00;
+    --warn-w:   #FBF1DE;
+    --crit:     #B3261E;
+    --crit-w:   #FBEAE9;
+    --t1: #2B5F8A; --t2: #8A5A2B; --t3: #4A7A2B; --t4: #6B3F7A;
+    --on-accent: #FFFFFF;
+    --shadow: 0 1px 2px rgba(18,22,31,.05), 0 8px 24px rgba(18,22,31,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0E1218;
+      --surface:  #161B24;
+      --sunken:   #1B212C;
+      --ink:      #E6E9EF;
+      --muted:    #9AA3B2;
+      --faint:    #6E7688;
+      --line:     #262D3A;
+      --line-soft:#1F2632;
+      --accent:   #7FB3DD;
+      --accent-w: #16283A;
+      --ok:       #63C89B;
+      --ok-w:     #14291F;
+      --warn:     #D9A441;
+      --warn-w:   #2B2113;
+      --crit:     #E0736B;
+      --crit-w:   #2E1614;
+      --t1: #7FB3DD; --t2: #D2A06A; --t3: #92C46B; --t4: #B48CC4;
+      --on-accent: #0E1218;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0E1218; --surface:#161B24; --sunken:#1B212C;
+    --ink:#E6E9EF; --muted:#9AA3B2; --faint:#6E7688;
+    --line:#262D3A; --line-soft:#1F2632;
+    --accent:#7FB3DD; --accent-w:#16283A;
+    --ok:#63C89B; --ok-w:#14291F; --warn:#D9A441; --warn-w:#2B2113;
+    --crit:#E0736B; --crit-w:#2E1614;
+    --t1:#7FB3DD; --t2:#D2A06A; --t3:#92C46B; --t4:#B48CC4;
+    --on-accent: #0E1218;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px 120px; }
+
+  /* ─── portada ─── */
+  .cover {
+    border-bottom: 1px solid var(--line);
+    padding: 76px 0 46px;
+    margin-bottom: 52px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--faint); margin: 0 0 20px;
+  }
+  h1 {
+    font-family: Spectral, Georgia, serif;
+    font-weight: 600; font-size: clamp(2.4rem, 5.4vw, 3.6rem);
+    line-height: 1.08; letter-spacing: -.018em;
+    margin: 0 0 20px; text-wrap: balance; max-width: 17ch;
+  }
+  .standfirst {
+    font-family: Spectral, Georgia, serif;
+    font-size: clamp(1.05rem, 2vw, 1.24rem); line-height: 1.6;
+    color: var(--muted); max-width: 62ch; margin: 0 0 34px;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0 40px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    color: var(--faint); border-top: 1px solid var(--line-soft); padding-top: 20px;
+  }
+  .meta b { color: var(--muted); font-weight: 500; }
+
+  /* ─── consejo ─── */
+  .council { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 14px; margin: 0 0 60px; }
+  .expert {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 3px; padding: 17px 18px; border-top: 2px solid var(--role, var(--accent));
+  }
+  .expert h4 {
+    margin: 0 0 5px; font-size: 14px; font-weight: 600;
+    font-family: "IBM Plex Sans", sans-serif; letter-spacing: -.005em;
+  }
+  .expert p { margin: 0; font-size: 13.2px; line-height: 1.5; color: var(--muted); }
+
+  /* ─── secciones ─── */
+  section { scroll-margin-top: 24px; padding-top: 8px; }
+  .sec-head {
+    display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: baseline;
+    border-top: 2px solid var(--ink); padding-top: 16px; margin: 68px 0 26px;
+  }
+  .sec-num {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    color: var(--accent); letter-spacing: .06em; padding-top: 6px;
+  }
+  .sec-head h2 {
+    font-family: Spectral, Georgia, serif; font-weight: 600;
+    font-size: clamp(1.5rem, 3vw, 2.05rem); line-height: 1.15;
+    margin: 0; letter-spacing: -.014em; text-wrap: balance;
+  }
+  h3 {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 15px; font-weight: 600;
+    margin: 36px 0 10px; letter-spacing: -.003em;
+  }
+  h3:first-child { margin-top: 0; }
+  h4 { font-size: 13.5px; font-weight: 600; margin: 22px 0 8px; color: var(--muted); }
+
+  p { margin: 0 0 15px; max-width: 70ch; }
+  ul, ol { margin: 0 0 15px; padding-left: 20px; max-width: 70ch; }
+  li { margin: 6px 0; }
+  li::marker { color: var(--faint); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .875em; background: var(--sunken);
+    padding: 1.5px 5px; border-radius: 2px; color: var(--ink);
+  }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ─── bloques ─── */
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 3px; padding: 20px 22px; margin: 20px 0;
+  }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); gap: 16px; margin: 20px 0; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 20px 0; }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-w);
+    padding: 15px 18px; margin: 22px 0; border-radius: 0 3px 3px 0;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: 6px;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-w); }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.crit { border-color: var(--crit); background: var(--crit-w); }
+  .callout.crit .tag { color: var(--crit); }
+
+  /* ─── tablas ─── */
+  .tbl-wrap { overflow-x: auto; margin: 20px 0; border: 1px solid var(--line); border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 480px; }
+  th {
+    text-align: left; font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); font-weight: 400;
+    padding: 11px 15px; border-bottom: 1px solid var(--line); background: var(--sunken);
+    white-space: nowrap;
+  }
+  td { padding: 12px 15px; border-bottom: 1px solid var(--line-soft); vertical-align: top; line-height: 1.5; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; font-size: 13px; white-space: nowrap; }
+
+  /* ─── diagramas ─── */
+  .diagram { background: var(--sunken); border: 1px solid var(--line); border-radius: 3px; padding: 26px 22px; margin: 24px 0; overflow-x: auto; }
+  .layer { display: grid; grid-template-columns: 118px 1fr; gap: 16px; align-items: stretch; margin-bottom: 10px; min-width: 460px; }
+  .layer:last-child { margin-bottom: 0; }
+  .layer-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--faint);
+    display: flex; align-items: center; justify-content: flex-end; text-align: right;
+  }
+  .layer-boxes { display: flex; gap: 8px; flex-wrap: wrap; }
+  .box {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 2px; padding: 9px 13px; font-size: 12.8px; flex: 1; min-width: 96px;
+    display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.35;
+  }
+  /* El color del texto sale de un token, no de reglas condicionales encadenadas:
+     un color definido solo dentro de un bloque de tema no aplica en el estado
+     sin marcar, que es el de la mayoria de los lectores. */
+  .box.solid { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 500; }
+  .box.t1 { border-color: var(--t1); border-top: 2px solid var(--t1); }
+  .box.t2 { border-color: var(--t2); border-top: 2px solid var(--t2); }
+  .box.t3 { border-color: var(--t3); border-top: 2px solid var(--t3); }
+  .box.t4 { border-color: var(--t4); border-top: 2px solid var(--t4); }
+  .flow-arrow { text-align: center; color: var(--faint); font-size: 13px; margin: 3px 0; font-family: "IBM Plex Mono", monospace; }
+
+  /* ─── chat ─── */
+  .chat { max-width: 430px; margin: 20px 0; display: flex; flex-direction: column; gap: 8px; }
+  .bub { padding: 10px 14px; border-radius: 13px; font-size: 14.2px; line-height: 1.5; max-width: 88%; }
+  .bub.bot { background: var(--sunken); border: 1px solid var(--line); border-bottom-left-radius: 3px; align-self: flex-start; }
+  .bub.usr { background: var(--accent); color: var(--on-accent); border-bottom-right-radius: 3px; align-self: flex-end; }
+  .qr { display: flex; gap: 6px; flex-wrap: wrap; align-self: flex-start; margin-top: -2px; }
+  .qr span {
+    border: 1px solid var(--accent); color: var(--accent);
+    border-radius: 999px; padding: 5px 12px; font-size: 12.5px;
+  }
+  .ui-note {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--faint);
+    align-self: flex-start; padding-left: 3px;
+  }
+
+  /* ─── desacuerdos ─── */
+  .debate { border: 1px solid var(--line); border-radius: 3px; margin: 20px 0; overflow: hidden; }
+  .debate-q { background: var(--sunken); padding: 13px 18px; font-weight: 600; font-size: 14.5px; border-bottom: 1px solid var(--line); }
+  .debate-body { padding: 4px 18px 16px; }
+  .pos { display: grid; grid-template-columns: 130px 1fr; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+  .pos:last-of-type { border-bottom: 0; }
+  .pos-who { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; padding-top: 2px; }
+  .pos p { margin: 0; font-size: 14px; }
+  .verdict { background: var(--ok-w); border-top: 1px solid var(--line); padding: 13px 18px; font-size: 14px; }
+  .verdict b { color: var(--ok); font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; display: block; margin-bottom: 5px; }
+
+  /* ─── fases ─── */
+  .phase { display: grid; grid-template-columns: 88px 1fr; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--line-soft); }
+  .phase:last-child { border-bottom: 0; }
+  .phase-tag { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); font-weight: 500; padding-top: 2px; }
+  .phase-tag small { display: block; color: var(--faint); font-size: 10.5px; margin-top: 3px; font-weight: 400; letter-spacing: .05em; }
+  .phase h3 { margin: 0 0 7px; font-size: 15.5px; }
+  .phase p { margin: 0 0 9px; font-size: 14.3px; }
+  .phase ul { margin: 0; font-size: 14px; }
+
+  .pill {
+    display: inline-block; font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 2px; background: var(--sunken);
+    color: var(--muted); border: 1px solid var(--line); white-space: nowrap;
+  }
+  .pill.ok   { background: var(--ok-w);   color: var(--ok);   border-color: transparent; }
+  .pill.warn { background: var(--warn-w); color: var(--warn); border-color: transparent; }
+  .pill.crit { background: var(--crit-w); color: var(--crit); border-color: transparent; }
+
+  footer {
+    margin-top: 76px; padding-top: 26px; border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--faint); max-width: 70ch;
+  }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 0 18px 80px; }
+    .sec-head { grid-template-columns: 1fr; gap: 4px; }
+    .pos, .phase { grid-template-columns: 1fr; gap: 5px; }
+    .layer { grid-template-columns: 1fr; gap: 6px; }
+    .layer-label { justify-content: flex-start; text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="cover">
+    <p class="eyebrow">Informe de diseño · Plataforma conversacional</p>
+    <h1>Un motor, muchas marcas</h1>
+    <p class="standfirst">
+      Diseño de referencia para un sistema de chatbot capaz de atender a varios
+      negocios independientes desde una sola base de código: cada uno con su
+      identidad, sus flujos, su catálogo y sus reglas. Agnóstico de sector, pensado
+      para escalar de una marca a cientos sin reescribir el núcleo.
+    </p>
+    <div class="meta">
+      <span><b>Elaborado por</b> Consejo de cuatro especialidades</span>
+      <span><b>Alcance</b> Arquitectura, producto, integraciones, seguridad</span>
+      <span><b>Horizonte</b> MVP a plataforma comercial</span>
+    </div>
+  </header>
+
+  <div class="council">
+    <div class="expert" style="--role: var(--t1)">
+      <h4>Arquitectura de software</h4>
+      <p>Modelo multiempresa, aislamiento de datos, APIs, escalabilidad y costo de operación.</p>
+    </div>
+    <div class="expert" style="--role: var(--t2)">
+      <h4>Experiencia de usuario</h4>
+      <p>Flujos de conversación, elementos de interfaz, accesibilidad y momento del relevo humano.</p>
+    </div>
+    <div class="expert" style="--role: var(--t3)">
+      <h4>Estrategia de negocio</h4>
+      <p>Roles, permisos, modelo de cobro, políticas de uso y flujos de administración.</p>
+    </div>
+    <div class="expert" style="--role: var(--t4)">
+      <h4>Integraciones</h4>
+      <p>Canales de mensajería, CRM, pagos, notificaciones y sincronización con terceros.</p>
+    </div>
+  </div>
+
+  <!-- ════════════ 1 ════════════ -->
+  <section id="s1">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Visión general y objetivos</h2></div>
+
+    <p>
+      Un chatbot multimarca no es un chatbot con varios temas. Es una <strong>plataforma
+      de arrendamiento</strong>: un motor conversacional único que atiende a inquilinos
+      —empresas— que no se conocen entre sí, no comparten datos y, sin embargo,
+      corren sobre el mismo código y la misma factura de infraestructura.
+    </p>
+
+    <p>Esa definición impone cuatro objetivos que el diseño debe cumplir a la vez:</p>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Identidad por inquilino, motor compartido</h3>
+        <p>Cada marca define su personalidad, colores, saludo, catálogo y reglas. Ninguna
+        de esas diferencias debe vivir en el código: si dar de alta una marca exige un
+        despliegue, el modelo de negocio no existe.</p>
+      </div>
+      <div class="card">
+        <h3>Aislamiento demostrable</h3>
+        <p>No basta con que los datos <em>estén</em> separados: hay que poder demostrarlo
+        ante un cliente y ante un auditor. El aislamiento se prueba, no se declara.</p>
+      </div>
+      <div class="card">
+        <h3>Costo marginal decreciente</h3>
+        <p>El inquilino número cien debe costar menos que el primero. Todo lo que crezca
+        de forma lineal con el número de marcas —una base de datos por cliente, un
+        despliegue por cliente— es un techo comercial disfrazado de arquitectura.</p>
+      </div>
+      <div class="card">
+        <h3>Autonomía del administrador</h3>
+        <p>El dueño de la marca debe poder cambiar precios, horarios y respuestas sin
+        pedirle nada al proveedor. Cada solicitud que llega al equipo técnico es margen
+        que se evapora.</p>
+      </div>
+    </div>
+
+    <h3>Qué éxito significa, medido</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Indicador</th><th>Definición</th><th>Umbral sano</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Tasa de resolución</strong></td><td>Conversaciones cerradas sin intervención humana</td><td class="num">60–75 %</td></tr>
+          <tr><td><strong>Tasa de escape</strong></td><td>Usuarios que piden un humano en los primeros dos turnos</td><td class="num">&lt; 15 %</td></tr>
+          <tr><td><strong>Alta de marca</strong></td><td>Tiempo desde el alta hasta el primer mensaje real atendido</td><td class="num">&lt; 1 día</td></tr>
+          <tr><td><strong>Costo por conversación</strong></td><td>Inferencia + infraestructura ÷ conversaciones</td><td class="num">Estable o a la baja</td></tr>
+          <tr><td><strong>Fugas entre inquilinos</strong></td><td>Incidentes de datos cruzados entre marcas</td><td class="num">Cero, sin excepción</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Consenso del consejo</span>
+      <p>La tasa de resolución es la métrica que vende el producto, pero la métrica que
+      lo mantiene vivo es la de fugas. Un solo incidente de datos cruzados entre dos
+      clientes termina con la plataforma, sin importar lo bien que converse.</p>
+    </div>
+  </section>
+
+  <!-- ════════════ 2 ════════════ -->
+  <section id="s2">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Arquitectura técnica</h2></div>
+
+    <h3>Vista por capas</h3>
+    <p>
+      El sistema se ordena en cinco capas. La regla que las gobierna: <strong>cada capa
+      solo conoce a la de abajo</strong>, y el identificador de inquilino se resuelve una
+      sola vez, lo más cerca posible de la entrada.
+    </p>
+
+    <div class="diagram">
+      <div class="layer">
+        <div class="layer-label">Canales</div>
+        <div class="layer-boxes">
+          <div class="box">Widget web</div><div class="box">WhatsApp</div>
+          <div class="box">Messenger</div><div class="box">Voz / IVR</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓ &nbsp; sobre canónico de mensaje &nbsp; ↓</div>
+      <div class="layer">
+        <div class="layer-label">Adaptadores</div>
+        <div class="layer-boxes"><div class="box">Normalización de entrada · firma de webhooks · reintentos</div></div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="layer">
+        <div class="layer-label">Orquestador</div>
+        <div class="layer-boxes">
+          <div class="box solid">Resolución de inquilino</div>
+          <div class="box">Guardas deterministas</div>
+          <div class="box">Máquina de estados</div>
+          <div class="box">Motor de IA</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="layer">
+        <div class="layer-label">Dominio</div>
+        <div class="layer-boxes">
+          <div class="box">Conocimiento</div><div class="box">Catálogo</div>
+          <div class="box">Conversaciones</div><div class="box">Contactos</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="layer">
+        <div class="layer-label">Persistencia</div>
+        <div class="layer-boxes">
+          <div class="box t1">Postgres + RLS</div><div class="box t2">Objetos / medios</div>
+          <div class="box t3">Vectores</div><div class="box t4">Caché / colas</div>
+        </div>
+      </div>
+    </div>
+
+    <h3>El modelo multiempresa: tres opciones y una recomendación</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Modelo</th><th>Aislamiento</th><th>Costo por inquilino</th><th>Cuándo</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Base por inquilino</strong></td>
+            <td><span class="pill ok">Máximo</span></td>
+            <td>Alto y lineal</td>
+            <td>Clientes con exigencia regulatoria o contractual de base dedicada</td>
+          </tr>
+          <tr>
+            <td><strong>Esquema por inquilino</strong></td>
+            <td><span class="pill ok">Alto</span></td>
+            <td>Medio</td>
+            <td>Decenas de inquilinos; las migraciones empiezan a doler más allá</td>
+          </tr>
+          <tr>
+            <td><strong>Esquema compartido + RLS</strong></td>
+            <td><span class="pill warn">Depende de las políticas</span></td>
+            <td>Bajo y decreciente</td>
+            <td><strong>Recomendado por omisión.</strong> Una migración sirve para todos</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      La recomendación es <strong>esquema compartido con seguridad a nivel de fila</strong>,
+      con una salida de emergencia: los contratos que exijan base dedicada se atienden con
+      un despliegue aislado del mismo código, cobrado como nivel empresarial. Así el
+      aislamiento extremo deja de ser una decisión de arquitectura y pasa a ser una
+      línea del precio.
+    </p>
+
+    <div class="callout warn">
+      <span class="tag">La trampa del identificador de inquilino</span>
+      <p>
+        El error clásico es tomar el <code>tenant_id</code> del token que envía el cliente.
+        Un token lo puede manipular quien sepa hacerlo. El identificador debe resolverse
+        <strong>en el servidor, contra la base</strong>, a partir de la identidad
+        autenticada — y las políticas de la base deben volver a comprobarlo. Dos
+        cerraduras: si la aplicación falla, la base sigue negando.
+      </p>
+    </div>
+
+    <h3>Esquema de datos, mínimo viable</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Tabla</th><th>Papel</th><th>Notas de diseño</th></tr></thead>
+        <tbody>
+          <tr><td><code>tenants</code></td><td>Una fila por marca</td><td>Identificador legible (<code>slug</code>), plan, estado, configuración visible en JSON</td></tr>
+          <tr><td><code>tenant_secrets</code></td><td>Config sensible</td><td>Cifrada en la aplicación. Prompt, catálogo con márgenes, llaves propias del cliente</td></tr>
+          <tr><td><code>users</code></td><td>Cuentas del panel</td><td>Rol y pertenencia viven aquí, nunca en el token. Alta en estado <em>pendiente</em></td></tr>
+          <tr><td><code>conversations</code></td><td>Hilos</td><td>Cuerpo cifrado; en claro solo lo agregable: canal, duración, resultado</td></tr>
+          <tr><td><code>messages</code></td><td>Turnos</td><td>Particionadas por fecha. Son el 90 % del volumen a los seis meses</td></tr>
+          <tr><td><code>contacts</code></td><td>Personas</td><td>Datos personales cifrados en bloque, no en columnas sueltas</td></tr>
+          <tr><td><code>knowledge</code></td><td>Lo que el bot sabe</td><td>Fragmentos + vectores. Filtrado por inquilino <em>antes</em> de la búsqueda semántica</td></tr>
+          <tr><td><code>events</code></td><td>Bitácora</td><td>Solo inserción. Nadie la edita ni la borra, tampoco el superadministrador</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout crit">
+      <span class="tag">Riesgo específico de la búsqueda semántica</span>
+      <p>
+        En un índice vectorial compartido, filtrar por inquilino <em>después</em> de
+        recuperar los vecinos más cercanos es una fuga con retraso: el motor ya leyó
+        contenido ajeno y basta un error de programación para que llegue al prompt. El
+        filtro por inquilino va en la propia consulta, o cada marca lleva su índice.
+      </p>
+    </div>
+
+    <h3>Autenticación y autorización</h3>
+    <ul>
+      <li><strong>Identidad:</strong> proveedor OIDC estándar. No construir gestión de contraseñas propia.</li>
+      <li><strong>Autorización:</strong> el rol se lee de la base en cada petición. El token solo prueba <em>quién</em> es, nunca <em>qué puede</em>.</li>
+      <li><strong>Alta segura:</strong> una cuenta recién creada nace sin marca y sin permisos. Que cualquiera que se registre entre a algo es exactamente el camino de la fuga entre clientes.</li>
+      <li><strong>Servicio a servicio:</strong> credenciales de servicio con alcance limitado, jamás la llave maestra en el navegador.</li>
+      <li><strong>Widget público:</strong> anónimo por diseño. No toca la base: habla con la API, que es la única con credenciales.</li>
+    </ul>
+
+    <h3>Hospedaje</h3>
+    <div class="grid3">
+      <div class="card">
+        <h3>Borde (edge)</h3>
+        <p>Widget y API en una red de borde. Latencia baja, ancho de banda barato, escalado sin operación. Encaja con cargas cortas y muchas.</p>
+      </div>
+      <div class="card">
+        <h3>Datos</h3>
+        <p>Postgres administrado con seguridad a nivel de fila nativa. Es la pieza que no conviene improvisar ni migrar después.</p>
+      </div>
+      <div class="card">
+        <h3>Trabajos largos</h3>
+        <p>Colas para lo que no cabe en una petición: ingesta de documentos, sincronización con CRM, reportes.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ 3 ════════════ -->
+  <section id="s3">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Flujos conversacionales</h2></div>
+
+    <p>
+      Cuatro flujos cubren la mayor parte del tráfico real. Se describen con los
+      elementos de interfaz que aparecen en cada paso, porque en conversación el
+      componente <em>es</em> el diseño: un botón cierra una ambigüedad que tres
+      párrafos no cierran.
+    </p>
+
+    <h3>Principios que aplican a los cuatro</h3>
+    <ul>
+      <li><strong>Menú visible, texto siempre aceptado.</strong> Los botones guían a quien no sabe qué pedir; el campo libre no se bloquea nunca.</li>
+      <li><strong>Máximo tres respuestas rápidas.</strong> Con cuatro o más, la persona lee en vez de elegir, y el botón deja de ahorrar tiempo.</li>
+      <li><strong>Una sola pregunta por turno.</strong> Dos preguntas juntas producen una respuesta a medias y un turno perdido.</li>
+      <li><strong>Regla de los dos intentos.</strong> Tras dos fallos de comprensión seguidos, se ofrece un humano. Insistir una tercera vez es donde se pierde a la gente.</li>
+      <li><strong>Salida siempre a la vista.</strong> «Hablar con una persona» disponible en todo momento, no escondido al final del árbol.</li>
+    </ul>
+
+    <h3>A · Saludo y encaminamiento</h3>
+    <div class="chat">
+      <div class="bub bot">Hola 👋 ¿En qué te ayudo?</div>
+      <div class="qr"><span>Ver catálogo</span><span>Estado de mi pedido</span><span>Hablar con alguien</span></div>
+      <div class="ui-note">quick replies · máx. 3 · persisten hasta el primer mensaje</div>
+      <div class="bub usr">quiero saber si tienen disponible el modelo azul</div>
+      <div class="bub bot">Sí, hay disponibilidad. ¿Lo quieres para recoger o con envío?</div>
+      <div class="qr"><span>Recoger</span><span>Envío</span></div>
+    </div>
+    <p>
+      El saludo no pregunta «¿qué deseas?»: ofrece tres caminos concretos y acepta texto
+      libre. La intención se detecta del texto, no del botón — el botón solo acelera a
+      quien no quiere escribir.
+    </p>
+
+    <h3>B · Consulta de información</h3>
+    <div class="chat">
+      <div class="bub usr">a qué hora abren los sábados</div>
+      <div class="bub bot">Los sábados abrimos de 9:00 a 14:00. ¿Te ayudo con algo más?</div>
+      <div class="qr"><span>Cómo llegar</span><span>Ver precios</span></div>
+      <div class="ui-note">respuesta de base de conocimiento · sin llamada a IA generativa</div>
+    </div>
+    <div class="callout">
+      <span class="tag">Decisión de diseño</span>
+      <p>
+        Las preguntas de dato duro —horarios, dirección, precios— se responden desde la
+        base de conocimiento, no generando texto. Es más barato, instantáneo, y
+        <strong>elimina la posibilidad de que el sistema invente un horario</strong>. Un
+        dato inventado manda a alguien a una puerta cerrada.
+      </p>
+    </div>
+
+    <h3>C · Compra o reserva</h3>
+    <div class="chat">
+      <div class="bub usr">quiero apartar dos</div>
+      <div class="bub bot">Listo. Necesito tres cosas: nombre, teléfono y cuándo lo quieres.</div>
+      <div class="ui-note">formulario embebido · campos validados · casilla de consentimiento obligatoria</div>
+      <div class="bub usr">[formulario enviado]</div>
+      <div class="bub bot">Recibido. Te confirmamos por WhatsApp en menos de una hora. Todavía no es una reserva confirmada.</div>
+    </div>
+    <ul>
+      <li><strong>El bot no confirma lo que no controla.</strong> Levanta la intención y la enruta; confirmar de más genera una promesa que alguien tendrá que romper.</li>
+      <li><strong>Consentimiento explícito</strong> antes de guardar datos personales, con enlace al aviso de privacidad vigente y registro de qué versión se aceptó.</li>
+      <li><strong>Confirmación honesta:</strong> decir «recibido, te confirmamos» y no «reservado» cuando la reserva aún depende de una persona.</li>
+    </ul>
+
+    <h3>D · Relevo a un humano</h3>
+    <div class="diagram">
+      <div class="layer">
+        <div class="layer-label">Disparadores</div>
+        <div class="layer-boxes">
+          <div class="box">Petición explícita</div><div class="box">Dos fallos seguidos</div>
+          <div class="box">Frustración detectada</div><div class="box">Tema de alto riesgo</div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="layer">
+        <div class="layer-label">Transición</div>
+        <div class="layer-boxes"><div class="box solid">Resumen del hilo + contexto → cola del agente</div></div>
+      </div>
+      <div class="flow-arrow">↓ &nbsp; según horario &nbsp; ↓</div>
+      <div class="layer">
+        <div class="layer-label">Resultado</div>
+        <div class="layer-boxes">
+          <div class="box t3">Agente disponible: entra en vivo</div>
+          <div class="box t2">Fuera de horario: promesa con plazo</div>
+        </div>
+      </div>
+    </div>
+    <p>
+      El relevo lleva <strong>el resumen del hilo</strong>, no el hilo crudo: el agente
+      necesita saber qué se intentó ya, no leer veinte turnos. Y fuera de horario nunca
+      se dice «un agente te atenderá en breve» — se da un plazo concreto o se recogen
+      los datos.
+    </p>
+  </section>
+
+  <!-- ════════════ 4 ════════════ -->
+  <section id="s4">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Panel de administración</h2></div>
+
+    <p>
+      Tres perfiles, con una regla que los separa: <strong>cada uno solo ve lo que puede
+      cambiar</strong>. Mostrar controles deshabilitados «para que sepan que existen» es
+      cómo se generan solicitudes de soporte.
+    </p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Capacidad</th><th>Superadmin</th><th>Admin de marca</th><th>Agente</th></tr></thead>
+        <tbody>
+          <tr><td>Alta y baja de marcas</td><td><span class="pill ok">Sí</span></td><td>—</td><td>—</td></tr>
+          <tr><td>Cambiar plan y límites</td><td><span class="pill ok">Sí</span></td><td>—</td><td>—</td></tr>
+          <tr><td>Suspender una marca</td><td><span class="pill ok">Sí</span></td><td>—</td><td>—</td></tr>
+          <tr><td>Asignar usuarios a una marca</td><td><span class="pill ok">Sí</span></td><td><span class="pill warn">Solo la suya</span></td><td>—</td></tr>
+          <tr><td>Editar personalidad y conocimiento</td><td><span class="pill warn">Con registro</span></td><td><span class="pill ok">Sí</span></td><td>—</td></tr>
+          <tr><td>Catálogo, horarios, precios</td><td>—</td><td><span class="pill ok">Sí</span></td><td>—</td></tr>
+          <tr><td>Ver conversaciones</td><td><span class="pill warn">Con registro</span></td><td><span class="pill ok">Las suyas</span></td><td><span class="pill ok">Las asignadas</span></td></tr>
+          <tr><td>Responder en vivo</td><td>—</td><td><span class="pill ok">Sí</span></td><td><span class="pill ok">Sí</span></td></tr>
+          <tr><td>Exportar datos personales</td><td><span class="pill crit">Con registro</span></td><td><span class="pill warn">Los suyos</span></td><td>—</td></tr>
+          <tr><td>Leer la bitácora</td><td><span class="pill ok">Toda</span></td><td><span class="pill ok">La suya</span></td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout crit">
+      <span class="tag">El poder del superadministrador es el punto débil</span>
+      <p>
+        En toda plataforma multiempresa, la cuenta que puede verlo todo es el mayor
+        riesgo concentrado. Tres mitigaciones, y las tres son obligatorias:
+        <strong>registrar en bitácora inmutable</strong> cada acceso a datos de un
+        inquilino; <strong>no permitir</strong> que el superadministrador edite
+        contenido de una marca sin dejar rastro; y <strong>separar</strong> la cuenta de
+        operación diaria de la cuenta con privilegios totales.
+      </p>
+    </div>
+
+    <div class="grid3">
+      <div class="card">
+        <h3>Superadministrador</h3>
+        <ul>
+          <li>Directorio de marcas con estado, plan y consumo</li>
+          <li>Alta guiada de un inquilino nuevo</li>
+          <li>Suspensión y reactivación</li>
+          <li>Consumo de IA y facturación por marca</li>
+          <li>Salud del sistema: errores, latencia, cuotas</li>
+          <li>Bitácora global</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Administrador de marca</h3>
+        <ul>
+          <li>Identidad: nombre, colores, avatar, saludo</li>
+          <li>Personalidad y límites del bot</li>
+          <li>Base de conocimiento con vista previa</li>
+          <li>Catálogo de productos o servicios</li>
+          <li>Horarios y mensajes fuera de horario</li>
+          <li>Equipo y roles internos</li>
+          <li>Métricas: resolución, temas frecuentes, huecos de conocimiento</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Agente</h3>
+        <ul>
+          <li>Bandeja con hilos asignados y en espera</li>
+          <li>Resumen del hilo al tomarlo</li>
+          <li>Respuestas guardadas</li>
+          <li>Notas internas invisibles al cliente</li>
+          <li>Cierre con clasificación del motivo</li>
+          <li>Devolver al bot cuando el tema se resolvió</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>La función más subestimada: huecos de conocimiento</h3>
+    <p>
+      Un informe semanal de <strong>las preguntas que el bot no supo responder</strong>,
+      agrupadas y ordenadas por frecuencia, con un botón para convertir cada una en
+      respuesta. Es la función que más sube la tasa de resolución con menos trabajo, y la
+      que convierte al administrador en alguien que mejora su bot en vez de alguien que
+      lo padece.
+    </p>
+  </section>
+
+  <!-- ════════════ 5 ════════════ -->
+  <section id="s5">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Estrategia de integración</h2></div>
+
+    <h3>El sobre canónico</h3>
+    <p>
+      Todo canal entra por un adaptador que traduce a una sola estructura interna. El
+      orquestador nunca sabe de qué canal viene un mensaje; si lo supiera, cada canal
+      nuevo obligaría a tocar el núcleo.
+    </p>
+    <div class="card">
+      <p style="margin:0"><code>{ tenant, canal, id_externo_conversacion, id_externo_persona, tipo, contenido, adjuntos, recibido_en, firma }</code></p>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Canal</th><th>Esfuerzo</th><th>Trámite previo</th><th>Cuándo</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Widget web</strong></td><td><span class="pill ok">Bajo</span></td><td>Ninguno</td><td>Fase 1. Es el único que se controla de punta a punta</td></tr>
+          <tr><td><strong>WhatsApp Business</strong></td><td><span class="pill warn">Alto</span></td><td>Verificación de empresa, número dedicado, plantillas aprobadas</td><td>Fase 2. Semanas de trámite antes del primer mensaje</td></tr>
+          <tr><td><strong>Messenger / Instagram</strong></td><td><span class="pill warn">Medio</span></td><td>App de Meta, revisión de permisos</td><td>Fase 2, junto con WhatsApp</td></tr>
+          <tr><td><strong>Telegram</strong></td><td><span class="pill ok">Bajo</span></td><td>Ninguno</td><td>Útil como segundo canal de prueba</td></tr>
+          <tr><td><strong>Correo</strong></td><td><span class="pill ok">Bajo</span></td><td>Dominio verificado</td><td>Buen canal de <em>salida</em>; malo de entrada</td></tr>
+          <tr><td><strong>Voz</strong></td><td><span class="pill crit">Muy alto</span></td><td>Telefonía, latencia, transcripción</td><td>Fase 4 o nunca. Es otro producto</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Webhooks entrantes: cuatro reglas</h3>
+    <ol>
+      <li><strong>Verificar la firma antes de leer el cuerpo.</strong> Un webhook sin verificar es una API pública de escritura.</li>
+      <li><strong>Responder 200 de inmediato y procesar aparte.</strong> Los proveedores reintentan agresivamente ante lentitud; procesar en línea genera duplicados.</li>
+      <li><strong>Idempotencia por identificador de mensaje.</strong> El mismo evento llegará dos veces. Es cuestión de cuándo.</li>
+      <li><strong>Cola de fallidos con reintento manual.</strong> Un mensaje perdido en silencio es un cliente perdido en silencio.</li>
+    </ol>
+
+    <h3>Sistemas de terceros</h3>
+    <div class="grid2">
+      <div class="card">
+        <h3>CRM</h3>
+        <p>Sincronización en un solo sentido primero: el bot <em>crea</em> contactos y
+        oportunidades. La sincronización bidireccional multiplica los conflictos de
+        datos y rara vez se necesita al principio.</p>
+      </div>
+      <div class="card">
+        <h3>Pagos</h3>
+        <p>El bot <strong>nunca</strong> maneja datos de tarjeta. Genera un enlace de
+        pago del proveedor y escucha el webhook de confirmación. Cualquier otro diseño
+        arrastra a la plataforma a un ámbito regulatorio que no quiere.</p>
+      </div>
+      <div class="card">
+        <h3>Notificaciones</h3>
+        <p>Correo para lo que debe quedar registrado, mensajería para lo urgente. El
+        asunto y la vista previa nunca llevan datos sensibles: se leen en la pantalla
+        bloqueada del teléfono.</p>
+      </div>
+      <div class="card">
+        <h3>Calendario</h3>
+        <p>Empezar con archivos de evento estándar y enlaces de un clic, que funcionan
+        sin autorización previa. La integración con API completa exige consentimiento y
+        renovación de credenciales: vale la pena solo cuando hay volumen.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════ 6 ════════════ -->
+  <section id="s6">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Seguridad y privacidad</h2></div>
+
+    <h3>Aislamiento en capas</h3>
+    <div class="diagram">
+      <div class="layer">
+        <div class="layer-label">Capa 1</div>
+        <div class="layer-boxes"><div class="box t1">Base de datos · políticas por fila. Niega por omisión</div></div>
+      </div>
+      <div class="layer">
+        <div class="layer-label">Capa 2</div>
+        <div class="layer-boxes"><div class="box t2">Aplicación · el inquilino se resuelve en el servidor, no del token</div></div>
+      </div>
+      <div class="layer">
+        <div class="layer-label">Capa 3</div>
+        <div class="layer-boxes"><div class="box t3">Cifrado · llave derivada por inquilino, fuera de la base</div></div>
+      </div>
+      <div class="layer">
+        <div class="layer-label">Capa 4</div>
+        <div class="layer-boxes"><div class="box t4">Bitácora · solo inserción. Quién vio qué, y cuándo</div></div>
+      </div>
+    </div>
+    <p>
+      Las cuatro capas son independientes a propósito: un error en una no compromete a
+      las demás. Si la aplicación se equivoca al construir una consulta, la base sigue
+      negando. Si alguien se lleva un respaldo, lo que obtiene es ilegible.
+    </p>
+
+    <div class="callout warn">
+      <span class="tag">Qué protege el cifrado y qué no</span>
+      <p>
+        Cifrar en la aplicación protege contra un respaldo robado, una base mal
+        configurada o un empleado del proveedor con acceso a las tablas.
+        <strong>No protege contra quien tenga la llave.</strong> Confundir ambas cosas
+        lleva a relajar el control de acceso porque «total, está cifrado».
+      </p>
+      <p>
+        Por eso la llave maestra vive en el entorno de ejecución, nunca en la base: si
+        se guarda al lado de lo que protege, es la llave pegada en la chapa.
+      </p>
+    </div>
+
+    <h3>Datos personales</h3>
+    <ul>
+      <li><strong>Minimización.</strong> No pedir lo que no se va a usar. Cada campo es una obligación futura.</li>
+      <li><strong>Consentimiento registrado</strong> con la versión del aviso aceptada y la marca de tiempo.</li>
+      <li><strong>Retención con caducidad.</strong> Las conversaciones se borran o anonimizan a plazo definido, por omisión y automáticamente.</li>
+      <li><strong>Derechos de acceso y borrado</strong> resueltos en el panel, no por correo al soporte.</li>
+      <li><strong>Residencia de datos</strong> configurable por inquilino cuando el contrato lo exija.</li>
+    </ul>
+
+    <h3>Riesgos propios de la conversación con IA</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Riesgo</th><th>Qué ocurre</th><th>Mitigación</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Inyección de instrucciones</strong></td>
+            <td>El usuario escribe texto que el modelo interpreta como orden</td>
+            <td>Contenido del usuario siempre como dato, nunca concatenado al prompt de sistema. Validar la salida contra el esquema esperado</td>
+          </tr>
+          <tr>
+            <td><strong>Invención de datos</strong></td>
+            <td>El modelo responde un precio u horario que no existe</td>
+            <td>Datos duros desde la base de conocimiento; el modelo no los genera. Instrucción explícita de admitir cuando no sabe</td>
+          </tr>
+          <tr>
+            <td><strong>Fuga entre inquilinos vía contexto</strong></td>
+            <td>Un fragmento de otra marca llega al prompt</td>
+            <td>Filtro por inquilino dentro de la consulta de recuperación, no después</td>
+          </tr>
+          <tr>
+            <td><strong>Temas de alto riesgo</strong></td>
+            <td>Salud, dinero, seguridad física, menores</td>
+            <td><strong>Guardas deterministas antes del modelo.</strong> No se le pregunta a la IA si algo es una urgencia: lo decide el código</td>
+          </tr>
+          <tr>
+            <td><strong>Abuso de cuota</strong></td>
+            <td>Alguien quema el presupuesto de inferencia</td>
+            <td>Límite por dirección y por inquilino, tope de longitud, tope de gasto diario con degradación a respuestas guardadas</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout crit">
+      <span class="tag">La regla que no se negocia</span>
+      <p>
+        Un modelo de lenguaje es probabilístico. En los caminos donde equivocarse tiene
+        consecuencias graves, <strong>la decisión la toma el código, no el modelo</strong>.
+        El filtro determinista corre antes, corta el paso y devuelve una respuesta fija
+        revisada por un humano competente en la materia. «Casi siempre acierta» no es un
+        estándar aceptable cuando el error hace daño.
+      </p>
+    </div>
+  </section>
+
+  <!-- ════════════ 7 ════════════ -->
+  <section id="s7">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Plan de implementación</h2></div>
+
+    <div class="phase">
+      <div class="phase-tag">Fase 1<small>MVP</small></div>
+      <div>
+        <h3>Una marca, un canal, conversación real</h3>
+        <p>El objetivo no es demostrar tecnología: es que una persona real resuelva algo real sin intervención humana.</p>
+        <ul>
+          <li>Widget web incrustable con una línea</li>
+          <li>Configuración de marca en archivo o tabla, sin panel todavía</li>
+          <li>Base de conocimiento sencilla y respuesta con IA</li>
+          <li>Captura de contacto con consentimiento</li>
+          <li>Guardas deterministas para los temas de riesgo del sector</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-tag">Fase 2<small>Multiempresa</small></div>
+      <div>
+        <h3>El motor deja de saber de quién es</h3>
+        <p>Es la fase que convierte un chatbot en un producto vendible. También la más fácil de posponer y la más cara de posponer.</p>
+        <ul>
+          <li>Esquema multiempresa con políticas por fila, <strong>probadas suplantando cada rol</strong></li>
+          <li>Cifrado por inquilino de configuración y datos personales</li>
+          <li>Panel: superadministrador y administrador de marca</li>
+          <li>Alta de marca sin desplegar código</li>
+          <li>Bitácora de solo inserción</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-tag">Fase 3<small>Operación</small></div>
+      <div>
+        <h3>Humanos en el circuito</h3>
+        <p>Sin relevo humano, la tasa de resolución tiene techo y las conversaciones difíciles terminan en abandono.</p>
+        <ul>
+          <li>Bandeja del agente con asignación y resumen del hilo</li>
+          <li>Segundo canal de mensajería con adaptador</li>
+          <li>Informe de huecos de conocimiento</li>
+          <li>Medición de consumo por inquilino y facturación</li>
+          <li>Retención y borrado automáticos</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-tag">Fase 4<small>Plataforma</small></div>
+      <div>
+        <h3>Que crezca sin ti</h3>
+        <p>El objetivo de esta fase es que el proveedor deje de ser el cuello de botella de sus propios clientes.</p>
+        <ul>
+          <li>Autoservicio de alta con periodo de prueba</li>
+          <li>Marca blanca: dominio y branding propios del cliente</li>
+          <li>API pública y webhooks salientes</li>
+          <li>Integraciones con CRM y pagos</li>
+          <li>Nivel empresarial con despliegue aislado</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Sobre el orden</span>
+      <p>
+        La tentación permanente es adelantar la fase 4 —integraciones vistosas— antes de
+        terminar la 2. El resultado típico es una plataforma con muchas conexiones y un
+        aislamiento que nadie probó. <strong>El aislamiento no se puede añadir después</strong>:
+        rehacerlo con clientes dentro implica migrar datos de producción de varias empresas
+        a la vez.
+      </p>
+    </div>
+  </section>
+
+  <!-- ════════════ desacuerdos ════════════ -->
+  <section id="s8">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Desacuerdos del consejo</h2></div>
+
+    <p>
+      Un documento en el que cuatro especialistas coinciden en todo no refleja un debate
+      real. Estos son los puntos donde el consejo discutió, y cómo se resolvieron.
+    </p>
+
+    <div class="debate">
+      <div class="debate-q">¿Base de datos separada por cliente?</div>
+      <div class="debate-body">
+        <div class="pos"><div class="pos-who">Arquitectura</div><div><p>Separar bases hace la fuga entre clientes imposible por construcción, no por una política bien escrita.</p></div></div>
+        <div class="pos"><div class="pos-who">Negocio</div><div><p>Cada base cuesta dinero y operación. Con veinte clientes pequeños, el margen desaparece antes de que el producto despegue.</p></div></div>
+      </div>
+      <div class="verdict"><b>Resolución</b>Esquema compartido con políticas por fila, probadas suplantando cada rol. La base dedicada existe como nivel empresarial de pago: el aislamiento extremo pasa de decisión técnica a línea del precio.</div>
+    </div>
+
+    <div class="debate">
+      <div class="debate-q">¿Menús o conversación libre?</div>
+      <div class="debate-body">
+        <div class="pos"><div class="pos-who">Negocio</div><div><p>Los menús desvían más consultas y cuestan una fracción: cada mensaje de texto libre es una llamada de inferencia pagada.</p></div></div>
+        <div class="pos"><div class="pos-who">Experiencia</div><div><p>Un árbol de menús es un formulario disfrazado. La gente escribe lo que quiere; obligarla a navegar es la razón por la que odia los chatbots.</p></div></div>
+      </div>
+      <div class="verdict"><b>Resolución</b>Ambas, con jerarquía: botones visibles para los tres caminos más frecuentes, campo de texto siempre activo. El botón acelera, no obliga. Se mide qué proporción usa cada vía y se ajustan los botones a lo que la gente realmente pide.</div>
+    </div>
+
+    <div class="debate">
+      <div class="debate-q">¿WhatsApp desde el primer día?</div>
+      <div class="debate-body">
+        <div class="pos"><div class="pos-who">Integraciones</div><div><p>Es donde está la gente. Un widget web al que nadie entra no prueba nada del producto.</p></div></div>
+        <div class="pos"><div class="pos-who">Arquitectura</div><div><p>La verificación de empresa y la aprobación de plantillas toman semanas. Bloquear el desarrollo entero esperando un trámite es planificación pobre.</p></div></div>
+      </div>
+      <div class="verdict"><b>Resolución</b>Núcleo agnóstico de canal desde el primer día; se lanza con web mientras el trámite avanza en paralelo. Si el adaptador está bien hecho, sumar WhatsApp es enchufar, no reescribir.</div>
+    </div>
+
+    <div class="debate">
+      <div class="debate-q">¿Cuánta autonomía se le da al modelo?</div>
+      <div class="debate-body">
+        <div class="pos"><div class="pos-who">Negocio</div><div><p>Mientras más resuelva el modelo solo, menos personal hace falta. Ahí está el margen del producto.</p></div></div>
+        <div class="pos"><div class="pos-who">Arquitectura</div><div><p>En los caminos donde equivocarse hace daño, «casi siempre acierta» no sirve. Y esos caminos casi nunca son los que el modelo identifica como difíciles.</p></div></div>
+      </div>
+      <div class="verdict"><b>Resolución</b>Autonomía amplia por omisión, con guardas deterministas en las rutas de alto riesgo definidas por cada marca. El código decide antes de que el modelo vea el mensaje; el modelo se queda con todo lo demás.</div>
+    </div>
+  </section>
+
+  <!-- ════════════ tecnologías ════════════ -->
+  <section id="s9">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Recomendaciones técnicas</h2></div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Pieza</th><th>Recomendación</th><th>Por qué</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Ejecución</strong></td><td>Funciones en el borde, sobre estándares web</td><td>Escalado sin operación, latencia baja, ancho de banda barato. Código portátil entre proveedores</td></tr>
+          <tr><td><strong>Base de datos</strong></td><td>Postgres administrado con seguridad a nivel de fila</td><td>Es la única pieza cara de cambiar después. La seguridad por fila nativa vale más que cualquier ORM</td></tr>
+          <tr><td><strong>Búsqueda semántica</strong></td><td>Extensión vectorial sobre el mismo Postgres</td><td>Una base menos que operar y filtrado por inquilino en la misma consulta</td></tr>
+          <tr><td><strong>Modelos</strong></td><td>Cadena de dos o más proveedores con reserva automática</td><td>Que a uno se le acabe la cuota deja de ser un problema del usuario final y pasa a ser una línea de registro</td></tr>
+          <tr><td><strong>Frontal</strong></td><td>Widget sin dependencias, en Shadow DOM</td><td>Se incrusta en sitios ajenos con CSS impredecible. Sin aislamiento, cada cliente reporta un fallo visual distinto</td></tr>
+          <tr><td><strong>Cifrado</strong></td><td>AES-GCM con llave derivada por inquilino</td><td>GCM autentica además de cifrar: un dato alterado falla en vez de devolver basura silenciosa</td></tr>
+          <tr><td><strong>Colas</strong></td><td>Cola administrada del mismo proveedor</td><td>Webhooks y trabajos largos no caben en el ciclo de una petición</td></tr>
+          <tr><td><strong>Observabilidad</strong></td><td>Registro estructurado con inquilino en cada línea</td><td>Sin esa etiqueta, depurar en producción obliga a leer datos de clientes</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Buenas prácticas que sostienen la modularidad</h3>
+    <ul>
+      <li><strong>Configuración como dato, nunca como código.</strong> Si dar de alta una marca requiere un despliegue, no hay producto multiempresa.</li>
+      <li><strong>Un solo punto por dependencia externa.</strong> Un módulo por proveedor de modelos, uno por canal. Cambiar de proveedor debe tocar un archivo.</li>
+      <li><strong>El núcleo no conoce el canal ni la marca.</strong> Recibe un sobre normalizado y una configuración; nada más.</li>
+      <li><strong>Migraciones idempotentes y versionadas.</strong> En multiempresa, una migración fallida a medias afecta a todos los clientes a la vez.</li>
+      <li><strong>Probar el aislamiento como se prueba una función.</strong> Una prueba automática que se hace pasar por cada rol y verifica qué ve. Y verificar con qué identidad corre la prueba: los dueños de las tablas suelen saltarse las políticas, y una prueba mal escrita aprueba una fuga real.</li>
+      <li><strong>Degradación digna.</strong> Sin modelo disponible, el bot responde algo útil y ofrece un humano. Un bot que dice «error» es peor que no tener bot.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Informe de diseño de referencia. Las decisiones marcadas como recomendación
+      suponen un producto que empieza pequeño y aspira a vender a terceros; un sistema
+      de una sola marca sin ambición comercial puede saltarse la fase 2 completa y
+      ahorrarse la mayor parte de esta complejidad.
+    </p>
+    <p style="margin-bottom:0">
+      Las cifras de las tablas de indicadores son órdenes de magnitud habituales en
+      productos conversacionales, no mediciones de un sistema concreto. Conviene
+      sustituirlas por las propias en cuanto haya tráfico real.
+    </p>
+  </footer>
+
+</div>

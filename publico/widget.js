@@ -211,6 +211,21 @@
   .form .cancelar { background: transparent; color: #64748b; border: 1.5px solid rgba(0,0,0,.12); }
   .form .error { font-size: 12px; color: #b91c1c; }
 
+  /* Estados. Un chat que falla en silencio es peor que uno que no existe:
+     la persona se queda esperando sin saber que ya no va a llegar nada. */
+  .aviso-estado {
+    margin: 0 14px 8px; padding: 9px 12px; border-radius: 9px;
+    font-size: 13px; line-height: 1.45; display: flex; gap: 9px; align-items: flex-start;
+  }
+  .aviso-estado.sinred { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  .aviso-estado.error  { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .aviso-estado button {
+    background: transparent; border: 1.5px solid currentColor; color: inherit;
+    border-radius: 7px; padding: 3px 10px; font-size: 12.5px; cursor: pointer;
+    font-weight: 600; flex: none; align-self: center;
+  }
+  .aviso-estado .txt { flex: 1; }
+
   .wa {
     display: block; text-align: center; margin: 0 14px 10px; padding: 10px;
     background: #25d366; color: #fff; border-radius: 10px; font-size: 14px;
@@ -240,11 +255,14 @@
     boton = el('button', 'lanzador');
     boton.textContent = c.avatar;
     boton.setAttribute('aria-label', 'Abrir chat de ' + cfg.nombre);
+    boton.setAttribute('aria-expanded', 'false');
+    boton.setAttribute('aria-haspopup', 'dialog');
     boton.addEventListener('click', alternar);
     raiz.appendChild(boton);
 
     caja = el('div', 'panel');
     caja.setAttribute('role', 'dialog');
+    caja.setAttribute('aria-modal', 'false');
     caja.setAttribute('aria-label', 'Chat de ' + cfg.nombre);
 
     var cab = el('div', 'cabecera');
@@ -257,7 +275,12 @@
     caja.appendChild(cab);
 
     lista = el('div', 'lista');
+    // role=log + aria-live: el lector de pantalla anuncia los mensajes nuevos
+    // sin robarle el foco a quien está escribiendo.
+    lista.setAttribute('role', 'log');
     lista.setAttribute('aria-live', 'polite');
+    lista.setAttribute('aria-relevant', 'additions');
+    lista.setAttribute('aria-label', 'Conversación');
     caja.appendChild(lista);
 
     var pie = el('div', 'pie');
@@ -291,6 +314,23 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && abierto) alternar();
     });
+
+    // El navegador avisa cuando vuelve la red. Aprovecharlo evita que la
+    // persona se quede mirando un mensaje de error que ya no es cierto.
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('offline', function () {
+        if (abierto) mostrarAviso('sinred', 'Te quedaste sin internet.');
+      });
+      window.addEventListener('online', function () {
+        var a = raiz.querySelector('.aviso-estado.sinred');
+        if (!a) return;
+        quitarAviso();
+        if (ultimoTexto) {
+          mostrarAviso('sinred', 'Ya volvió el internet.',
+            { etiqueta: 'Reintentar', hacer: function () { quitarAviso(); reenviar(); } });
+        }
+      });
+    }
   }
 
   function alternar() {
@@ -298,6 +338,11 @@
     caja.dataset.abierto = abierto ? '1' : '0';
     boton.dataset.abierto = abierto ? '1' : '0';
     boton.textContent = abierto ? '✕' : cfg.marca.avatar;
+    boton.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+    boton.setAttribute('aria-label', (abierto ? 'Cerrar' : 'Abrir') + ' chat de ' + cfg.nombre);
+    // Al cerrar, el foco vuelve al lanzador: si se queda en un elemento
+    // oculto, quien navega con teclado se pierde dentro de la página.
+    if (!abierto) boton.focus();
     if (abierto) {
       if (!mensajes.length) {
         pintarBot(cfg.saludo);
@@ -352,13 +397,53 @@
     }, 2000);
   }
 
+  // ── Estados visibles ──────────────────────────────────────────────────
+  // Se muestran DENTRO de la lista, no como alerta del navegador: la persona
+  // está mirando la conversación, no la barra de direcciones.
+  var ultimoTexto = null;
+
+  function quitarAviso() {
+    var a = raiz.querySelector('.aviso-estado');
+    if (a) a.remove();
+  }
+
+  function mostrarAviso(clase, mensaje, accion) {
+    quitarAviso();
+    var d = el('div', 'aviso-estado ' + clase);
+    d.setAttribute('role', 'status');
+    d.appendChild(el('span', 'txt', mensaje));
+    if (accion) {
+      var b = el('button', null, accion.etiqueta);
+      b.addEventListener('click', accion.hacer);
+      d.appendChild(b);
+    }
+    lista.appendChild(d); abajo();
+  }
+
+  function sinConexion() {
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
+  }
+
   function enviar(texto) {
     texto = String(texto || '').trim();
     if (!texto || ocupado) return;
 
+    // Si no hay red, no se gasta una petición que ya se sabe que falla: se
+    // avisa y se ofrece reintentar cuando vuelva.
+    if (sinConexion()) {
+      pintarUsuario(texto);
+      entrada.value = ''; entrada.style.height = 'auto';
+      ultimoTexto = texto;
+      mostrarAviso('sinred', 'Parece que te quedaste sin internet. Tu mensaje no se envió.',
+        { etiqueta: 'Reintentar', hacer: function () { quitarAviso(); reenviar(); } });
+      return;
+    }
+    quitarAviso();
+
     entrada.value = ''; entrada.style.height = 'auto';
     pintarUsuario(texto);
     pintarChips([]);
+    ultimoTexto = texto;
     mensajes.push({ rol: 'usuario', texto: texto });
     guardar();
 
@@ -368,7 +453,15 @@
     }
 
     ocupado = true; puntitos(true);
+    pedirRespuesta();
+  }
 
+  /**
+   * La llamada al servidor, separada de enviar() para poder repetirla tal
+   * cual desde el botón de reintentar, sin volver a pintar el mensaje ni
+   * duplicarlo en el historial.
+   */
+  function pedirRespuesta() {
     fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -377,6 +470,7 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         puntitos(false); ocupado = false;
+        quitarAviso();
         if (d.error) { pintarBot(d.error); return; }
 
         pintarBot(d.texto, d.urgencia);
@@ -396,7 +490,12 @@
       })
       .catch(function () {
         puntitos(false); ocupado = false;
-        pintarBot('No pude conectarme. Revisa tu internet e inténtalo otra vez.');
+        // Un botón de reintentar convierte un callejón sin salida en un
+        // tropiezo. Sin él, la única salida es cerrar y volver a empezar.
+        mostrarAviso('error', sinConexion()
+          ? 'Sigues sin internet. Cuando vuelva, reintenta.'
+          : 'No pude conectarme.',
+          { etiqueta: 'Reintentar', hacer: function () { quitarAviso(); reenviar(); } });
         enlaceWhatsapp('general');
       });
   }
@@ -415,6 +514,19 @@
       etiqueta: (elegido && elegido.etiqueta) ||
                 (caso === 'urgencia' ? 'Escribir a urgencias' : 'Escribir por WhatsApp'),
     };
+  }
+
+  /**
+   * Repite el último mensaje sin volver a agregarlo al historial: ya está
+   * ahí. Duplicarlo haría que el modelo lea la misma pregunta dos veces y
+   * conteste como si la persona insistiera.
+   */
+  function reenviar() {
+    if (!ultimoTexto || ocupado) return;
+    var yaEsta = mensajes.length && mensajes[mensajes.length - 1].rol === 'usuario';
+    if (!yaEsta) mensajes.push({ rol: 'usuario', texto: ultimoTexto });
+    ocupado = true; puntitos(true);
+    pedirRespuesta();
   }
 
   function enlaceWhatsapp(caso) {

@@ -71,8 +71,28 @@ export async function empresaPorSlug(slug) {
     conocimiento: await abrir('conocimiento_cifrado') || [],
     limites:      await abrir('limites_cifrados')     || [],
     destinos:     await abrir('destinos_cifrados')    || null,
-    llaves:       await abrir('llaves_cifradas')      || null,
+    ...repartirLlaves(await abrir('llaves_cifradas')),
   };
+}
+
+/**
+ * El bulto cifrado de llaves guarda dos cosas distintas y conviene separarlas
+ * antes de que salgan de aquí:
+ *
+ *   { orden: ['gemini','groq'], claves: { gemini: '...', groq: '...' } }
+ *
+ * `orden` deja que cada marca elija su cadena de proveedores; `claves` deja
+ * que traiga su propia cuenta y pague su propio consumo. Ninguna de las dos
+ * debería obligar a tocar código ni a redesplegar.
+ *
+ * Se acepta también el formato viejo —un objeto plano de llaves, sin `claves`—
+ * para no romper lo que ya estuviera guardado.
+ */
+function repartirLlaves(blob) {
+  if (!blob || typeof blob !== 'object') return { llaves: null, proveedores: null };
+  const claves = blob.claves && typeof blob.claves === 'object' ? blob.claves : blob;
+  const orden  = Array.isArray(blob.orden) ? blob.orden : null;
+  return { llaves: claves, proveedores: orden };
 }
 
 /**

@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pruebas · Chatbot multimarca</title>
+<style>
+  :root { --ok:#16a34a; --mal:#dc2626; --tinta:#0f172a; --suave:#64748b; --linea:#e2e8f0; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+         background:#f8fafc; color:var(--tinta); line-height:1.55; }
+  .hoja { max-width:900px; margin:0 auto; padding:32px 20px 80px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--suave); margin:0 0 24px; font-size:14px; }
+  .resumen { padding:14px 18px; border-radius:10px; font-weight:600; margin-bottom:22px; }
+  .resumen.ok  { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+  .resumen.mal { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+  .suite { background:#fff; border:1px solid var(--linea); border-radius:10px;
+           margin-bottom:14px; overflow:hidden; }
+  .suite h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em;
+              color:var(--suave); margin:0; padding:12px 18px; background:#f8fafc;
+              border-bottom:1px solid var(--linea); }
+  ul { margin:0; padding:8px 18px 14px; list-style:none; }
+  li { padding:4px 0; font-size:14px; display:flex; gap:9px; align-items:flex-start; }
+  li .m { flex:none; width:16px; }
+  li.mal { color:var(--mal); }
+  li .por { color:var(--suave); font-size:12.5px; display:block; margin-top:2px; }
+  code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="hoja">
+  <h1>Pruebas del chatbot multimarca</h1>
+  <p class="sub">Corren en el navegador con <code>fetch</code> simulado: no se hace
+  ninguna llamada real ni se gasta cuota de ningún proveedor.</p>
+  <div id="resumen" class="resumen">Corriendo…</div>
+  <div id="salida"></div>
+</div>
+
+<script type="module">
+import {
+  planDeProveedores, preguntar, extraerJSON, limpiar,
+  _limpiarCacheModelos, ORDEN_POR_OMISION,
+} from '../publico/cerebro/proveedores.mjs';
+import { revisarEntorno, explicarFallo } from '../publico/cerebro/diagnostico.mjs';
+import { respuestaInmediata } from '../publico/cerebro/cerebro.mjs';
+import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
+
+/* ── mini marco de pruebas ─────────────────────────────────────────── */
+const suites = [];
+let actual = null;
+function suite(nombre, fn) { actual = { nombre, casos: [] }; suites.push(actual); return fn(); }
+function ok(nombre, condicion, porque = '') {
+  actual.casos.push({ nombre, pasa: !!condicion, porque: condicion ? '' : porque });
+}
+async function lanza(fn) { try { await fn(); return null; } catch (e) { return e; } }
+
+/* ── fetch simulado ────────────────────────────────────────────────── */
+// Cada prueba describe qué debe contestar cada URL. Respeta la señal de
+// aborto para poder probar el tiempo límite de verdad.
+function simularFetch(guion) {
+  const llamadas = [];
+  globalThis.fetch = (url, opciones = {}) => {
+    const u = String(url);
+    llamadas.push({ url: u, headers: opciones.headers || {} });
+    const paso = guion.find(g => g.coincide(u, llamadas.length));
+    if (!paso) return Promise.resolve(new Response('{}', { status: 404 }));
+
+    if (paso.colgar) {
+      return new Promise((_, rechazar) => {
+        opciones.signal?.addEventListener('abort', () => {
+          const err = new Error('abortado'); err.name = 'AbortError'; rechazar(err);
+        });
+      });
+    }
+    return Promise.resolve(new Response(
+      typeof paso.cuerpo === 'string' ? paso.cuerpo : JSON.stringify(paso.cuerpo ?? {}),
+      { status: paso.estado ?? 200, headers: { 'content-type': 'application/json' } }));
+  };
+  return llamadas;
+}
+const fetchReal = globalThis.fetch;
+function restaurarFetch() { globalThis.fetch = fetchReal; }
+
+// Respuestas de cada proveedor, en su formato real.
+const LISTA_GEMINI = { models: [{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }] };
+const LISTA_GROQ   = { data: [{ id: 'llama-3.1-8b-instant' }] };
+const RESP_GEMINI  = t => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(t) }] } }] });
+const RESP_GROQ    = t => ({ choices: [{ message: { content: JSON.stringify(t) } }] });
+const CUERPO = { texto: 'hola', sugerencias: [], accion: 'ninguna' };
+
+const entornoDe = obj => n => obj[n];
+
+/* ══════════════════════════════════════════════════════════════════════
+   1 · ENCAMINAMIENTO
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Encaminamiento de proveedores', () => {
+  const env2 = entornoDe({ GEMINI_API_KEY: 'g1', GROQ_API_KEY: 'q1' });
+
+  const porOmision = planDeProveedores({ marca: {}, leerEntorno: env2 });
+  ok('sin configuración usa el orden por omisión',
+     porOmision.map(p => p.nombre).join(',') === ORDEN_POR_OMISION,
+     'obtuvo ' + porOmision.map(p => p.nombre).join(','));
+
+  const conEnv = planDeProveedores({
+    marca: {}, leerEntorno: entornoDe({ BOT_ORDEN: 'groq,gemini', GEMINI_API_KEY: 'g1', GROQ_API_KEY: 'q1' }) });
+  ok('BOT_ORDEN cambia el orden', conEnv.map(p => p.nombre).join(',') === 'groq,gemini');
+
+  const porMarca = planDeProveedores({
+    marca: { proveedores: ['groq'] },
+    leerEntorno: entornoDe({ BOT_ORDEN: 'gemini', GEMINI_API_KEY: 'g1', GROQ_API_KEY: 'q1' }) });
+  ok('la marca gana sobre BOT_ORDEN',
+     porMarca.length === 1 && porMarca[0].nombre === 'groq');
+
+  const sinLlave = planDeProveedores({
+    marca: {}, leerEntorno: entornoDe({ BOT_ORDEN: 'gemini,groq', GROQ_API_KEY: 'q1' }) });
+  ok('se salta el proveedor sin llave',
+     sinLlave.length === 1 && sinLlave[0].nombre === 'groq');
+
+  const repetido = planDeProveedores({
+    marca: { proveedores: ['groq', 'groq', 'gemini'] },
+    leerEntorno: env2 });
+  ok('no repite proveedores', repetido.map(p => p.nombre).join(',') === 'groq,gemini');
+
+  const inventado = planDeProveedores({
+    marca: { proveedores: ['inventado', 'groq'] }, leerEntorno: env2 });
+  ok('ignora nombres desconocidos', inventado.map(p => p.nombre).join(',') === 'groq');
+
+  const vacio = planDeProveedores({ marca: {}, leerEntorno: entornoDe({}) });
+  ok('sin ninguna llave el plan queda vacío', vacio.length === 0);
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   2 · LLAVES POR MARCA  (aislamiento entre inquilinos)
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Llaves por marca · aislamiento', () => {
+  const env2 = entornoDe({ GEMINI_API_KEY: 'PLATAFORMA', GROQ_API_KEY: 'PLATAFORMA_Q' });
+
+  const conPropia = planDeProveedores({
+    marca: { llaves: { gemini: 'DE_LA_MARCA' } }, leerEntorno: env2 });
+  const g = conPropia.find(p => p.nombre === 'gemini');
+  ok('la llave de la marca gana sobre la de la plataforma', g.key === 'DE_LA_MARCA');
+  ok('se reporta el origen de la llave', g.origen === 'marca');
+
+  const q = conPropia.find(p => p.nombre === 'groq');
+  ok('sin llave propia cae a la de la plataforma', q.key === 'PLATAFORMA_Q' && q.origen === 'plataforma');
+
+  // Dos marcas distintas, mismo entorno: ninguna debe ver la llave de la otra.
+  const marcaA = planDeProveedores({ marca: { llaves: { gemini: 'LLAVE_A' } }, leerEntorno: env2 });
+  const marcaB = planDeProveedores({ marca: { llaves: { gemini: 'LLAVE_B' } }, leerEntorno: env2 });
+  ok('la marca A no recibe la llave de B',
+     marcaA.find(p => p.nombre === 'gemini').key === 'LLAVE_A');
+  ok('la marca B no recibe la llave de A',
+     marcaB.find(p => p.nombre === 'gemini').key === 'LLAVE_B');
+
+  const soloEnv = planDeProveedores({ marca: {}, leerEntorno: env2 });
+  ok('una marca sin llaves propias no hereda las de otra marca',
+     soloEnv.every(p => p.origen === 'plataforma'));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   3 · RESPALDO Y REINTENTO
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Respaldo y reintento', async () => {
+  const env2 = entornoDe({ BOT_ORDEN: 'gemini,groq', GEMINI_API_KEY: 'g1', GROQ_API_KEY: 'q1' });
+
+  // Gemini caído (500 siempre) → debe contestar Groq
+  _limpiarCacheModelos();
+  simularFetch([
+    { coincide: u => u.includes('generativelanguage'), estado: 500, cuerpo: 'boom' },
+    { coincide: u => u.includes('groq.com/openai/v1/models'), cuerpo: LISTA_GROQ },
+    { coincide: u => u.includes('groq.com'), cuerpo: RESP_GROQ(CUERPO) },
+  ]);
+  const r1 = await preguntar({ prompt: 'x', leerEntorno: env2, reintentos: 0 });
+  ok('si el primero falla, contesta el segundo', r1.via === 'groq');
+  ok('el fallo del primero queda registrado', r1.intentos.length >= 1);
+
+  // Reintento: primer intento 503, segundo bien
+  _limpiarCacheModelos();
+  let n = 0;
+  globalThis.fetch = (url) => {
+    const u = String(url);
+    if (u.includes('groq.com/openai/v1/models')) return Promise.resolve(new Response(JSON.stringify(LISTA_GROQ)));
+    if (u.includes('groq.com')) {
+      n++;
+      if (n === 1) return Promise.resolve(new Response('caido', { status: 503 }));
+      return Promise.resolve(new Response(JSON.stringify(RESP_GROQ(CUERPO))));
+    }
+    return Promise.resolve(new Response('{}', { status: 404 }));
+  };
+  const r2 = await preguntar({ prompt: 'x', leerEntorno: entornoDe({ BOT_ORDEN: 'groq', GROQ_API_KEY: 'q1' }), reintentos: 1 });
+  ok('un 503 pasajero se reintenta y acierta', r2.via === 'groq' && n === 2);
+
+  // 401 NO se reintenta: es configuración, no un pico
+  _limpiarCacheModelos();
+  let m = 0;
+  globalThis.fetch = (url) => {
+    const u = String(url);
+    if (u.includes('groq.com/openai/v1/models')) return Promise.resolve(new Response(JSON.stringify(LISTA_GROQ)));
+    if (u.includes('groq.com')) { m++; return Promise.resolve(new Response('no autorizado', { status: 401 })); }
+    return Promise.resolve(new Response('{}', { status: 404 }));
+  };
+  const e401 = await lanza(() => preguntar({ prompt: 'x', leerEntorno: entornoDe({ BOT_ORDEN: 'groq', GROQ_API_KEY: 'malaq' }), reintentos: 2 }));
+  ok('un 401 no se reintenta', m === 1, 'se llamó ' + m + ' veces');
+  ok('un 401 agota la cadena', e401?.codigo === 'TODOS_FALLARON');
+
+  restaurarFetch();
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   4 · TIEMPO LÍMITE
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Tiempo límite', async () => {
+  _limpiarCacheModelos();
+  simularFetch([
+    { coincide: u => u.includes('generativelanguage'), colgar: true },
+    { coincide: u => u.includes('groq.com/openai/v1/models'), cuerpo: LISTA_GROQ },
+    { coincide: u => u.includes('groq.com'), cuerpo: RESP_GROQ(CUERPO) },
+  ]);
+  const t0 = Date.now();
+  const r = await preguntar({
+    prompt: 'x',
+    leerEntorno: entornoDe({ BOT_ORDEN: 'gemini,groq', GEMINI_API_KEY: 'g1', GROQ_API_KEY: 'q1' }),
+    msLimite: 300, reintentos: 0,
+  });
+  const ms = Date.now() - t0;
+  ok('un proveedor colgado no bloquea: pasa al siguiente', r.via === 'groq');
+  ok('el corte respeta el límite configurado', ms < 2500, 'tardó ' + ms + ' ms');
+  ok('el vencimiento se registra como 408', r.intentos.some(i => i.estado === 408));
+  restaurarFetch();
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   5 · SIN LLAVES  ·  ERRORES SEGUROS
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Sin llaves y errores seguros', async () => {
+  const e = await lanza(() => preguntar({ prompt: 'x', leerEntorno: entornoDe({}) }));
+  ok('sin ninguna llave devuelve SIN_PROVEEDORES', e?.codigo === 'SIN_PROVEEDORES');
+
+  const f = explicarFallo(e, { hayContacto: true });
+  ok('el mensaje público NO menciona llaves ni variables',
+     !/api|key|llave|variable|token|configur/i.test(f.publico), f.publico);
+  ok('el mensaje público sí dice qué hacer', /escríbenos|int[eé]nt/i.test(f.publico));
+  ok('el mensaje de administrador sí es específico', /llave/i.test(f.admin));
+  ok('trae instrucción de arreglo', /GEMINI_API_KEY|GROQ_API_KEY/.test(f.arreglo));
+
+  // Ningún valor secreto puede salir en un texto de error
+  ok('limpiar() borra una llave de Google', limpiar('fallo key=AIzaSyABCDEFG12345 y más') === 'fallo key=*** y más');
+  ok('limpiar() borra un Bearer', !limpiar('Authorization: Bearer gsk_abcdefghijklmno').includes('gsk_abcdef'));
+  ok('limpiar() borra una llave sk-', !limpiar('usé sk-proj-abcdefghijklmnop').includes('abcdefghij'));
+
+  // Un error de proveedor con la llave dentro llega ya limpio
+  _limpiarCacheModelos();
+  simularFetch([
+    { coincide: u => u.includes('generativelanguage'), estado: 400,
+      cuerpo: 'error en https://x/models?key=AIzaSyTOPSECRET123' },
+  ]);
+  const e2 = await lanza(() => preguntar({
+    prompt: 'x', leerEntorno: entornoDe({ BOT_ORDEN: 'gemini', GEMINI_API_KEY: 'AIzaSyTOPSECRET123' }), reintentos: 0 }));
+  const todo = JSON.stringify(e2?.intentos || []);
+  ok('la llave no aparece en el detalle de los intentos', !todo.includes('TOPSECRET'), todo.slice(0, 120));
+  restaurarFetch();
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   6 · DIAGNÓSTICO DEL ENTORNO
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Diagnóstico del entorno', () => {
+  const vacio = revisarEntorno(entornoDe({}));
+  ok('sin nada, no está listo', vacio.listo === false);
+  ok('detecta que no hay proveedor', vacio.problemas.some(p => p.clave === 'sin_proveedor'));
+  ok('el diagnóstico no contiene valores, solo booleanos',
+     Object.values(vacio.proveedores).every(v => typeof v === 'boolean'));
+
+  const conGemini = revisarEntorno(entornoDe({ GEMINI_API_KEY: 'g' }));
+  ok('con un proveedor ya está listo', conGemini.listo === true);
+  ok('sigue avisando de lo que falta', conGemini.problemas.some(p => p.gravedad === 'aviso'));
+
+  const baseSinCifrado = revisarEntorno(entornoDe({
+    GEMINI_API_KEY: 'g', SUPABASE_URL: 'u', SUPABASE_SERVICE_KEY: 'k' }));
+  ok('base sin cifrado es crítico', baseSinCifrado.problemas.some(
+     p => p.clave === 'base_sin_cifrado' && p.gravedad === 'critico'));
+  ok('y por eso no está listo', baseSinCifrado.listo === false);
+
+  const serializado = JSON.stringify(revisarEntorno(entornoDe({
+    GEMINI_API_KEY: 'SECRETO_GEMINI', SUPABASE_SERVICE_KEY: 'SECRETO_SB' })));
+  ok('el diagnóstico serializado no filtra ningún valor',
+     !serializado.includes('SECRETO_GEMINI') && !serializado.includes('SECRETO_SB'));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   7 · DEGRADACIÓN
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Degradación digna', () => {
+  const cuota = explicarFallo({ codigo: 'TODOS_FALLARON', intentos: [{ estado: 429 }] }, { hayContacto: true });
+  ok('cuota agotada: el admin lo sabe', /cuota/i.test(cuota.admin));
+  ok('cuota agotada: el visitante recibe una salida', /escríbenos/i.test(cuota.publico));
+
+  const lento = explicarFallo({ codigo: 'TODOS_FALLARON', intentos: [{ estado: 408 }] }, {});
+  ok('vencimiento: se explica como pasajero', /tiempo|contestaron/i.test(lento.admin));
+  ok('sin contacto, invita a reintentar', /int[eé]nt/i.test(lento.publico));
+
+  const malaLlave = explicarFallo({ codigo: 'TODOS_FALLARON', intentos: [{ estado: 401 }] }, {});
+  ok('llave rechazada: se distingue de la cuota', /rechaz|autoriz/i.test(malaLlave.admin));
+
+  ok('nunca se filtra el detalle técnico al público',
+     [cuota, lento, malaLlave].every(f => !/\b(429|408|401|gemini|groq)\b/i.test(f.publico)));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   8 · JSON TOLERANTE
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Lectura de la respuesta', () => {
+  ok('JSON limpio', extraerJSON('{"a":1}').a === 1);
+  ok('JSON envuelto en ```json', extraerJSON('```json\n{"a":2}\n```').a === 2);
+  ok('JSON envuelto en ``` a secas', extraerJSON('```\n{"a":3}\n```').a === 3);
+  ok('JSON con texto alrededor', extraerJSON('claro: {"a":4} listo').a === 4);
+  let fallo = false;
+  try { extraerJSON('no hay json aquí'); } catch { fallo = true; }
+  ok('texto sin JSON lanza error claro', fallo);
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   9 · BANDERAS ROJAS  (no deben depender del proveedor)
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Banderas rojas', () => {
+  const clinica  = { dominio: 'clinico' };
+  const comercio = { dominio: 'comercial' };
+  ok('dolor de pecho dispara en marca clínica', !!respuestaInmediata(clinica, 'me duele el pecho'));
+  ok('no puedo respirar dispara', !!respuestaInmediata(clinica, 'no puedo respirar'));
+  ok('la misma frase NO dispara en marca comercial', respuestaInmediata(comercio, 'me duele el pecho') === null);
+  ok('una consulta normal no dispara', respuestaInmediata(clinica, 'cuánto cuesta la consulta') === null);
+  const r = respuestaInmediata(clinica, 'me duele el pecho');
+  ok('la respuesta de urgencia no pasa por ningún proveedor', r.via === 'filtro-local');
+  ok('la respuesta de urgencia manda al 911', /911/.test(r.texto));
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   10 · CIFRADO POR MARCA
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Cifrado por marca', async () => {
+  const maestra = generarLlaveMaestra();
+  const A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  const dato = { nombre: 'María', telefono: '9611234567' };
+
+  const c = await cifrar(maestra, A, dato);
+  ok('ida y vuelta', JSON.stringify(await descifrar(maestra, A, c)) === JSON.stringify(dato));
+  ok('el cifrado no filtra el contenido', !c.includes('María') && !c.includes('9611234567'));
+  ok('mismo dato, cifrado distinto', c !== await cifrar(maestra, A, dato));
+  ok('la marca B no puede abrir lo de A', !!(await lanza(() => descifrar(maestra, B, c))));
+  ok('otra llave maestra no abre', !!(await lanza(() => descifrar(generarLlaveMaestra(), A, c))));
+});
+
+/* ── pintar ─────────────────────────────────────────────────────────── */
+const total = suites.reduce((n, s) => n + s.casos.length, 0);
+const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);
+
+document.getElementById('resumen').className = 'resumen ' + (fallos ? 'mal' : 'ok');
+document.getElementById('resumen').textContent =
+  fallos ? `${fallos} de ${total} pruebas fallaron` : `Las ${total} pruebas pasan`;
+
+document.getElementById('salida').innerHTML = suites.map(s => `
+  <div class="suite">
+    <h2>${s.nombre}</h2>
+    <ul>${s.casos.map(c => `
+      <li class="${c.pasa ? '' : 'mal'}"><span class="m">${c.pasa ? '✅' : '❌'}</span>
+      <span>${c.nombre}${c.porque ? `<span class="por">${String(c.porque).replace(/[<>]/g, '')}</span>` : ''}</span></li>`).join('')}
+    </ul>
+  </div>`).join('');
+
+window.__resultados = {
+  total, fallos,
+  suites: suites.map(s => ({ nombre: s.nombre, casos: s.casos })),
+};
+</script>
+</body>
+</html>

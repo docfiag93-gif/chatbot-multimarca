@@ -226,3 +226,55 @@ configuración.
 2. **Las variables de Netlify** de arriba.
 3. **Llenar los datos reales.** Sigue siendo lo que más rinde.
 4. **Aviso de privacidad de verdad**, enlazado desde la casilla del formulario.
+
+---
+
+# Proveedores de IA
+
+## Cómo se elige quién contesta
+
+Tres niveles, de mayor a menor precedencia:
+
+1. **La marca** — `proveedores: ['groq','gemini']` dentro de su configuración cifrada
+2. **La instalación** — variable `BOT_ORDEN`
+3. **Por omisión** — `gemini,groq`
+
+Para cada proveedor, **la llave de la marca gana sobre la de la plataforma**.
+Así un cliente puede traer su propia cuenta y pagar su propio consumo sin que
+eso afecte a las demás marcas ni obligue a tocar código.
+
+## Qué pasa cuando algo falla
+
+| Situación | Comportamiento |
+|---|---|
+| Proveedor tarda más de 15 s | Se corta y pasa al siguiente |
+| Error pasajero (429, 5xx, red) | Un reintento con espera corta, después el siguiente |
+| Llave rechazada (401, 403) | **No** se reintenta: es configuración, no un pico |
+| Todos fallan | Mensaje útil al visitante + detalle técnico solo del lado del servidor |
+| Sin ninguna llave | El visitante nunca lee «falta una API key» |
+
+El límite y los reintentos se ajustan con `msLimite` y `reintentos`; los
+valores por omisión están en `publico/cerebro/proveedores.mjs`.
+
+## Diagnóstico
+
+`/api/bot?ping=1` responde qué está configurado y qué falta, **sin revelar
+ningún valor**: solo nombres de variables y booleanos. Cada problema trae
+gravedad, explicación y cómo arreglarlo.
+
+# Pruebas
+
+```bash
+python3 -m http.server 8796
+```
+
+- `http://127.0.0.1:8796/pruebas/pruebas.html` — 60 pruebas de encaminamiento,
+  aislamiento entre marcas, respaldo, reintento, tiempo límite, errores
+  seguros, degradación y cifrado. Usa `fetch` simulado: **no gasta cuota**.
+- `python3 pruebas/probar_banderas.py` — 36 casos de banderas rojas.
+
+# Documentación
+
+`docs/arquitectura-multimarca.html` es el informe de diseño de la plataforma.
+Vive fuera de `publico/`, así que **no se despliega**: es documentación
+interna, no parte del producto.

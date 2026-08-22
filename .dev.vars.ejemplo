@@ -1,6 +1,10 @@
 # Copia este archivo como `.dev.vars` para probar en local con wrangler.
 # `.dev.vars` está en .gitignore: NUNCA se sube. Las llaves de verdad van
 # en el panel de Cloudflare, marcadas como Secret.
+# Orden de proveedores. Por omision: gemini,groq (los dos con capa gratuita).
+# Cada marca puede sobrescribirlo desde su propia configuracion cifrada.
+BOT_ORDEN=gemini,groq
+
 CHATBOT_CLAVE=
 SUPABASE_URL=https://gnhndbqbgvtoxhelikcy.supabase.co
 SUPABASE_ANON_KEY=
