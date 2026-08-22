@@ -333,3 +333,55 @@ Antes de publicar, revisa el perfil y dice **exactamente qué falta** — no un
 Las filas que ya existan con `dominio` no pierden nada: se traduce a categoría
 legible, y **solo** las marcadas como clínicas conservan su política. Ninguna
 otra la hereda por su giro.
+
+
+---
+
+# Anclaje: que no invente datos duros
+
+## El problema
+
+Un modelo de lenguaje **siempre** contesta. Si no sabe el horario, se lo
+inventa con total naturalidad: «abrimos de 9 a 6» suena idéntico venga de la
+base de conocimiento o de la nada. El resultado es alguien parado frente a una
+cortina cerrada un domingo.
+
+Pedirlo en el prompt ayuda, pero no basta: **el prompt es una petición, no una
+garantía.**
+
+## La garantía
+
+Después de que el modelo responde, se extraen los datos duros —precios, horas,
+días, teléfonos, porcentajes— y se comprueba que **cada uno exista** en lo que
+el negocio cargó. El que no aparezca está inventado.
+
+| Respuesta | Resultado |
+|---|---|
+| «La afinación sale en $1,800» (está en el catálogo) | pasa |
+| «Son 1800 pesos» (mismo dato, otro formato) | pasa |
+| «La afinación cuesta $2,500» (no existe) | **degradada** |
+| «También abrimos el domingo» (cerrado) | **degradada** |
+| «Con gusto te ayudo» | pasa — no es un dato |
+
+Cuando detecta invención **no corrige**: corregir con otro dato inventado es el
+mismo error. Admite el hueco y ofrece a una persona — exactamente lo que haría
+un empleado honesto que no se sabe el precio.
+
+## Lo que NO revisa, a propósito
+
+Afirmaciones generales («somos rápidos», «el envío es sencillo»). Un
+verificador que bloquea lenguaje normal convierte al bot en un robot inútil, y
+entonces alguien lo apaga. Hay pruebas específicas de que no da falsos
+positivos.
+
+También quita las muletillas de robot: «como asistente de IA», «estoy aquí
+para ayudarte», «espero que te sea de utilidad».
+
+## Entrada con Google
+
+El panel acepta Google además de correo y contraseña. Quien administra un
+negocio ya tiene sesión de Google en su teléfono; pedirle que invente otra
+contraseña es fricción, y la que inventa suele ser mala.
+
+**Falta configurarlo:** en Supabase → Authentication → Providers → Google, con
+un ID de cliente de Google Cloud. El código ya está.

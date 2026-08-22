@@ -18,6 +18,8 @@ import { MARCAS } from '../publico/cerebro/marcas.mjs';
 import { construirPrompt, respuestaInmediata, accionValida } from '../publico/cerebro/cerebro.mjs';
 import { preguntar } from '../publico/cerebro/proveedores.mjs';
 import { revisarEntorno, explicarFallo } from '../publico/cerebro/diagnostico.mjs';
+import { revisarAnclaje, revisarRedaccion, limpiarMuletillas, respuestaSinDato }
+  from '../publico/cerebro/anclaje.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar }
   from '../publico/cerebro/datos.mjs';
 
@@ -168,16 +170,35 @@ export async function manejar(req, context) {
       },
     });
 
-    const salida = {
-      texto: String(datos.texto || '').slice(0, 1200),
-      sugerencias: Array.isArray(datos.sugerencias) ? datos.sugerencias.slice(0, 3).map(String) : [],
-      // Que el modelo pida una acción no significa que el negocio la tenga
-      // encendida. Se filtra contra su configuración: una tienda sin
-      // "agendar" nunca va a abrir un formulario de citas por un desliz
-      // del modelo.
-      accion: accionValida(marca, datos.accion),
-      via,
-    };
+    // ── ANCLAJE ────────────────────────────────────────────────────────
+    // Pedirle en el prompt que no invente es una petición, no una garantía.
+    // Aquí se comprueba: cada precio, hora, día o teléfono de la respuesta
+    // tiene que existir en lo que el negocio cargó. Si no está, se degrada
+    // a una respuesta que admite el hueco.
+    //
+    // Es la diferencia entre un bot que suena bien y uno en el que se puede
+    // confiar: inventar un horario manda a alguien a una cortina cerrada.
+    let texto = limpiarMuletillas(String(datos.texto || '')).slice(0, 1200);
+    const anclaje = revisarAnclaje(marca, texto);
+    const redaccion = revisarRedaccion(texto);
+
+    let salida;
+    if (!anclaje.anclado) {
+      const seguro = respuestaSinDato(marca, anclaje.inventadas);
+      salida = { ...seguro, via, anclaje: 'degradado' };
+    } else {
+      salida = {
+        texto,
+        sugerencias: Array.isArray(datos.sugerencias) ? datos.sugerencias.slice(0, 3).map(String) : [],
+        // Que el modelo pida una acción no significa que el negocio la tenga
+        // encendida. Se filtra contra su configuración: una tienda sin
+        // "agendar" nunca va a abrir un formulario de citas por un desliz
+        // del modelo.
+        accion: accionValida(marca, datos.accion),
+        via,
+      };
+      if (redaccion.largo || redaccion.muchasPreguntas) salida.redaccion = 'floja';
+    }
 
     // Cuando hubo un fallo antes de acertar, se deja constancia: es la señal
     // temprana de que un proveedor se está degradando.

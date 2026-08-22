@@ -252,6 +252,15 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
         <button class="btn" id="btn-entrar">Entrar</button>
         <button class="btn sec" id="btn-registrar">Crear cuenta</button>
       </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--tenue);font-size:12px">
+        <span style="flex:1;height:1px;background:var(--linea)"></span>o<span style="flex:1;height:1px;background:var(--linea)"></span>
+      </div>
+      <button class="btn sec" id="btn-google" style="width:100%;justify-content:center">
+        <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/><path fill="#EA4335" d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.46 14.97.5 12 .5A11 11 0 0 0 2.18 7.05l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continuar con Google
+      </button>
+      <div id="google-msg"></div>
       <p class="pista" style="margin-top:12px">Una cuenta nueva nace <b>sin permisos</b>:
       no ve nada hasta que el administrador la asigne a un negocio.</p>
     </div>
@@ -856,6 +865,45 @@ $('#btn-registrar').addEventListener('click', async () => {
     $('#acceso-msg').innerHTML = `<div class="aviso ok">Cuenta creada. Falta que te asignen a un negocio.</div>`;
   } catch (e) { $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
 });
+/**
+ * Entrada con Google.
+ *
+ * Supabase se encarga del ida y vuelta con Google; aquí solo se le dice a
+ * dónde volver. Se usa `redirectTo` con la URL actual para que la persona
+ * regrese a la misma pantalla donde estaba, no a la raíz.
+ *
+ * Por qué conviene: quien administra un negocio ya tiene sesión de Google
+ * abierta en su teléfono. Pedirle que invente y recuerde otra contraseña es
+ * fricción pura, y las contraseñas que inventa para esto suelen ser malas.
+ */
+$('#btn-google').addEventListener('click', () => {
+  const volverA = location.origin + location.pathname;
+  const url = `${SB_URL}/auth/v1/authorize?provider=google` +
+              `&redirect_to=${encodeURIComponent(volverA)}`;
+  location.href = url;
+});
+
+/**
+ * Al volver de Google, el token llega en el fragmento de la URL (después del
+ * #). Se recoge, se guarda y se limpia la barra de direcciones: dejar un
+ * token a la vista invita a que alguien lo copie de la pantalla.
+ */
+(function recogerSesionDeGoogle() {
+  if (!location.hash.includes('access_token')) return;
+  const p = new URLSearchParams(location.hash.slice(1));
+  const t = p.get('access_token');
+  const err = p.get('error_description');
+
+  history.replaceState(null, '', location.pathname + location.search);
+
+  if (err) {
+    $('#google-msg').innerHTML = `<div class="aviso mal">${esc(err)}</div>`;
+    $('#v-acceso').classList.remove('oculto');
+    return;
+  }
+  if (t) { token = t; sessionStorage.setItem('consola:token', t); }
+})();
+
 $('#btn-salir').addEventListener('click', () => {
   token = null; yo = null; enLinea = false;
   sessionStorage.removeItem('consola:token');

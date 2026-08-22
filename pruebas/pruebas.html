@@ -51,6 +51,8 @@ import { accionesDisponibles, accionPermitida, fragmentoDeAcciones } from '../pu
 import { construirPrompt, accionValida } from '../publico/cerebro/cerebro.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 import { obtenerMarca } from '../publico/cerebro/marcas.mjs';
+import { revisarAnclaje, afirmacionesDe, corpusDe, revisarRedaccion,
+         limpiarMuletillas, respuestaSinDato } from '../publico/cerebro/anclaje.mjs';
 
 /* ── mini marco de pruebas ─────────────────────────────────────────── */
 const suites = [];
@@ -578,6 +580,98 @@ suite('Revisión antes de publicar', () => {
     conocimiento: [{ tema: 'a', texto: 'b' }] });
   ok('avisa si no hay forma de contactar al negocio',
      sinSalida.faltan.some(f => f.campo === 'contactos'));
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   18 · ANCLAJE — que no invente datos duros
+   ══════════════════════════════════════════════════════════════════════ */
+suite('Anclaje · detecta invención', () => {
+  const negocio = normalizarPerfil({
+    nombre: 'Taller El Piñón',
+    catalogo: [{ nombre: 'Afinación mayor', precio: '$1,800' },
+               { nombre: 'Cambio de aceite', precio: '$450' }],
+    horarios: { lunes:{abre:'08:00',cierra:'18:00'}, martes:{abre:'08:00',cierra:'18:00'},
+                sabado:{abre:'09:00',cierra:'14:00'} },
+    conocimiento: [{ tema:'garantía', texto:'Todos los trabajos llevan 6 meses de garantía.' }],
+    contactos: { principal: { whatsapp: '5219611234567' } },
+  });
+
+  // ── lo que SÍ está cargado debe pasar ──
+  ok('un precio real del catálogo pasa',
+     revisarAnclaje(negocio, 'La afinación mayor sale en $1,800.').anclado);
+  ok('el mismo precio escrito sin coma también pasa',
+     revisarAnclaje(negocio, 'Son 1800 pesos.').anclado);
+  ok('un horario real pasa',
+     revisarAnclaje(negocio, 'Abrimos de 08:00 a 18:00.').anclado);
+  ok('un día real pasa',
+     revisarAnclaje(negocio, 'El sábado abrimos más temprano.').anclado);
+  ok('el teléfono real pasa',
+     revisarAnclaje(negocio, 'Escríbenos al 5219611234567.').anclado);
+  ok('un dato del conocimiento pasa',
+     revisarAnclaje(negocio, 'Llevan 6 meses de garantía.').anclado);
+
+  // ── lo inventado debe caer ──
+  const precioFalso = revisarAnclaje(negocio, 'La afinación cuesta $2,500.');
+  ok('un precio INVENTADO se detecta', !precioFalso.anclado);
+  ok('se reporta qué se inventó', precioFalso.inventadas[0].tipo === 'dinero');
+
+  ok('un horario INVENTADO se detecta',
+     !revisarAnclaje(negocio, 'Abrimos de 07:00 a 22:00.').anclado);
+  ok('un día en que está cerrado se detecta',
+     !revisarAnclaje(negocio, 'También abrimos el domingo.').anclado);
+  ok('un teléfono INVENTADO se detecta',
+     !revisarAnclaje(negocio, 'Llámanos al 5559998888.').anclado);
+
+  // ── SIN falsos positivos: lo más importante ──
+  const normales = [
+    'Con gusto te ayudo con eso.',
+    'Sí, manejamos esa marca. ¿Para qué modelo lo necesitas?',
+    'Te confirmo disponibilidad y te aviso.',
+    'Depende del estado del motor, habría que revisarlo.',
+    'Claro, pasa cuando gustes.',
+    'No tengo ese dato a la mano, te paso con alguien.',
+  ];
+  normales.forEach(t => ok(`lenguaje normal no se bloquea: "${t.slice(0,32)}…"`,
+    revisarAnclaje(negocio, t).anclado, JSON.stringify(revisarAnclaje(negocio,t).inventadas)));
+
+  ok('un negocio sin datos no bloquea lenguaje general',
+     revisarAnclaje(normalizarPerfil({}), 'Con gusto te ayudo.').anclado);
+});
+
+suite('Anclaje · degradación honesta', () => {
+  const negocio = normalizarPerfil({ nombre:'X',
+    contactos: { principal: { whatsapp: '521000' } } });
+
+  const r = respuestaSinDato(negocio, [{ tipo:'dinero' }]);
+  ok('admite que no tiene el dato', /no tengo/i.test(r.texto));
+  ok('NO inventa un dato de repuesto', !/\$|\d{3,}/.test(r.texto));
+  ok('ofrece una salida', r.accion === 'derivar_humano');
+  ok('dice de qué dato se trata', /precio/i.test(r.texto));
+
+  const sinContacto = respuestaSinDato(normalizarPerfil({}), [{ tipo:'hora' }]);
+  ok('sin contacto, pide los datos', sinContacto.accion === 'capturar_contacto');
+  ok('distingue horario de precio', /horario/i.test(sinContacto.texto));
+});
+
+suite('Anclaje · redacción', () => {
+  ok('quita "como asistente de IA"',
+     !/asistente de IA/i.test(limpiarMuletillas('Como asistente de IA, te comento que sí.')));
+  ok('quita "estoy aquí para ayudarte"',
+     !/aquí para ayudarte/i.test(limpiarMuletillas('¡Hola! Estoy aquí para ayudarte con lo que necesites.')));
+  ok('no destroza el resto de la frase',
+     limpiarMuletillas('Como asistente de IA, el envío tarda 3 días.').includes('el envío tarda 3 días'));
+  ok('deja intacto un texto limpio',
+     limpiarMuletillas('Sí, manejamos esa marca.') === 'Sí, manejamos esa marca.');
+
+  ok('detecta respuesta larga',
+     revisarRedaccion('palabra '.repeat(120)).largo);
+  ok('no marca una respuesta corta',
+     !revisarRedaccion('Sí, con gusto.').largo);
+  ok('detecta dos preguntas seguidas',
+     revisarRedaccion('¿Para cuándo lo necesitas? ¿Y de qué modelo es?').muchasPreguntas);
+  ok('una sola pregunta está bien',
+     !revisarRedaccion('¿Para cuándo lo necesitas?').muchasPreguntas);
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */
