@@ -1,59 +1,71 @@
-# Cómo subirlo a Cloudflare Pages (gratis)
+# Subirlo a Cloudflare Pages
 
-## Por qué se mueve
+## Qué es este proyecto
 
-El chatbot compartía sitio con la app médica en Netlify. Dos problemas con eso,
-y el segundo importa más que el dinero:
+Un producto **aparte**. No comparte repositorio, ni base de datos, ni
+hospedaje con la app médica. Esa fue una decisión explícita: la integración
+con el resto del ecosistema queda para el final, cuando los demás productos
+estén terminados. Mientras tanto, nada de aquí puede tocar los datos de los
+pacientes, ni por accidente ni por un error de configuración.
 
-1. Cada despliegue del chatbot reconstruía también la app de los pacientes.
-2. Las llamadas del chatbot consumían la misma cuota. Si el bot se pone
-   popular —o alguien lo abusa— se lleva entre las patas la app que usan
-   tus pacientes.
-
-Cloudflare Pages: **ancho de banda ilimitado**, 100 mil llamadas de función
-al día, 500 compilaciones al mes. Y permite uso comercial en el plan gratuito,
-cosa que **Vercel no** — su plan Hobby lo prohíbe, y tú planeas vender esto.
-
-## El código ya está listo para las dos plataformas
-
-No hay que elegir de golpe. La misma lógica corre en Netlify y en Cloudflare:
+## La estructura, y por qué está así
 
 ```
-chatbot/servidor/bot.mjs      ← la lógica, sin saber dónde vive
-chatbot/servidor/admin.mjs
-
-netlify/functions/bot.mjs     ← envoltorio Netlify (2 líneas)
-functions/api/bot.js          ← envoltorio Cloudflare (10 líneas)
+chatbot/                    ← la raíz del repo
+├── publico/                ← ESTO es lo único que se publica
+│   ├── index.html          consola: pruebas, panel, herramientas
+│   ├── widget.js           la burbuja que se incrusta en los sitios
+│   ├── cerebro/            módulos compartidos cliente + servidor
+│   ├── _headers            cabeceras y caché
+│   └── _routes.json        qué rutas despiertan una función
+├── functions/api/          las funciones de Cloudflare (2 archivos chicos)
+├── servidor/               la lógica del bot y del panel — NO se publica
+├── db/                     el esquema de Supabase
+└── pruebas/
 ```
 
-Lo que hacía falta para eso: `chatbot/cerebro/entorno.mjs`. Netlify corre sobre
-Node y usa `process.env`; Cloudflare corre sobre Workers, donde `process` **no
-existe** y las variables llegan por petición. Ese archivo traduce, y el resto
-del código pregunta `env('X')` sin enterarse.
-
-Además el widget ya pega a **`/api/bot`**, que funciona igual en los dos lados
-(en Netlify por una reescritura en `netlify.toml`). Los sitios que ya tengan el
-widget pegado **no hay que tocarlos** cuando se haga el cambio.
+`servidor/` vive fuera de `publico/` a propósito: es código de servidor y no
+tiene por qué poder descargarse. Las llaves nunca están en archivos —siempre
+en variables de entorno— pero aun así, publicar lo que no hace falta es
+regalar información.
 
 ## Los pasos
 
-### 1. Conectar el repo
-En Cloudflare → Workers & Pages → Create → Pages → Connect to Git →
-`docfiag93-gif/isa-plataformas`.
+### 1. Crear el repositorio en GitHub
 
-### 2. La configuración de compilación
+En [github.com/new](https://github.com/new):
+
+- **Nombre:** `chatbot-multimarca`
+- **Visibilidad: Private.** Aquí va la lógica de un producto que vas a
+  vender. Que sea privado no es paranoia, es lo normal.
+- **No** marques "Add a README" — el proyecto ya tiene uno y chocarían.
+
+### 2. Subirlo
+
+Desde `~/Desktop/CLAUDE/chatbot` (cambia el usuario si tu cuenta de GitHub
+es otra):
+
+```bash
+git remote add origin https://github.com/docfiag93-gif/chatbot-multimarca.git && git branch -M main && git push -u origin main
+```
+
+### 3. Conectarlo en Cloudflare
+
+Workers & Pages → Create → Pages → Connect to Git → `chatbot-multimarca`.
+
 | Campo | Valor |
 |---|---|
 | Framework preset | None |
-| Build command | *(vacío)* |
-| Build output directory | `chatbot` |
-| Root directory | *(vacío, la raíz del repo)* |
+| Build command | *(déjalo vacío)* |
+| Build output directory | `publico` |
+| Root directory | *(déjalo vacío)* |
 
-El comando de compilación va vacío a propósito: no hay nada que compilar, son
-archivos estáticos. Cloudflare encuentra solo la carpeta `functions/` de la raíz.
+El comando de compilación va vacío porque no hay nada que compilar: son
+archivos estáticos. Cloudflare encuentra `functions/` solo, en la raíz.
 
-### 3. Las variables (Settings → Variables and Secrets)
-Marca **todas** como *Secret*, no como *Variable de texto*:
+### 4. Las variables (Settings → Variables and Secrets)
+
+Todas como **Secret**, no como texto plano:
 
 ```
 CHATBOT_CLAVE          # consola → Herramientas → Generar llave
@@ -66,29 +78,50 @@ GROQ_API_KEY
 RESEND_API_KEY
 ```
 
-### 4. Comprobar que quedó
-Abre `https://<tu-proyecto>.pages.dev/api/bot?ping=1`. Debe contestar con
-`base: true`, `cifrado: true` y los proveedores que tengan llave.
+### 5. Comprobar que quedó bien
 
-Luego la consola en `https://<tu-proyecto>.pages.dev/` y, en Herramientas,
-**Correr pruebas** — si el cifrado pasa sus 10 casos, el despliegue quedó bien.
+1. `https://<tu-proyecto>.pages.dev/api/bot?ping=1` → debe contestar
+   `base: true`, `cifrado: true` y los proveedores con llave.
+2. La consola en `https://<tu-proyecto>.pages.dev/` → Herramientas →
+   **Correr pruebas**. Si el cifrado pasa sus 10 casos, quedó bien.
+3. Regístrate en el panel y hazte superadmin una sola vez, en el editor SQL
+   de Supabase:
+   ```sql
+   update usuarios set rol='superadmin', activo=true where email='doc.fiag93@gmail.com';
+   ```
 
-### 5. Cuando funcione, apagar el de Netlify
-Borra `netlify/functions/bot.mjs` y `admin.mjs`, y la reescritura de `/api/*`
-en `netlify.toml`. **No antes**: mientras existan los dos, puedes volverte
-atrás en un minuto.
+### 6. Hasta entonces, no toques Netlify
 
-## Dos cosas honestas
+El chatbot todavía existe dentro de `isa-plataformas`. **Se borra de ahí
+cuando Cloudflare ya esté sirviendo**, no antes: mientras existan los dos,
+volver atrás toma un minuto. Lo que hay que quitar cuando llegue el momento:
 
-**No pude confirmar qué está consumiendo tus créditos.** La API de Netlify no
-expone los contadores de consumo. Si el gasto no eran las funciones sino el
-ancho de banda de la app médica, mover el chatbot ayuda poco — el consumo
-seguiría en `isahealthcore`. Vale la pena mirar el panel de Netlify
-(Team → Usage) antes de dar el problema por resuelto. Ya nos pasó una vez
-diagnosticar mal esto.
+- `chatbot/` completo
+- `netlify/functions/bot.mjs` y `netlify/functions/admin.mjs`
+- `functions/` (la carpeta de Cloudflare que quedó en el repo viejo)
+- la reescritura de `/api/*` en `netlify.toml`
 
-**`chatbot/cerebro/` y `chatbot/servidor/` quedan descargables**, porque están
-dentro de la carpeta que se publica. No hay secretos ahí: las llaves viven en
-variables de entorno y nunca en los archivos. Lo que sí queda a la vista es el
-texto del prompt en `marcas.mjs` — y eso deja de pasar en cuanto las marcas se
-muevan a la base, donde ya viajan cifradas.
+## Sobre los créditos de Netlify
+
+**No pude confirmar qué los está consumiendo:** la API de Netlify no expone
+los contadores de consumo. Sacar el chatbot ayuda seguro por una razón
+estructural —dejaba de compartir cuota y despliegues con la app de tus
+pacientes— pero si el gasto real era el ancho de banda de la app médica, el
+consumo va a seguir. Vale la pena mirar Team → Usage antes de darlo por
+resuelto: ya diagnosticamos mal esto una vez.
+
+## Probarlo en local
+
+```bash
+python3 -m http.server 8792
+```
+
+Y abrir `http://127.0.0.1:8792/publico/index.html`. Se ve la consola y se
+pueden afinar marcas y colores. Lo que **no** funciona en local son las
+respuestas del bot ni el panel: necesitan las funciones desplegadas.
+
+Las pruebas que sí corren sin desplegar nada:
+
+```bash
+python3 pruebas/probar_banderas.py
+```
