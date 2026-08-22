@@ -464,6 +464,49 @@ RESEND_API_KEY         # para los avisos</pre>
 
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════════════
+     Detector de file://  ·  SCRIPT CLÁSICO, no módulo, a propósito.
+     Los módulos están bloqueados en file:// — que es justo lo que estamos
+     detectando— así que este aviso tiene que poder correr sin ellos.
+     ══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function () {
+  if (location.protocol !== 'file:') return;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var caja = document.createElement('div');
+    caja.className = 'aviso ojo';
+    caja.style.cssText = 'margin:0 0 20px;padding:18px 20px;line-height:1.6';
+    caja.innerHTML =
+      '<b style="display:block;font-size:15px;margin-bottom:6px">' +
+      'La consola no puede funcionar abierta así</b>' +
+      'Tu navegador <b>bloquea el código</b> cuando el archivo se abre con doble ' +
+      'clic (<code>file://</code>). Es una protección suya, no un error del ' +
+      'proyecto, y no se puede desactivar desde aquí.' +
+      '<div style="margin-top:12px;padding:12px 14px;background:var(--panel);' +
+      'border-radius:8px;border:1px solid var(--linea)">' +
+      '<b>La solución:</b> en la carpeta <code>chatbot</code> hay un archivo ' +
+      '<code>abrir.command</code>. Dale doble clic y la consola se abre sola.' +
+      '<div class="pista" style="margin-top:8px">La primera vez macOS puede ' +
+      'preguntar si confías en el archivo: clic derecho → Abrir → Abrir.</div>' +
+      '</div>';
+
+    var donde = document.querySelector('.hoja');
+    var nav = document.getElementById('pestanas');
+    if (donde && nav) donde.insertBefore(caja, nav);
+    else if (donde) donde.appendChild(caja);
+
+    // Se ocultan las pestañas: dejarlas visibles invita a hacer clic en
+    // cosas que no van a responder, y eso confunde más que ayudar.
+    if (nav) nav.style.display = 'none';
+    ['negocios','alta','probar','herramientas','acceso'].forEach(function (v) {
+      var sec = document.getElementById('v-' + v);
+      if (sec) sec.style.display = 'none';
+    });
+  });
+})();
+</script>
+
 <script type="module">
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO, IDIOMAS, TIPOS_OFERTA }
   from './cerebro/perfil.mjs';
