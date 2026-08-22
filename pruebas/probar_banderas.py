@@ -14,7 +14,7 @@ import re, unicodedata, sys
 
 import os
 AQUI = os.path.dirname(os.path.abspath(__file__))
-src = open(os.path.join(AQUI, '..', 'publico', 'cerebro', 'seguridad.mjs'), encoding='utf-8').read()
+src = open(os.path.join(AQUI, '..', 'servidor', 'nucleo', 'seguridad.mjs'), encoding='utf-8').read()
 
 bloques = re.findall(r"motivo:\s*'([^']+)',\s*patrones:\s*\[(.*?)\n\s*\],", src, re.S)
 banderas = []

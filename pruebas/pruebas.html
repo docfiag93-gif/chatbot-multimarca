@@ -780,7 +780,17 @@ await suite('Superficie pública', async () => {
   const PERMITIDOS = ['perfil.mjs', 'catalogos-ui.mjs', 'cifrado.mjs', 'semillas.mjs'];
   const PROHIBIDOS = ['anclaje.mjs','cerebro.mjs','politicas.mjs','acciones.mjs',
                       'proveedores.mjs','diagnostico.mjs','datos.mjs','supabase.mjs',
-                      'entorno.mjs','enlaces.mjs','seguridad.mjs','avisos.mjs','marcas.mjs'];
+                      'entorno.mjs','enlaces.mjs','seguridad.mjs','avisos.mjs'];
+
+  // marcas.mjs es un caso aparte: NO se puede simplemente borrar. La red de
+  // distribución ya había cacheado la versión vieja —que sí traía prompts— y
+  // una copia cacheada no desaparece porque el archivo deje de existir en el
+  // origen. Borrar deja el hueco; sobrescribir sí reemplaza la copia.
+  // Por eso sigue ahí, vacío, y lo que se verifica es que esté vacío.
+  const senuelo = await (await fetch('../publico/cerebro/marcas.mjs?v=' + Date.now())).text();
+  ok('marcas.mjs es un señuelo, no el archivo real', senuelo.length < 2000, senuelo.length + ' bytes');
+  ok('el señuelo no contiene prompts', !/NO diagnosticas|NO recetas|Eres el asistente/.test(senuelo));
+  ok('el señuelo no exporta datos de marcas', /MARCAS = \{\}/.test(senuelo));
 
   for (const a of PERMITIDOS) {
     const r = await fetch('../publico/cerebro/' + a + '?v=' + Date.now());

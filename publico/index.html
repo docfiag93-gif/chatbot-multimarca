@@ -117,6 +117,35 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .placa.ojo{background:var(--alerta-suave);color:var(--alerta)}
 .placa.info{background:var(--acento-suave);color:var(--acento)}
 
+/* ── tablero ── */
+.tablero{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.metrica{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r);padding:15px 16px}
+.metrica .n{font-size:27px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.metrica .r{font-size:12.5px;color:var(--suave);margin-top:3px}
+.metrica.urge{border-color:var(--mal)}
+.metrica.urge .n{color:var(--mal)}
+
+/* La cola de escalamiento es lo primero que debe verse: son personas
+   esperando. Va ancha, con color, y con el botón a la derecha — no debajo,
+   para que en móvil no quede el texto quebrado palabra por palabra. */
+.cola{background:var(--acento);color:var(--acento-tinta);border-radius:var(--r);
+  padding:18px 20px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.cola .num{font-size:38px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;flex:none}
+.cola .txt{flex:1;min-width:150px}
+.cola .txt b{display:block;font-size:15.5px;line-height:1.35}
+.cola .txt span{font-size:13px;opacity:.85;display:block;margin-top:3px}
+.cola .btn{background:var(--panel);color:var(--acento);flex:none}
+.cola.vacia{background:var(--ok-suave);color:var(--ok)}
+.cola.vacia .btn{display:none}
+
+/* ── acceso ── */
+.acceso{max-width:400px;margin:0 auto}
+.acceso .btn{width:100%;justify-content:center;margin-bottom:9px}
+.separa{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--tenue);font-size:12px}
+.separa::before,.separa::after{content:'';flex:1;height:1px;background:var(--linea)}
+.plegable{border:0;background:none;color:var(--suave);font-size:13px;cursor:pointer;
+  width:100%;padding:8px;font-family:inherit;text-decoration:underline}
+
 /* ── tarjetas de negocio ── */
 .negocios{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px}
 .negocio{background:var(--panel);border:1px solid var(--linea);border-radius:var(--r);
@@ -237,40 +266,46 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     <button data-vista="alta" role="tab">Agregar negocio</button>
     <button data-vista="probar" role="tab">Probar el widget</button>
     <button data-vista="herramientas" role="tab">Herramientas</button>
+    <button data-vista="super" role="tab" class="oculto" id="pest-super">Superusuario</button>
   </nav>
 
   <!-- ══════════ ACCESO ══════════ -->
   <section id="v-acceso" class="oculto">
-    <div class="tarjeta" style="max-width:420px;margin:0 auto 18px">
-      <h2 class="sec">Acceso</h2>
+    <div class="tarjeta acceso">
+      <h2 class="sec" style="text-align:center">Entra a tu panel</h2>
       <div id="acceso-msg"></div>
-      <div class="campo"><label for="ac-correo">Correo</label>
-        <input type="email" id="ac-correo" autocomplete="username"></div>
-      <div class="campo"><label for="ac-clave">Contraseña</label>
-        <input type="password" id="ac-clave" autocomplete="current-password"></div>
-      <div class="fila" style="margin-top:6px">
-        <button class="btn" id="btn-entrar">Entrar</button>
-        <button class="btn sec" id="btn-registrar">Crear cuenta</button>
-      </div>
 
-      <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--tenue);font-size:12px">
-        <span style="flex:1;height:1px;background:var(--linea)"></span>o<span style="flex:1;height:1px;background:var(--linea)"></span>
-      </div>
-      <button class="btn sec" id="btn-enlace" style="width:100%;justify-content:center;margin-bottom:9px">
-        ✉︎ Enviarme un enlace para entrar
-      </button>
-      <button class="btn sec" id="btn-google" style="width:100%;justify-content:center">
+      <button class="btn sec oculto" id="btn-google">
         <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.65l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/><path fill="#EA4335" d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.46 14.97.5 12 .5A11 11 0 0 0 2.18 7.05l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
         Continuar con Google
       </button>
+
+      <div class="separa">o con tu correo</div>
+
+      <div class="campo"><label for="ac-correo">Correo</label>
+        <input type="email" id="ac-correo" autocomplete="username" placeholder="tucorreo@ejemplo.com"></div>
+      <button class="btn" id="btn-enlace">Enviarme un enlace para entrar</button>
       <div id="google-msg"></div>
-      <p class="pista" style="margin-top:12px">Una cuenta nueva nace <b>sin permisos</b>:
-      no ve nada hasta que el administrador la asigne a un negocio.</p>
+
+      <button class="plegable" id="ver-clave">Entrar con contraseña</button>
+      <div id="bloque-clave" class="oculto">
+        <div class="campo"><label for="ac-clave">Contraseña</label>
+          <input type="password" id="ac-clave" autocomplete="current-password"></div>
+        <div class="fila">
+          <button class="btn" id="btn-entrar" style="flex:1;justify-content:center">Entrar</button>
+          <button class="btn sec" id="btn-registrar" style="flex:1;justify-content:center;margin:0">Crear cuenta</button>
+        </div>
+      </div>
+
+      <p class="pista" style="margin-top:14px;text-align:center">Una cuenta nueva nace
+      <b>sin permisos</b>: no ve nada hasta que la asignen a un negocio.</p>
     </div>
   </section>
 
   <!-- ══════════ NEGOCIOS ══════════ -->
   <section id="v-negocios">
+    <div id="cola-escalamiento"></div>
+    <div class="tablero" id="tablero"></div>
     <div class="barra-busq">
       <input type="search" id="busca" placeholder="Buscar por nombre o giro…" aria-label="Buscar negocios">
       <select id="filtro-estado" aria-label="Filtrar por estado">
@@ -433,6 +468,43 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     </div>
   </section>
 
+  <!-- ══════════ SUPERUSUARIO ══════════ -->
+  <!-- Vive en ESTE archivo, no en uno aparte: un HTML por función obliga a
+       repetir estilos, sesión y estado en cada uno, y a mantenerlos
+       sincronizados a mano. Una sola página con vistas evita las tres cosas. -->
+  <section id="v-super" class="oculto">
+    <div class="tablero" id="tablero-super"></div>
+
+    <div class="tarjeta">
+      <h2 class="sec">Usuarios de la plataforma</h2>
+      <p class="pista" style="margin-top:-8px">Una cuenta nueva llega como
+      <b>pendiente</b> y no ve nada. Asígnale un negocio y un rol para que entre.</p>
+      <div class="desliza"><table id="tabla-usuarios"></table></div>
+    </div>
+
+    <div class="tarjeta">
+      <h2 class="sec">Ejemplos de demostración</h2>
+      <p class="pista" style="margin-top:-8px">Los cuatro negocios de muestra.
+      Retirarlos solo toca lo marcado como ejemplo: un cliente real nunca lleva esa marca.</p>
+      <div class="fila"><button class="btn sec" id="btn-quitar-ejemplos">Retirar los ejemplos</button></div>
+      <div id="msg-ejemplos"></div>
+    </div>
+
+    <div class="tarjeta">
+      <h2 class="sec">Avisos enviados a sistemas externos</h2>
+      <p class="pista" style="margin-top:-8px">Cuando el bot avisa a la agenda o al
+      CRM de un negocio. Si algo falla, aquí se ve sin abrir los datos del cliente.</p>
+      <div class="desliza"><table id="tabla-envios"></table></div>
+    </div>
+
+    <div class="tarjeta">
+      <h2 class="sec">Bitácora</h2>
+      <p class="pista" style="margin-top:-8px">Quién vio o cambió qué. Solo se
+      inserta: nadie la edita ni la borra, tampoco tú.</p>
+      <div class="desliza"><table id="tabla-bitacora"></table></div>
+    </div>
+  </section>
+
   <!-- ══════════ HERRAMIENTAS ══════════ -->
   <section id="v-herramientas" class="oculto">
     <div class="tarjeta">
@@ -537,7 +609,7 @@ $('#btn-tema').addEventListener('click', () => {
 });
 
 /* ── pestañas ─────────────────────────────────────────────────────── */
-const VISTAS = ['negocios','alta','probar','herramientas'];
+const VISTAS = ['negocios','alta','probar','herramientas','super'];
 $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   $$('#pestanas button').forEach(x => delete x.dataset.on);
   b.dataset.on = '1';
@@ -897,19 +969,72 @@ async function api(accion, datos = {}) {
   if (!r.ok) throw new Error(d.error || 'Falló la petición');
   return d;
 }
+/**
+ * Traduce los errores de Supabase a algo que una persona entienda.
+ *
+ * "Anonymous sign-ins are disabled" es lo que contesta cuando le mandas una
+ * petición SIN correo ni contraseña: cree que quieres entrar como anónimo.
+ * Mostrarle eso tal cual a quien solo olvidó llenar un campo es inútil, y
+ * además suena a que algo se rompió.
+ */
+function traducirError(mensaje) {
+  const m = String(mensaje || '');
+  if (/anonymous sign-ins are disabled/i.test(m))
+    return 'Faltan el correo y la contraseña.';
+  if (/invalid login credentials/i.test(m))
+    return 'El correo o la contraseña no coinciden.';
+  if (/email not confirmed/i.test(m))
+    return 'Falta confirmar tu correo. Busca el mensaje que te llegó (revisa spam).';
+  if (/user already registered/i.test(m))
+    return 'Ese correo ya tiene cuenta. Entra en vez de crear una.';
+  if (/password should be at least/i.test(m))
+    return 'La contraseña necesita al menos 6 caracteres.';
+  if (/rate limit|too many requests/i.test(m))
+    return 'Demasiados intentos seguidos. Espera unos minutos.';
+  if (/provider is not enabled/i.test(m))
+    return 'Ese método de entrada no está activado en el proyecto.';
+  return m;
+}
+
+/** Revisa que los campos estén llenos ANTES de molestar al servidor. */
+function validarAcceso(pedirClave) {
+  const correo = $('#ac-correo').value.trim();
+  const clave = $('#ac-clave').value;
+  if (!correo) { $('#ac-correo').focus(); return 'Escribe tu correo.'; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) { $('#ac-correo').focus(); return 'Ese correo no se ve bien escrito.'; }
+  if (pedirClave && !clave) { $('#ac-clave').focus(); return 'Escribe tu contraseña.'; }
+  if (pedirClave && clave.length < 6) { $('#ac-clave').focus(); return 'La contraseña necesita al menos 6 caracteres.'; }
+  return null;
+}
+
 $('#btn-entrar').addEventListener('click', async () => {
+  const falta = validarAcceso(true);
+  if (falta) { $('#acceso-msg').innerHTML = `<div class="aviso ojo">${esc(falta)}</div>`; return; }
+  const b = $('#btn-entrar'); b.disabled = true; b.textContent = 'Entrando…';
   try {
     const d = await auth('token?grant_type=password',
       { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
     token = d.access_token; sessionStorage.setItem('consola:token', token);
     await arrancar();
-  } catch (e) { $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
+  } catch (e) {
+    $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
+  }
+  b.disabled = false; b.textContent = 'Entrar';
 });
+
 $('#btn-registrar').addEventListener('click', async () => {
+  const falta = validarAcceso(true);
+  if (falta) { $('#acceso-msg').innerHTML = `<div class="aviso ojo">${esc(falta)}</div>`; return; }
+  const b = $('#btn-registrar'); b.disabled = true;
   try {
     await auth('signup', { email: $('#ac-correo').value.trim(), password: $('#ac-clave').value });
-    $('#acceso-msg').innerHTML = `<div class="aviso ok">Cuenta creada. Falta que te asignen a un negocio.</div>`;
-  } catch (e) { $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
+    $('#acceso-msg').innerHTML = `<div class="aviso ok">Cuenta creada.
+      <b>Te mandamos un correo para confirmarla</b> — ábrelo antes de entrar
+      (revisa spam). Después hay que asignarte a un negocio.</div>`;
+  } catch (e) {
+    $('#acceso-msg').innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
+  }
+  b.disabled = false;
 });
 /**
  * Entrada con Google.
@@ -931,20 +1056,19 @@ $('#btn-registrar').addEventListener('click', async () => {
  * servicio. Un enlace al correo elimina las tres.
  */
 $('#btn-enlace').addEventListener('click', async () => {
+  const falta = validarAcceso(false);
+  if (falta) { $('#google-msg').innerHTML = `<div class="aviso ojo">${esc(falta)}</div>`; return; }
   const correo = $('#ac-correo').value.trim();
-  if (!correo) {
-    $('#google-msg').innerHTML = `<div class="aviso ojo">Escribe tu correo primero.</div>`;
-    $('#ac-correo').focus();
-    return;
-  }
+  const b = $('#btn-enlace'); b.disabled = true; b.textContent = 'Enviando…';
   try {
     await auth('otp', { email: correo,
       options: { email_redirect_to: location.origin + location.pathname } });
     $('#google-msg').innerHTML = `<div class="aviso ok">Te mandamos un enlace a
       <b>${esc(correo)}</b>. Ábrelo desde este mismo dispositivo.</div>`;
   } catch (e) {
-    $('#google-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
+    $('#google-msg').innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
   }
+  b.disabled = false; b.textContent = 'Enviarme un enlace para entrar';
 });
 
 $('#btn-google').addEventListener('click', () => {
@@ -992,7 +1116,162 @@ async function arrancar() {
     } catch (e) { token = null; sessionStorage.removeItem('consola:token'); }
   }
   await cargarNegocios();
+  await cargarTablero();
+
+  // La pestaña de superusuario solo aparece si el rol viene de la BASE.
+  // Ocultarla no es seguridad —cualquiera edita el DOM— pero mostrarla a
+  // quien no puede usarla solo genera clics que terminan en "no tienes
+  // permiso". Quien manda de verdad es RLS del otro lado.
+  if (yo?.esSuper) {
+    $('#pest-super').classList.remove('oculto');
+    await cargarSuper();
+  }
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   TABLERO
+   Lo primero que se ve es la cola de escalamiento: son personas esperando
+   respuesta. Los números vienen después, porque informan pero no urgen.
+   ══════════════════════════════════════════════════════════════════════ */
+async function cargarTablero() {
+  const cola = $('#cola-escalamiento'), tab = $('#tablero');
+
+  if (!enLinea) {
+    cola.innerHTML = '';
+    tab.innerHTML = `<div class="metrica"><div class="n">${negocios.length}</div>
+      <div class="r">negocios de ejemplo</div></div>
+      <div class="metrica"><div class="n">—</div><div class="r">inicia sesión para ver tus números</div></div>`;
+    return;
+  }
+
+  tab.innerHTML = '<div class="metrica"><div class="esqueleto" style="width:50%;height:26px"></div>' +
+                  '<div class="esqueleto" style="width:75%;margin-top:8px;height:11px"></div></div>'.repeat(4);
+  try {
+    const m = await api('metricas');
+    const esperan = m.leadsSinAtender || 0;
+
+    cola.innerHTML = esperan
+      ? `<div class="cola">
+           <span class="num">${esperan}</span>
+           <span class="txt"><b>${esperan === 1 ? 'Alguien espera' : 'Personas esperan'} respuesta</b>
+           <span>Dejaron sus datos y todavía nadie los contactó.</span></span>
+           <button class="btn" id="ir-leads">Ver y responder →</button>
+         </div>`
+      : `<div class="cola vacia"><span class="num">✓</span>
+           <span class="txt"><b>Nadie está esperando</b>
+           <span>Todas las solicitudes están atendidas.</span></span></div>`;
+
+    const irLeads = $('#ir-leads');
+    if (irLeads) irLeads.addEventListener('click',
+      () => document.querySelector('[data-vista=super]')?.click() || alert('Los datos recibidos están en el panel del negocio.'));
+
+    tab.innerHTML = `
+      <div class="metrica"><div class="n">${m.conversaciones ?? 0}</div><div class="r">conversaciones</div></div>
+      <div class="metrica ${m.urgencias ? 'urge' : ''}"><div class="n">${m.urgencias ?? 0}</div><div class="r">urgencias detectadas</div></div>
+      <div class="metrica"><div class="n">${m.leads ?? 0}</div><div class="r">datos recibidos</div></div>
+      <div class="metrica"><div class="n">${negocios.length}</div><div class="r">negocios</div></div>`;
+  } catch (e) {
+    cola.innerHTML = '';
+    tab.innerHTML = `<div class="aviso mal" style="grid-column:1/-1">No pude leer los números: ${esc(e.message)}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   SUPERUSUARIO
+   ══════════════════════════════════════════════════════════════════════ */
+async function cargarSuper() {
+  if (!yo?.esSuper) return;
+
+  try {
+    const m = await api('metricas');
+    $('#tablero-super').innerHTML = `
+      <div class="metrica"><div class="n">${negocios.length}</div><div class="r">negocios en la plataforma</div></div>
+      <div class="metrica"><div class="n">${negocios.filter(n=>n.estado==='publicado').length}</div><div class="r">publicados</div></div>
+      <div class="metrica"><div class="n">${negocios.filter(n=>n.ejemplo).length}</div><div class="r">ejemplos</div></div>
+      <div class="metrica ${m.urgencias?'urge':''}"><div class="n">${m.urgencias ?? 0}</div><div class="r">urgencias</div></div>`;
+  } catch (e) { $('#tablero-super').innerHTML = ''; }
+
+  // ── usuarios ──
+  try {
+    const { usuarios } = await api('usuarios.listar');
+    const ops = e => negocios.map(x =>
+      `<option value="${esc(x.id)}" ${x.id===e?'selected':''}>${esc(x.nombre)}</option>`).join('');
+    $('#tabla-usuarios').innerHTML = usuarios.length ? `
+      <tr><th>Persona</th><th>Rol</th><th>Negocio</th><th>Activo</th><th></th></tr>
+      ${usuarios.map(u => `
+        <tr data-u="${esc(u.id)}">
+          <td>${esc(u.nombre||'')}<div class="pista">${esc(u.email||'')}</div></td>
+          <td><select class="u-rol">${['pendiente','staff','dueno','superadmin'].map(r=>
+            `<option value="${r}" ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></td>
+          <td><select class="u-emp"><option value="">— ninguno —</option>${ops(u.empresa_id)}</select></td>
+          <td style="text-align:center"><input type="checkbox" class="u-act" ${u.activo?'checked':''} style="width:auto"></td>
+          <td><button class="btn sec chico u-guardar">Guardar</button></td>
+        </tr>`).join('')}`
+      : '<tr><td class="pista">Todavía no hay cuentas.</td></tr>';
+
+    $$('.u-guardar').forEach(b => b.addEventListener('click', async () => {
+      const tr = b.closest('tr');
+      const original = b.textContent;
+      b.disabled = true; b.textContent = '…';
+      try {
+        await api('usuarios.asignar', { id: tr.dataset.u,
+          rol: tr.querySelector('.u-rol').value,
+          empresa_id: tr.querySelector('.u-emp').value || null,
+          activo: tr.querySelector('.u-act').checked });
+        b.textContent = '✓ listo';
+        setTimeout(() => { b.textContent = original; b.disabled = false; }, 1600);
+      } catch (e) {
+        b.textContent = original; b.disabled = false;
+        alert(e.message);
+      }
+    }));
+  } catch (e) { $('#tabla-usuarios').innerHTML = `<tr><td class="pista">${esc(e.message)}</td></tr>`; }
+
+  // ── envíos a sistemas externos ──
+  try {
+    const { avisos } = await api('avisos.listar');
+    $('#tabla-envios').innerHTML = avisos?.length ? `
+      <tr><th>Cuándo</th><th>Qué</th><th>Resultado</th><th>A dónde</th></tr>
+      ${avisos.slice(0,20).map(a => `
+        <tr><td class="pista">${new Date(a.created_at).toLocaleString('es-MX')}</td>
+        <td><span class="placa ${a.tipo==='urgencia'?'mal':''}">${esc(a.tipo)}</span></td>
+        <td><span class="placa ${a.estado==='enviado'?'ok':'mal'}">${esc(a.estado)}</span>
+        ${a.estado!=='enviado'?`<div class="pista">${esc(a.detalle?.nota||'')}</div>`:''}</td>
+        <td class="pista">${esc(a.destino||'—')}</td></tr>`).join('')}`
+      : '<tr><td class="pista">Todavía no se ha enviado ningún aviso.</td></tr>';
+  } catch (e) { $('#tabla-envios').innerHTML = `<tr><td class="pista">${esc(e.message)}</td></tr>`; }
+
+  // ── bitácora ──
+  try {
+    const { bitacora } = await api('bitacora.listar');
+    $('#tabla-bitacora').innerHTML = bitacora?.length ? `
+      <tr><th>Cuándo</th><th>Acción</th><th>Detalle</th></tr>
+      ${bitacora.slice(0,30).map(b => `
+        <tr><td class="pista">${new Date(b.created_at).toLocaleString('es-MX')}</td>
+        <td><code>${esc(b.accion)}</code></td>
+        <td class="pista">${esc(JSON.stringify(b.detalle))}</td></tr>`).join('')}`
+      : '<tr><td class="pista">Sin movimientos todavía.</td></tr>';
+  } catch (e) { $('#tabla-bitacora').innerHTML = `<tr><td class="pista">${esc(e.message)}</td></tr>`; }
+}
+
+$('#btn-quitar-ejemplos').addEventListener('click', async () => {
+  if (!confirm('¿Retirar los negocios de ejemplo? Se apagan, no se borran, y solo los marcados como ejemplo.')) return;
+  try {
+    const r = await api('empresas.borrarEjemplos');
+    $('#msg-ejemplos').innerHTML = `<div class="aviso ok">Se retiraron ${r.retiradas} ejemplo(s).</div>`;
+    await cargarNegocios();
+  } catch (e) { $('#msg-ejemplos').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
+});
+
+/* ── el bloque de contraseña arranca plegado ── */
+$('#ver-clave').addEventListener('click', () => {
+  const b = $('#bloque-clave');
+  b.classList.toggle('oculto');
+  $('#ver-clave').textContent = b.classList.contains('oculto')
+    ? 'Entrar con contraseña' : 'Ocultar';
+  if (!b.classList.contains('oculto')) $('#ac-clave').focus();
+});
 
 /* ── herramientas ─────────────────────────────────────────────────── */
 $('#btn-llave').addEventListener('click', async () => {
@@ -1032,6 +1311,49 @@ $('#btn-probar-cifrado').addEventListener('click', async () => {
   } catch (e) { s.innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
 });
 
+
+/**
+ * La consola pregunta a Supabase QUÉ métodos de entrada están activos, en vez
+ * de dar botones por hecho.
+ *
+ * Por qué: poner el botón de Google sin comprobarlo mandaba a la persona a una
+ * pantalla de JSON crudo — "Unsupported provider" — que no dice qué hacer ni
+ * de quién es el problema. Un botón que no funciona es peor que ningún botón.
+ *
+ * El día que se active Google en Supabase, este código lo detecta solo y el
+ * botón aparece. No hay nada que recordar actualizar aquí.
+ */
+async function ajustarMetodosDeEntrada() {
+  try {
+    const r = await fetchReal(`${SB_URL}/auth/v1/settings`, { headers: { apikey: SB_ANON } });
+    if (!r.ok) return;
+    const cfg = await r.json();
+    const ext = cfg.external || {};
+
+    if (ext.google) {
+      $('#btn-google').classList.remove('oculto');
+    }
+
+    // Si el proyecto exige confirmar el correo, hay que decirlo ANTES de que
+    // alguien cree su cuenta y se quede esperando sin saber por qué.
+    if (cfg.mailer_autoconfirm === false) {
+      const nota = document.createElement('p');
+      nota.className = 'pista';
+      nota.style.marginTop = '8px';
+      nota.textContent = 'Al crear cuenta te llega un correo de confirmación. Ábrelo antes de entrar.';
+      $('#bloque-clave')?.appendChild(nota);
+    }
+
+    // Sin ningún proveedor externo, el separador "o con tu correo" sobra:
+    // no hay nada de lo otro con qué comparar.
+    const hayExterno = Object.entries(ext).some(([k, v]) => v && k !== 'email');
+    if (!hayExterno) {
+      const sep = document.querySelector('#v-acceso .separa');
+      if (sep) sep.style.display = 'none';
+    }
+  } catch (e) { /* si no se puede preguntar, se deja como está */ }
+}
+
 /* ── arranque ─────────────────────────────────────────────────────── */
 if (!token) $('#banda-acceso').classList.remove('oculto');
 $('#btn-mostrar-acceso').addEventListener('click', () => {
@@ -1040,6 +1362,7 @@ $('#btn-mostrar-acceso').addEventListener('click', () => {
   if (!c.classList.contains('oculto')) $('#ac-correo').focus();
 });
 refrescarPrevio();
+ajustarMetodosDeEntrada();
 arrancar();
 </script>
 </body>
