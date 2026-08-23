@@ -544,6 +544,27 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 /* Un bot callado no debe verse igual que uno trabajando. */
 .negocio:has(.interruptor.apagado){opacity:.72}
 .negocio:has(.interruptor.apagado) .marca{filter:grayscale(1)}
+
+/* Una conversación se lee como conversación, no como renglón de tabla. */
+.charla-guardada{background:var(--panel);border:1px solid var(--linea);
+  border-radius:13px;padding:0;overflow:hidden}
+.charla-guardada+.charla-guardada{margin-top:11px}
+.charla-guardada.urge{border-left:3px solid var(--mal)}
+.charla-guardada>summary{cursor:pointer;list-style:none;display:flex;gap:11px;
+  align-items:center;flex-wrap:wrap;padding:14px 17px}
+.charla-guardada>summary::-webkit-details-marker{display:none}
+.charla-guardada .resumen{flex:1;min-width:190px}
+.charla-guardada .resumen b{display:block;font-size:14.5px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-.01em}
+.charla-guardada .cuando{font-size:11.5px;color:var(--tenue);margin-top:3px}
+.charla-guardada .cuerpo{padding:0 17px 17px;display:flex;flex-direction:column;
+  gap:9px;border-top:1px solid var(--linea-sutil);margin-top:2px;padding-top:15px}
+.charla-guardada .msj{max-width:84%;padding:10px 13px;font-size:14px;line-height:1.5;
+  border-radius:13px;white-space:pre-wrap;word-break:break-word}
+.charla-guardada .msj.usuario{align-self:flex-start;background:var(--hundido);
+  border:1px solid var(--linea-sutil);border-bottom-left-radius:4px}
+.charla-guardada .msj.bot{align-self:flex-end;background:var(--acento-suave);
+  color:var(--acento);border-bottom-right-radius:4px}
 </style>
 </head>
 <body>
@@ -589,6 +610,7 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <span class="rotulo">Tu negocio</span>
       <button data-vista="negocios" data-on role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Negocios</button>
       <button data-vista="solicitudes" role="tab" class="oculto" id="pest-solicitudes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>Solicitudes<span class="globo oculto" id="cuantas-solicitudes"></span></button>
+      <button data-vista="charlas" role="tab" class="oculto" id="pest-charlas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 4 11.5a8.5 8.5 0 0 1 8.5-8.5 8.4 8.4 0 0 1 8.5 8.5z"/><path d="M8 10h8M8 14h5"/></svg>Conversaciones</button>
       <button data-vista="alta" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Agregar negocio</button>
       <button data-vista="probar" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 4 11.5a8.5 8.5 0 0 1 8.5-8.5 8.4 8.4 0 0 1 8.5 8.5z"/></svg>Probar el widget</button>
     </div>
@@ -989,6 +1011,26 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     </div>
   </section>
 
+  <!-- ══════════ CONVERSACIONES ══════════
+       Lo que la gente le escribió al bot. Se guardaban cifradas desde el
+       primer día y no había NADA para leerlas: ni pantalla ni endpoint. El
+       dato entraba y no volvía a salir. -->
+  <section id="v-charlas" class="oculto">
+    <div class="tarjeta">
+      <h2 class="sec">Lo que le escriben al bot</h2>
+      <p class="pista" style="margin-top:-8px">Se descifran al abrir esta
+      pantalla, y queda anotado en la bitácora — también cuando lo haces tú.
+      Son mensajes de personas.</p>
+      <div class="fila" style="margin:14px 0">
+        <label class="pista" style="display:flex;align-items:center;gap:7px;cursor:pointer">
+          <input type="checkbox" id="solo-urgencias"> Solo las urgencias
+        </label>
+        <button class="btn sec chico" id="btn-recargar-charlas">Actualizar</button>
+      </div>
+      <div id="lista-charlas" aria-live="polite"></div>
+    </div>
+  </section>
+
   <!-- ══════════ SOLICITUDES ══════════
        Las personas que dejaron su nombre y su teléfono esperando que
        alguien les llame. Se guardaban cifradas desde el principio y no
@@ -1214,7 +1256,7 @@ $('#velo-menu').addEventListener('click', () => cajon(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cajon(false); });
 
 /* ── pestañas ─────────────────────────────────────────────────────── */
-const VISTAS = ['negocios','alta','probar','solicitudes','soporte','herramientas','super'];
+const VISTAS = ['negocios','alta','probar','charlas','solicitudes','soporte','herramientas','super'];
 $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   $$('#pestanas button').forEach(x => delete x.dataset.on);
   b.dataset.on = '1';
@@ -1222,6 +1264,7 @@ $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.vista === 'alta') pintarPaso();
   if (b.dataset.vista === 'solicitudes') cargarSolicitudes();
   if (b.dataset.vista === 'soporte') cargarReportes();
+  if (b.dataset.vista === 'charlas') cargarCharlas();
   cajon(false);
 }));
 
@@ -2256,6 +2299,7 @@ async function arrancar() {
       $('#pest-solicitudes').classList.remove('oculto');
       $('#btn-menu').classList.remove('oculto');
       $('#pest-soporte').classList.remove('oculto');
+      $('#pest-charlas').classList.remove('oculto');
       modoConsola();
     } catch (e) {
       // Puede que solo haya caducado el acceso: se intenta una renovación
@@ -2270,6 +2314,7 @@ async function arrancar() {
           $('#pest-solicitudes').classList.remove('oculto');
       $('#btn-menu').classList.remove('oculto');
           $('#pest-soporte').classList.remove('oculto');
+          $('#pest-charlas').classList.remove('oculto');
           modoConsola();
           listo = true;
         } catch (e2) { /* el pase tampoco sirvió */ }
@@ -2494,6 +2539,86 @@ async function mostrarQR(slug) {
       `<div class="aviso mal">No pude dibujarlo: ${esc(e.message)}</div>`;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   CONVERSACIONES
+
+   Lo que la gente le escribió al bot. Se guardaban cifradas desde el primer
+   día y no había NADA para leerlas — ni pantalla ni endpoint. El dato
+   entraba y no volvía a salir nunca.
+
+   Sin esto, «te paso con una persona» era una promesa hueca: quien atendía
+   no tenía dónde ver lo que ya se había hablado, y la persona tenía que
+   contarlo todo otra vez.
+   ══════════════════════════════════════════════════════════════════════ */
+let charlas = [];
+
+async function cargarCharlas() {
+  const caja = $('#lista-charlas');
+  if (!enLinea) { caja.innerHTML = '<p class="pista">Hace falta iniciar sesión.</p>'; return; }
+
+  caja.innerHTML = '<div class="esqueleto" style="height:56px"></div>';
+  try {
+    const d = await api('conversaciones.listar', {
+      ...(contexto ? { empresa_id: contexto } : {}),
+      soloUrgencias: $('#solo-urgencias').checked,
+    });
+    charlas = d.conversaciones || [];
+    pintarCharlas();
+  } catch (e) {
+    caja.innerHTML = `<div class="aviso mal">No pude leerlas: ${esc(e.message)}</div>`;
+  }
+}
+
+function pintarCharlas() {
+  const caja = $('#lista-charlas');
+  const soloUrg = $('#solo-urgencias').checked;
+
+  if (!charlas.length) {
+    caja.innerHTML = `<div class="tarjeta vacio"><span class="ico">${soloUrg ? '✓' : '◻︎'}</span>
+      <h3>${soloUrg ? 'Ninguna urgencia' : 'Todavía no hay conversaciones'}</h3>
+      <p>${soloUrg
+        ? 'El bot no ha cortado ninguna charla por regla clínica.'
+        : 'Aquí va a aparecer lo que la gente le escriba al bot.'}</p></div>`;
+    return;
+  }
+
+  caja.innerHTML = charlas.map(c => {
+    const negocio = negocios.find(n => n.id === c.empresa_id);
+    // El primer mensaje de la persona es el mejor resumen que existe: es lo
+    // que venía a preguntar antes de que la charla se desviara.
+    const primero = (c.mensajes || []).find(m => m.rol === 'usuario')?.texto || '(sin texto)';
+
+    if (c.error) {
+      return `<div class="charla-guardada"><div style="padding:14px 17px">
+        <b>No se pudo abrir</b>
+        <div class="cuando">Se guardó con otra llave maestra · ${esc(fecha(c.created_at))}</div>
+      </div></div>`;
+    }
+
+    const cuerpo = (c.mensajes || []).map(m => `
+      <div class="msj ${m.rol === 'bot' ? 'bot' : 'usuario'}">${esc(m.texto || '')}</div>`).join('');
+
+    return `<details class="charla-guardada ${c.urgencia ? 'urge' : ''}">
+      <summary>
+        <div class="resumen">
+          <b>${esc(primero.slice(0, 90))}</b>
+          <div class="cuando">${esc(fecha(c.created_at))}
+            ${negocio ? ' · ' + esc(negocio.nombre) : ''}
+            ${c.mensajes.length ? ' · ' + c.mensajes.length + ' mensajes' : ''}
+            ${c.via ? ' · ' + esc(c.via) : ''}</div>
+        </div>
+        ${c.urgencia
+          ? `<span class="placa mal">urgencia${c.motivo_urgencia ? ': ' + esc(c.motivo_urgencia) : ''}</span>`
+          : ''}
+      </summary>
+      <div class="cuerpo">${cuerpo || '<p class="pista">Sin mensajes guardados.</p>'}</div>
+    </details>`;
+  }).join('');
+}
+
+$('#solo-urgencias').addEventListener('change', cargarCharlas);
+$('#btn-recargar-charlas').addEventListener('click', cargarCharlas);
 
 /* ══════════════════════════════════════════════════════════════════════
    SOPORTE
@@ -2901,7 +3026,7 @@ async function ajustarMetodosDeEntrada() {
    —antes se ofrecía sola, y una consola con el tablero en blanco y filtros
    que no filtran nada se lee como un panel roto, no como una demostración.
    ────────────────────────────────────────────────────────────────────── */
-const SECCIONES_CONSOLA = ['negocios','alta','probar','solicitudes','soporte','herramientas','super'];
+const SECCIONES_CONSOLA = ['negocios','alta','probar','charlas','solicitudes','soporte','herramientas','super'];
 
 function modoPortada() {
   document.body.classList.add('sin-cajon');

@@ -514,6 +514,47 @@ export async function manejar(req, context) {
         return json({ reporte: g[0] });
       }
 
+      /* ── conversaciones ───────────────────────────────────────────────
+         Se guardaban cifradas desde el primer día y NO HABÍA forma de
+         leerlas. Ni pantalla, ni endpoint: el dato entraba y no volvía a
+         salir nunca. Un chat que archiva lo que le dijeron y no deja
+         abrirlo no está guardando, está enterrando.
+
+         Y sin esto, «te paso con una persona» era una promesa hueca: la
+         persona no tenía dónde ver qué se había hablado. */
+      case 'conversaciones.listar': {
+        const partes = [];
+        if (datos.empresa_id) partes.push(`empresa_id=eq.${datos.empresa_id}`);
+        if (datos.soloUrgencias) partes.push('urgencia=is.true');
+        partes.push('order=created_at.desc', 'limit=' + Math.min(+datos.limite || 40, 100));
+
+        const filas = await sb.seleccionar('conversaciones',
+          'id,empresa_id,sesion,mensajes_cifrados,urgencia,motivo_urgencia,via,created_at',
+          partes.join('&'));
+
+        const abiertas = [];
+        for (const f of filas) {
+          let mensajes = null, error = null;
+          try { mensajes = await descifrar(MAESTRA, f.empresa_id, f.mensajes_cifrados); }
+          catch (e) { error = 'no se pudo abrir'; }
+          abiertas.push({
+            id: f.id, empresa_id: f.empresa_id, sesion: f.sesion,
+            urgencia: f.urgencia, motivo_urgencia: f.motivo_urgencia,
+            via: f.via, created_at: f.created_at,
+            mensajes: mensajes || [], error,
+          });
+        }
+
+        // Abrir conversaciones de pacientes es exactamente lo que hay que
+        // poder auditar después. Se anota SIEMPRE, también cuando lo hace
+        // el dueño de la plataforma.
+        await sb.bitacora({ actor: yo.id, empresa_id: datos.empresa_id || null,
+                            accion: 'conversaciones.ver',
+                            detalle: { cuantas: abiertas.length,
+                                       soloUrgencias: !!datos.soloUrgencias } });
+        return json({ conversaciones: abiertas });
+      }
+
       case 'bitacora.listar': {
         const filas = await sb.seleccionar('bitacora',
           'id,actor,empresa_id,accion,detalle,created_at', 'order=created_at.desc&limit=100');
