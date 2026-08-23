@@ -301,6 +301,10 @@ export async function manejar(req, context) {
       empresa: marca, sesion,
       mensajes: [...mensajes, { rol: 'bot', texto: salida.texto }],
       urgencia: false, via: origen === 'marca' ? via + ':marca' : via,
+      // El anclaje calculaba esto y lo tiraba. Cada vez que el bot tiene que
+      // admitir que no sabe algo, alguien preguntó algo que el negocio no ha
+      // cargado: es la lista de tareas más útil que existe.
+      sinDato: salida.anclaje === 'degradado',
     }));
 
     return json(salida);

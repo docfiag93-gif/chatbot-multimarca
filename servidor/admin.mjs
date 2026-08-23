@@ -417,10 +417,13 @@ export async function manejar(req, context) {
       // ── números para el tablero ───────────────────────────────────────
       case 'metricas': {
         const filtro = datos.empresa_id ? `&empresa_id=eq.${datos.empresa_id}` : '';
-        const [conv, urg, lead] = await Promise.all([
+        const [conv, urg, lead, sinDato] = await Promise.all([
           sb.seleccionar('conversaciones', 'id', `limit=1000${filtro}`),
           sb.seleccionar('conversaciones', 'id,motivo_urgencia,created_at', `urgencia=is.true&limit=200${filtro}`),
           sb.seleccionar('leads', 'id,atendido', `limit=1000${filtro}`),
+          // Las veces que el bot tuvo que decir «no tengo ese dato». Es la
+          // única métrica del tablero que se traduce en una tarea concreta.
+          sb.seleccionar('conversaciones', 'id', `sin_dato=is.true&limit=500${filtro}`),
         ]);
         return json({
           conversaciones: conv.length,
@@ -428,6 +431,7 @@ export async function manejar(req, context) {
           urgenciasRecientes: urg.slice(0, 10),
           leads: lead.length,
           leadsSinAtender: lead.filter(l => !l.atendido).length,
+          sinDato: sinDato.length,
         });
       }
 
@@ -535,6 +539,7 @@ export async function manejar(req, context) {
         const partes = [];
         if (datos.empresa_id) partes.push(`empresa_id=eq.${datos.empresa_id}`);
         if (datos.soloUrgencias) partes.push('urgencia=is.true');
+        if (datos.soloSinDato) partes.push('sin_dato=is.true');
         partes.push('order=created_at.desc', 'limit=' + Math.min(+datos.limite || 40, 100));
 
         const filas = await sb.seleccionar('conversaciones',

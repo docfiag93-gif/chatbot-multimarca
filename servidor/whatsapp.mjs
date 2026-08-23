@@ -205,6 +205,7 @@ export async function manejar(req, context = {}) {
     const conversacionId = await guardarConversacion({
       empresa: marca, sesion: clave.slice(0, 64), mensajes,
       urgencia: esUrgencia, motivo: salida.motivo, via: 'whatsapp:' + (salida.via || ''),
+      sinDato: salida.anclaje === 'degradado',
     });
     if (esUrgencia) {
       await avisar({

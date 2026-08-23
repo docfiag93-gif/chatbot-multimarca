@@ -185,7 +185,7 @@ export async function configPublica(slug) {
  * Guarda la conversación CIFRADA. Si no hay base o no hay llave, no guarda
  * nada y no truena: es preferible un chat sin historial que un chat caído.
  */
-export async function guardarConversacion({ empresa, sesion, mensajes, urgencia, motivo, via }) {
+export async function guardarConversacion({ empresa, sesion, mensajes, urgencia, motivo, via, sinDato }) {
   const sb = servicio(); const clave = MAESTRA();
   if (!sb || !clave || !empresa?.id) return null;
   try {
@@ -198,6 +198,8 @@ export async function guardarConversacion({ empresa, sesion, mensajes, urgencia,
       // puede contar urgencias sin que nadie lea un síntoma de pasada.
       motivo_urgencia: urgencia ? String(motivo || '').slice(0, 80) : null,
       via: via || null,
+      // Cuándo el bot NO supo. Es la lista de qué le falta al negocio.
+      sin_dato: !!sinDato,
     }]);
     return filas?.[0]?.id || null;
   } catch (e) { return null; }

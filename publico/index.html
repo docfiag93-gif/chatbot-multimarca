@@ -565,6 +565,19 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
   border:1px solid var(--linea-sutil);border-bottom-left-radius:4px}
 .charla-guardada .msj.bot{align-self:flex-end;background:var(--acento-suave);
   color:var(--acento);border-bottom-right-radius:4px}
+
+/* Pendientes del tablero: lo que pide acción, no lo que solo informa. */
+.pendientes{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+.pendiente{display:flex;align-items:center;gap:14px;background:var(--panel);
+  border:1px solid var(--linea);border-left:3px solid var(--linea);
+  border-radius:12px;padding:14px 17px;flex-wrap:wrap}
+.pendiente.urge{border-left-color:var(--alerta);background:var(--alerta-suave)}
+.pendiente.mal{border-left-color:var(--mal);background:var(--mal-suave)}
+.pendiente.ojo{border-left-color:var(--acento)}
+.pendiente .ico{font-size:19px;flex:none;line-height:1}
+.pendiente .txt{flex:1;min-width:180px}
+.pendiente .txt b{display:block;font-size:14.5px;letter-spacing:-.01em}
+.pendiente .txt span{display:block;font-size:13px;color:var(--suave);margin-top:2px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -1024,6 +1037,9 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <div class="fila" style="margin:14px 0">
         <label class="pista" style="display:flex;align-items:center;gap:7px;cursor:pointer">
           <input type="checkbox" id="solo-urgencias"> Solo las urgencias
+        </label>
+        <label class="pista" style="display:flex;align-items:center;gap:7px;cursor:pointer">
+          <input type="checkbox" id="solo-sin-dato"> Solo donde no supo
         </label>
         <button class="btn sec chico" id="btn-recargar-charlas">Actualizar</button>
       </div>
@@ -2374,30 +2390,92 @@ async function cargarTablero() {
                   '<div class="esqueleto" style="width:75%;margin-top:8px;height:11px"></div></div>'.repeat(4);
   try {
     const m = await api('metricas', contexto ? { empresa_id: contexto } : {});
-    const esperan = m.leadsSinAtender || 0;
 
-    cola.innerHTML = esperan
-      ? `<div class="cola">
-           <span class="num">${esperan}</span>
-           <span class="txt"><b>${esperan === 1 ? 'Alguien espera' : 'Personas esperan'} respuesta</b>
-           <span>Dejaron sus datos y todavía nadie los contactó.</span></span>
-           <button class="btn" id="ir-leads">Ver y responder →</button>
-         </div>`
+    /* ── QUÉ TE TOCA HACER ──────────────────────────────────────────────
+       El tablero eran cuatro números: conversaciones, urgencias, datos
+       recibidos, negocios. Todos contestaban «cuánto hay» y ninguno «qué
+       hago». Un tablero que solo informa se deja de mirar a la semana.
+
+       Ahora arriba va lo que pide acción, ordenado por quién espera más:
+       primero personas, luego el bot, al final la configuración. Los
+       números sueltos siguen abajo, más chicos, que para eso sirven. */
+    const pendientes = [];
+
+    if (m.leadsSinAtender) {
+      pendientes.push({
+        clase: 'urge', icono: '👤',
+        titulo: (m.leadsSinAtender === 1 ? 'Una persona espera' : m.leadsSinAtender + ' personas esperan') + ' respuesta',
+        detalle: 'Dejaron su nombre y teléfono, y todavía nadie los contactó.',
+        boton: 'Ver y responder', vista: 'solicitudes',
+      });
+    }
+
+    if (m.urgencias) {
+      pendientes.push({
+        clase: 'mal', icono: '🚑',
+        titulo: m.urgencias === 1 ? 'Una urgencia detectada' : m.urgencias + ' urgencias detectadas',
+        detalle: 'El bot cortó la charla y mandó al 911. Vale la pena leer qué pasó.',
+        boton: 'Leerlas', vista: 'charlas', filtro: 'urgencias',
+      });
+    }
+
+    /* La métrica que ninguna otra consola tiene: cada una es una pregunta
+       real que el bot no pudo contestar porque el dato no estaba cargado.
+       No es un error del bot — es una tarea del negocio. */
+    if (m.sinDato) {
+      pendientes.push({
+        clase: 'ojo', icono: '📓',
+        titulo: m.sinDato === 1 ? 'Una vez el bot no supo' : m.sinDato + ' veces el bot no supo qué contestar',
+        detalle: 'Prefirió decir que no tenía el dato antes que inventarlo. ' +
+                 'Cada una es algo que le falta en Conocimiento.',
+        boton: 'Ver qué le faltó', vista: 'charlas', filtro: 'sindato',
+      });
+    }
+
+    const sinPublicar = negociosVisibles().filter(n => n.id && !n.ejemplo && n.estado !== 'publicado');
+    if (sinPublicar.length) {
+      pendientes.push({
+        clase: '', icono: '◻︎',
+        titulo: sinPublicar.length === 1 ? 'Un negocio sin publicar' : sinPublicar.length + ' negocios sin publicar',
+        detalle: sinPublicar.map(n => n.nombre).join(', ') + '. Nadie puede escribirles todavía.',
+        boton: 'Ir a negocios', vista: 'negocios',
+      });
+    }
+
+    const callados = negociosVisibles().filter(n => n.id && !n.ejemplo && (n.modo || 'activo') !== 'activo');
+    if (callados.length) {
+      pendientes.push({
+        clase: 'ojo', icono: '🔇',
+        titulo: callados.length === 1 ? 'Un bot está callado' : callados.length + ' bots están callados',
+        detalle: callados.map(n => n.nombre + ' (' + (n.modo === 'apagado' ? 'apagado' : 'solo recados') + ')').join(', ') + '.',
+        boton: 'Ir a negocios', vista: 'negocios',
+      });
+    }
+
+    cola.innerHTML = pendientes.length
+      ? '<div class="pendientes">' + pendientes.map((p, i) => `
+          <div class="pendiente ${p.clase}">
+            <span class="ico" aria-hidden="true">${p.icono}</span>
+            <div class="txt"><b>${esc(p.titulo)}</b><span>${esc(p.detalle)}</span></div>
+            <button class="btn ${i === 0 ? '' : 'sec'} chico" data-ir="${p.vista}"
+                    ${p.filtro ? `data-filtro="${p.filtro}"` : ''}>${esc(p.boton)}</button>
+          </div>`).join('') + '</div>'
       : `<div class="cola vacia"><span class="num">✓</span>
-           <span class="txt"><b>Nadie está esperando</b>
-           <span>Todas las solicitudes están atendidas.</span></span></div>`;
-
-    // Antes este botón llevaba al panel de plataforma, donde las solicitudes
-    // no estaban. Ahora lleva a la pantalla que sí las muestra.
-    const irLeads = $('#ir-leads');
-    if (irLeads) irLeads.addEventListener('click',
-      () => document.querySelector('[data-vista=solicitudes]')?.click());
+           <span class="txt"><b>Nada pendiente</b>
+           <span>Nadie espera respuesta y el bot está contestando bien.</span></span></div>`;
 
     tab.innerHTML = `
       <div class="metrica"><div class="n">${m.conversaciones ?? 0}</div><div class="r">conversaciones</div></div>
-      <div class="metrica ${m.urgencias ? 'urge' : ''}"><div class="n">${m.urgencias ?? 0}</div><div class="r">urgencias detectadas</div></div>
       <div class="metrica"><div class="n">${m.leads ?? 0}</div><div class="r">datos recibidos</div></div>
       <div class="metrica"><div class="n">${negociosVisibles().length}</div><div class="r">${contexto ? 'negocio' : 'negocios'}</div></div>`;
+    // Un pendiente que no lleva a ningún lado es un letrero, no un pendiente.
+    $$('#cola-escalamiento [data-ir]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.filtro) {
+        $('#solo-urgencias').checked = b.dataset.filtro === 'urgencias';
+        $('#solo-sin-dato').checked = b.dataset.filtro === 'sindato';
+      }
+      document.querySelector(`[data-vista=${b.dataset.ir}]`)?.click();
+    }));
   } catch (e) {
     cola.innerHTML = '';
     tab.innerHTML = `<div class="aviso mal" style="grid-column:1/-1">No pude leer los números: ${esc(e.message)}</div>`;
@@ -2571,6 +2649,7 @@ async function cargarCharlas() {
     const d = await api('conversaciones.listar', {
       ...(contexto ? { empresa_id: contexto } : {}),
       soloUrgencias: $('#solo-urgencias').checked,
+      soloSinDato: $('#solo-sin-dato').checked,
     });
     charlas = d.conversaciones || [];
     pintarCharlas();
@@ -2628,6 +2707,7 @@ function pintarCharlas() {
 }
 
 $('#solo-urgencias').addEventListener('change', cargarCharlas);
+$('#solo-sin-dato').addEventListener('change', cargarCharlas);
 $('#btn-recargar-charlas').addEventListener('click', cargarCharlas);
 
 /* ══════════════════════════════════════════════════════════════════════
