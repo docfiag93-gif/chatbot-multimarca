@@ -931,6 +931,39 @@ await suite('Prender y apagar el bot', async () => {
   ok('un café apagado no inventa una urgencia clínica', enCafe.corte === 'apagado');
 });
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  TELÉFONOS INVENTADOS  ·  el hueco que se coló a producción
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Teléfonos inventados', async () => {
+  const consultorio = {
+    nombre: 'Consultorio', categoria: 'Salud y bienestar',
+    contactos: { principal: { whatsapp: '5219616552222', etiqueta: 'WhatsApp' } },
+    conocimiento: [{ tema: 'costos', texto: 'Primera vez $800.' }],
+    catalogo: [], horarios: { lunes: { abre: '16:00', cierra: '20:00' } },
+  };
+
+  /* EL CASO REAL. Preguntándole por WhatsApp en producción, el bot contestó
+     «te paso el número: 55 1234 5678». Ese número no existe en ninguna
+     parte. El anclaje no lo vio porque buscaba siete dígitos SEGUIDOS, y
+     nadie escribe un teléfono así. */
+  const inventado = revisarAnclaje(consultorio, 'Te paso el número: 55 1234 5678.');
+  ok('atrapa un teléfono inventado con espacios', !inventado.anclado, JSON.stringify(inventado.inventadas));
+
+  ok('atrapa uno con guiones',   !revisarAnclaje(consultorio, 'Marca al 55-1234-5678').anclado);
+  ok('atrapa uno con paréntesis', !revisarAnclaje(consultorio, 'Llama al (55) 1234 5678').anclado);
+  ok('atrapa uno pegado',        !revisarAnclaje(consultorio, 'Es el 5512345678').anclado);
+
+  // Y NO al revés: el número de verdad tiene que pasar, se escriba como se escriba.
+  ok('el número real pasa tal cual',      revisarAnclaje(consultorio, 'Escríbenos al 5219616552222.').anclado);
+  ok('el número real pasa con espacios',  revisarAnclaje(consultorio, 'Escríbenos al 961 655 2222.').anclado);
+  ok('el número real pasa sin lada',      revisarAnclaje(consultorio, 'Es el 9616552222').anclado);
+
+  // Falsos positivos: lo que NO es un teléfono no debe degradar la respuesta.
+  ok('un horario no se confunde con teléfono', revisarAnclaje(consultorio, 'Abrimos de 16:00 a 20:00 el lunes.').anclado);
+  ok('un precio del catálogo no se confunde',  revisarAnclaje(consultorio, 'La primera vez cuesta $800.').anclado);
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);

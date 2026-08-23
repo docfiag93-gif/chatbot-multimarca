@@ -103,9 +103,31 @@ export function afirmacionesDe(texto) {
     if (new RegExp('\\b' + dn + '\\b').test(sa)) fuera.push({ tipo: 'dia', crudo: dn, valor: dn });
   });
 
-  // Tandas largas de dígitos: teléfonos, códigos, números de cuenta
-  const digitos = t.match(/\b\d{7,}\b/g) || [];
+  /* Tandas MUY largas de dígitos: números de cuenta, folios, códigos.
+     De 7 a 15 dígitos lo atiende la regla de teléfonos de abajo, que compara
+     por dígitos y no por valor numérico. Si esta regla también los tomara,
+     el mismo número saldría dos veces con criterios distintos y el numérico
+     lo daría por inventado: «9616552222» y «5219616552222» son el mismo
+     teléfono pero no el mismo número. */
+  const digitos = t.match(/\b\d{16,}\b/g) || [];
   digitos.forEach(d => fuera.push({ tipo: 'digitos', crudo: d, valor: d }));
+
+  /* TELÉFONOS ESCRITOS COMO LOS ESCRIBE LA GENTE.
+     Este hueco se coló en producción y es el peor de todos: preguntándole
+     por WhatsApp, el bot contestó «te paso el número: 55 1234 5678». Ese
+     número no existe en ninguna parte — se lo inventó. Y el anclaje no lo
+     vio, porque solo buscaba siete dígitos SEGUIDOS, y nadie escribe un
+     teléfono así.
+
+     Un precio inventado cuesta una aclaración. Un teléfono inventado manda
+     a un paciente a llamarle a un desconocido. */
+  const telefonos = t.match(/\+?\d[\d\s().-]{6,18}\d/g) || [];
+  telefonos.forEach(tel => {
+    const soloDigitos = tel.replace(/\D/g, '');
+    // Entre 7 y 15 dígitos es lo que mide un teléfono en cualquier país.
+    if (soloDigitos.length < 7 || soloDigitos.length > 15) return;
+    fuera.push({ tipo: 'telefono', crudo: tel.trim(), valor: soloDigitos });
+  });
 
   // Porcentajes
   const pct = t.match(/\b\d{1,3}\s?%/g) || [];
@@ -136,6 +158,21 @@ function apareceEnCorpus(afirmacion, corpus) {
     const sueltas = (corpus.match(/\b(?:a las|de|hasta)\s+(\d{1,2})\b/gi) || [])
       .map(x => normalizarHora(x.replace(/[^\d]/g, ''))).filter(v => v != null);
     return [...horasCorpus, ...sueltas].includes(afirmacion.valor);
+  }
+
+  /* Un teléfono se compara por sus DÍGITOS, no por cómo está escrito: en el
+     panel puede estar «5219616552222» y el bot decirlo «961 655 2222». Es el
+     mismo número. Se acepta si el del corpus termina igual —así la lada del
+     país no lo descarta— siempre con al menos 8 dígitos en común, para que
+     dos números distintos no se den por buenos por coincidir en el final. */
+  if (afirmacion.tipo === 'telefono') {
+    const delCorpus = (corpus.match(/\+?\d[\d\s().-]{6,18}\d|\b\d{7,}\b/g) || [])
+      .map(x => x.replace(/\D/g, '')).filter(x => x.length >= 7);
+    return delCorpus.some(c => {
+      const comun = Math.min(c.length, afirmacion.valor.length);
+      if (comun < 8) return c === afirmacion.valor;
+      return c.slice(-comun) === afirmacion.valor.slice(-comun);
+    });
   }
 
   // dinero, dígitos y porcentaje se comparan por valor numérico

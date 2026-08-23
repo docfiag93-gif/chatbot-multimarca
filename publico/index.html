@@ -1485,6 +1485,10 @@ function secretosDe(p) {
     limites: p.limites?.length ? p.limites : (e.limites || []),
     perfil: {
       catalogo: p.catalogo, atributos: p.atributos, tono: p.tono,
+      // `descripcion` e `idioma` NO tienen columna propia. Sin esta línea el
+      // asistente pedía la descripción, la persona la escribía, y al publicar
+      // el servidor contestaba que faltaba: se guardaba en ninguna parte.
+      descripcion: p.descripcion, idioma: p.idioma,
       // Estos tres no se preguntan en el asistente: se conservan tal cual
       // venían. Ver `extrasDelNegocio`.
       horarios:    p.horarios    && Object.keys(p.horarios).length    ? p.horarios    : (e.horarios || {}),
@@ -1511,7 +1515,12 @@ async function publicar() {
   try {
     $('#alta-msg').innerHTML = `<div class="aviso info">Guardando…</div>`;
     const id = await crearOAdoptar(p);
-    await api('empresas.guardar', { id, ...p, secretos: secretosDe(p) });
+    // OJO CON EL ORDEN: `p` trae su propio `id` —el del perfil, nulo para un
+    // negocio nuevo— y escrito como `{ id, ...p }` lo pisaba. El servidor
+    // recibía id:null, consultaba `id=eq.null` y Postgres contestaba que
+    // «null» no es un uuid. Un error de sintaxis de base de datos por un
+    // orden de spread.
+    await api('empresas.guardar', { ...p, id, secretos: secretosDe(p) });
     await api('empresas.publicar', { id });
     $('#alta-msg').innerHTML = `<div class="aviso ok">Publicado. Ya puedes pegarlo con
       <code>data-marca="${esc(p.slug)}"</code>.</div>`;
@@ -1528,7 +1537,7 @@ $('#btn-borrador').addEventListener('click', async () => {
     // Guardar el borrador debe guardar TODO lo escrito, no solo los cuatro
     // campos que viajan en claro: antes se perdía el catálogo y los horarios
     // de quien cerraba la pestaña confiando en el botón.
-    await api('empresas.guardar', { id, ...p, secretos: secretosDe(p) });
+    await api('empresas.guardar', { ...p, id, secretos: secretosDe(p) });
     $('#alta-msg').innerHTML = `<div class="aviso ok">Borrador guardado. Puedes seguir después.</div>`;
     await cargarNegocios();
   } catch (e) { $('#alta-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
