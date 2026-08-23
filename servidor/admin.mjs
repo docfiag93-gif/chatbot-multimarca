@@ -108,7 +108,7 @@ export async function manejar(req, context) {
         // Sin filtro: RLS ya decide. El superadmin ve todas, un dueño ve la
         // suya. No se filtra aquí a propósito — que mande la base.
         const filas = await sb.seleccionar('empresas',
-          'id,slug,nombre,categoria,plan,activa,estado,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
+          'id,slug,nombre,categoria,plan,activa,estado,modo,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
           'order=created_at.desc');
         return json({ empresas: filas });
       }
@@ -285,6 +285,27 @@ export async function manejar(req, context) {
         await sb.bitacora({ actor: yo.id, empresa_id: id, accion: 'empresa.guardar',
                             detalle: { campos: Object.keys(cambios) } });
         return json({ empresa: guardada[0] });
+      }
+
+      /* El interruptor del dueño. A DIFERENCIA de `empresas.suspender`, esto
+         NO es solo del superadmin: quien recibe la queja del paciente es el
+         médico, a las once de la noche, y tiene que poder callar al bot en
+         ese momento. Obligarlo a pedirle permiso a la plataforma para dejar
+         de decir tonterías sería exactamente al revés de como debe ser.
+
+         RLS ya limita a un dueño a su propia empresa. */
+      case 'empresas.modo': {
+        if (!esDueno) return negar();
+        if (!['activo','recados','apagado'].includes(datos.modo)) {
+          return json({ error: 'Modo inválido.' }, 400);
+        }
+        const g = await sb.actualizar('empresas', `id=eq.${datos.id}`, { modo: datos.modo });
+        if (!g?.[0]) return json({ error: 'Esa empresa no existe o no es tuya.' }, 404);
+        // Apagar un bot es de las cosas que hay que poder auditar después:
+        // «¿desde cuándo dejó de contestar?» debe tener respuesta.
+        await sb.bitacora({ actor: yo.id, empresa_id: datos.id, accion: 'empresa.modo',
+                            detalle: { modo: datos.modo } });
+        return json({ empresa: g[0] });
       }
 
       case 'empresas.suspender': {

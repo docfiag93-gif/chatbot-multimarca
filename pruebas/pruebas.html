@@ -41,8 +41,8 @@ import {
   planDeProveedores, preguntar, extraerJSON, limpiar,
   _limpiarCacheModelos, ORDEN_POR_OMISION,
 } from '../servidor/nucleo/proveedores.mjs';
-import { revisarEntorno, explicarFallo } from '../servidor/nucleo/diagnostico.mjs';
-import { respuestaInmediata } from '../servidor/nucleo/cerebro.mjs';
+import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
+import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
 import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
@@ -843,6 +843,92 @@ suite('Catálogos del panel al día', () => {
     ok(`"${a.id}" tiene el mismo nombre en ambos lados`, ACCIONES[a.id].nombre === a.nombre);
     ok(`"${a.id}" declara igual qué necesita`, (ACCIONES[a.id].requiere || null) === a.requiere);
   });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  ¿LA BASE RESPONDE, O SOLO ESTÁ CONFIGURADA?
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('La base responde de verdad', async () => {
+  // Sin cliente: ni siquiera está configurada.
+  const nada = await probarBase(null);
+  ok('sin configurar lo dice', nada.lee === false && nada.razon === 'sin_configurar');
+
+  // Contesta y ve negocios: todo bien.
+  const bien = await probarBase({ seleccionar: async () => [{ id: 'a' }, { id: 'b' }] });
+  ok('con llave buena, lee', bien.lee === true);
+  ok('y reporta cuántos vio', bien.filas === 2);
+
+  // EL CASO QUE COSTÓ UNA TARDE: la llave publicable NO da error, da cero
+  // filas — lo mismo que ve alguien sin permiso. Si esto se confundiera con
+  // "no hay negocios", el diagnóstico volvería a mentir.
+  const publicable = await probarBase({ seleccionar: async () => [] });
+  ok('llave publicable: contesta pero no ve nada',
+     publicable.lee === true && publicable.filas === 0);
+
+  const rechazada = await probarBase({ seleccionar: async () => { throw new Error('401 Invalid API key'); } });
+  ok('llave rechazada se nombra como tal', rechazada.lee === false && rechazada.razon === 'llave_rechazada');
+
+  const sinPermiso = await probarBase({ seleccionar: async () => { throw new Error('403 permission denied'); } });
+  ok('falta de permiso se distingue', sinPermiso.razon === 'sin_permiso');
+
+  const caida = await probarBase({ seleccionar: async () => { throw new Error('failed to fetch'); } });
+  ok('sin conexión se distingue', caida.razon === 'sin_conexion');
+
+  // Regla dura: el error crudo puede traer la llave dentro.
+  const conLlave = await probarBase({
+    seleccionar: async () => { throw new Error('401 con apikey=sb_secret_ABCDEFGHIJK dentro'); } });
+  ok('nunca devuelve el error crudo', !JSON.stringify(conLlave).includes('sb_secret_ABCDEFGHIJK'));
+
+  // Y la revisión de entorno sigue diciendo lo que dice: que la variable
+  // está puesta. Eso NO es lo mismo que "responde", y por eso son dos campos.
+  const d = revisarEntorno(entornoDe({ SUPABASE_URL: 'https://x.supabase.co',
+                                       SUPABASE_SERVICE_KEY: 'lo-que-sea',
+                                       GEMINI_API_KEY: 'g' }));
+  ok('«configurada» solo mira la variable', d.capacidades.base === true);
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  EL INTERRUPTOR DEL BOT  ·  y qué NUNCA se apaga
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Prender y apagar el bot', async () => {
+  const consultorio = { ...SEMILLAS.consultorio, captura: { activa: true } };
+  const cafe = { ...SEMILLAS.cafe, captura: { activa: true } };
+
+  // Encendido: no corta nada, le toca a la IA.
+  ok('encendido deja pasar a la IA',
+     decidirSinIA({ marca: cafe, modo: 'activo', ultimo: '¿cuánto cuesta?' }) === null);
+
+  // Apagado y solo recados: contestan sin gastar en IA.
+  const off = decidirSinIA({ marca: cafe, modo: 'apagado', ultimo: '¿cuánto cuesta?', hayContacto: true });
+  ok('apagado no llama a la IA', off?.via === 'apagado');
+  ok('apagado ofrece escribir directo si hay contacto', off.accion === 'derivar_humano');
+
+  const off2 = decidirSinIA({ marca: cafe, modo: 'apagado', ultimo: 'hola', hayContacto: false });
+  ok('apagado sin contacto no promete lo que no hay', off2.accion === 'ninguna');
+
+  const rec = decidirSinIA({ marca: cafe, modo: 'recados', ultimo: '¿cuánto cuesta?' });
+  ok('solo recados no llama a la IA', rec?.via === 'recados');
+  ok('solo recados abre el formulario', rec.accion === 'capturar_contacto');
+  ok('solo recados dice la verdad: contesta una persona', /persona/i.test(rec.texto));
+
+  const recSinForm = decidirSinIA({ marca: { ...cafe, captura: { activa: false } },
+                                    modo: 'recados', ultimo: 'hola', hayContacto: true });
+  ok('sin formulario, recados deriva en vez de pedir datos', recSinForm.accion === 'derivar_humano');
+
+  /* LO QUE NO SE APAGA.
+     Este es el motivo de que la decisión viva en una función y no suelta en
+     el manejador: escribir el corte por «apagado» antes del filtro clínico
+     es lo natural, y deja a alguien con dolor de pecho sin el 911. */
+  for (const modo of ['activo', 'recados', 'apagado']) {
+    const r = decidirSinIA({ marca: consultorio, modo, ultimo: 'me duele el pecho' });
+    ok(`en modo "${modo}" la urgencia clínica gana`, r?.corte === 'urgencia', JSON.stringify(r));
+    ok(`en modo "${modo}" la urgencia manda al 911`, /911/.test(r?.texto || ''));
+  }
+
+  // Y no al revés: el filtro clínico no se dispara donde no toca.
+  const enCafe = decidirSinIA({ marca: cafe, modo: 'apagado', ultimo: 'me duele el pecho', hayContacto: true });
+  ok('un café apagado no inventa una urgencia clínica', enCafe.corte === 'apagado');
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

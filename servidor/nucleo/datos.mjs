@@ -71,6 +71,9 @@ export async function empresaPorSlug(slug) {
     // una categoría legible en vez de perder el dato.
     categoria: fila.categoria || traducirDominioViejo(fila.dominio),
     identidad: fila.marca || {},
+    // El interruptor del dueño. Viaja junto al perfil para que el bot pueda
+    // decidir SIN otra consulta: apagar tiene que ser inmediato.
+    modo: fila.modo || 'activo',
     saludo: fila.saludo,
     sugerencias: fila.sugerencias || [],
     descargo: fila.descargo,

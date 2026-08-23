@@ -15,7 +15,7 @@
 
 import { env } from './nucleo/entorno.mjs';
 import { MARCAS } from './nucleo/marcas.mjs';
-import { construirPrompt, respuestaInmediata, accionValida } from './nucleo/cerebro.mjs';
+import { construirPrompt, respuestaInmediata, accionValida, decidirSinIA } from './nucleo/cerebro.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
 import { revisarEntorno, explicarFallo, probarBase } from './nucleo/diagnostico.mjs';
 import { revisarAnclaje, revisarRedaccion, limpiarMuletillas, respuestaSinDato }
@@ -141,6 +141,24 @@ export async function manejar(req, context) {
 
   const hayContacto = !!(marca.contactos && Object.keys(marca.contactos).length);
 
+  /* ── EL INTERRUPTOR ────────────────────────────────────────────────────
+     Tres estados, no dos, y el de en medio es el que importa.
+
+     Apagar del todo deja a quien escribe sin nada: se va, y esa persona ya
+     no vuelve. Pero dejar contestando a un bot que responde mal —en un
+     consultorio— es peor que el silencio.
+
+     `recados` es la salida honesta: el bot deja de hablar por su cuenta,
+     dice la verdad («ahorita te contesta una persona») y se queda tomando
+     el nombre y el teléfono. No se pierde a nadie y no se dice ninguna
+     tontería. Es el botón que se aprieta a las 11 de la noche cuando algo
+     salió raro, sin tener que despertar a nadie.
+
+     Se comprueba AQUÍ, antes de llamar a la IA: apagar tiene que costar
+     cero y surtir efecto en el siguiente mensaje, no en el siguiente
+     despliegue. ─────────────────────────────────────────────────────── */
+  const modo = marca.modo || 'activo';
+
   // ── Rama 1: formulario de contacto ───────────────────────────────────
   if (tipo === 'lead') {
     if (!lead?.nombre || !lead?.telefono) return json({ error: 'Falta nombre o teléfono' }, 400);
@@ -192,7 +210,13 @@ export async function manejar(req, context) {
 
   // EL FILTRO. Corre en el servidor aunque el navegador ya lo haya corrido:
   // el widget se puede editar desde la consola, esto no.
-  const inmediata = respuestaInmediata(marca, ultimo);
+  //
+  // OJO CON EL ORDEN: esto va ANTES de atender el modo `recados`. Una
+  // urgencia clínica se responde aunque el bot esté callado — el modo existe
+  // para que no diga tonterías, no para que deje de mandar a alguien al 911.
+  const corte = decidirSinIA({ marca, modo, ultimo, hayContacto });
+  const inmediata = corte?.corte === 'urgencia' ? corte : null;
+
   if (inmediata) {
     // ORDEN DELIBERADO: la instrucción de llamar al 911 sale YA. Guardar la
     // conversación y avisar queda corriendo detrás, sin retrasarla.
@@ -218,6 +242,10 @@ export async function manejar(req, context) {
 
     return json(inmediata);
   }
+
+  // El bot callado: `decidirSinIA` ya resolvió el orden, incluido el caso
+  // de que una urgencia gane sobre el interruptor.
+  if (corte) { const { corte: _q, ...r } = corte; return json(r); }
 
   try {
     const { datos, via, origen, intentos } = await preguntar({

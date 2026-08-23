@@ -175,3 +175,50 @@ export function respuestaInmediata(perfil, texto) {
 export function accionValida(perfil, accion) {
   return accionPermitida(normalizarPerfil(perfil), accion) ? accion : 'ninguna';
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   QUÉ SE CONTESTA SIN LLAMAR A LA IA
+
+   Vive aquí, en una función pura, por una sola razón: EL ORDEN IMPORTA y el
+   orden que importa es fácil de escribir al revés.
+
+   Lo natural al programar es cortar por «el bot está apagado» en cuanto se
+   sabe, y eso está mal. Si alguien escribe «me duele el pecho» con el bot
+   apagado, esa persona no puede quedarse sin que le digan que llame al 911.
+
+   El interruptor existe para que el bot no diga tonterías. No para que deje
+   de mandar a alguien a urgencias. La política clínica corre en los tres
+   estados, y esta función es lo que se puede probar para asegurarlo.
+
+   Devuelve la respuesta ya lista, o null si toca preguntarle a la IA.
+   ══════════════════════════════════════════════════════════════════════ */
+export function decidirSinIA({ marca = {}, modo = 'activo', ultimo = '', hayContacto = false }) {
+  // 1 · Siempre primero. En los tres modos.
+  const urgente = respuestaInmediata(marca, ultimo);
+  if (urgente) return { ...urgente, corte: 'urgencia' };
+
+  if (modo === 'apagado') {
+    return {
+      texto: 'Por ahora no estoy atendiendo por aquí. ' +
+             (hayContacto ? 'Escríbenos directo y te contestamos.' : 'Vuelve más tarde, por favor.'),
+      sugerencias: [],
+      accion: hayContacto ? 'derivar_humano' : 'ninguna',
+      via: 'apagado', corte: 'apagado',
+    };
+  }
+
+  if (modo === 'recados') {
+    const puedeCapturar = !!marca.captura?.activa;
+    return {
+      texto: puedeCapturar
+        ? 'Ahorita te contesta una persona. Déjame tu nombre y tu teléfono y te buscamos.'
+        : 'Ahorita te contesta una persona directamente.',
+      sugerencias: [],
+      accion: puedeCapturar ? 'capturar_contacto' : (hayContacto ? 'derivar_humano' : 'ninguna'),
+      via: 'recados', corte: 'recados',
+    };
+  }
+
+  return null;
+}

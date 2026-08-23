@@ -450,6 +450,22 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 .qr-uno svg{display:block;width:100%;height:auto;max-width:220px}
 .qr-uno code{display:block;font-size:10.5px;margin-top:10px;word-break:break-all;
   color:var(--tenue)}
+
+/* Interruptor del bot. Se ve el estado sin leer: el color dice qué pasa. */
+.interruptor{display:flex;gap:2px;background:var(--hundido);border:1px solid var(--linea);
+  border-radius:9px;padding:2px;margin-top:10px}
+.interruptor button{flex:1;background:none;border:0;font:inherit;font-size:11.5px;
+  font-weight:600;color:var(--tenue);padding:6px 4px;border-radius:7px;cursor:pointer;
+  transition:background .14s,color .14s;white-space:nowrap}
+.interruptor button:hover:not([data-on]):not(:disabled){color:var(--tinta)}
+.interruptor button:disabled{opacity:.5;cursor:wait}
+.interruptor button[data-on]{background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.interruptor.activo  button[data-on]{color:var(--ok)}
+.interruptor.recados button[data-on]{color:var(--alerta)}
+.interruptor.apagado button[data-on]{color:var(--mal)}
+/* Un bot callado no debe verse igual que uno trabajando. */
+.negocio:has(.interruptor.apagado){opacity:.72}
+.negocio:has(.interruptor.apagado) .marca{filter:grayscale(1)}
 </style>
 </head>
 <body>
@@ -1490,6 +1506,30 @@ function llenarFormulario(p) {
   refrescarPrevio();
 }
 
+
+const MODOS = [
+  { id: 'activo',   rot: 'Contestando', pista: 'Responde con IA, con sus reglas y su anclaje.' },
+  { id: 'recados',  rot: 'Solo recados', pista: 'Deja de hablar por su cuenta. Solo toma nombre y teléfono.' },
+  { id: 'apagado',  rot: 'Apagado',     pista: 'No contesta. Manda a escribir directo.' },
+];
+
+/**
+ * El interruptor del bot, en la tarjeta y no escondido en una pantalla de
+ * ajustes. Cuando un bot contesta mal a un paciente, el camino hasta el
+ * botón que lo calla es parte del daño.
+ *
+ * Tres estados y no dos: apagar del todo deja a quien escribe sin nada y esa
+ * persona no vuelve. «Solo recados» es la salida honesta — el bot dice la
+ * verdad y sigue tomando el teléfono de quien llegó.
+ */
+function interruptorDe(n) {
+  const modo = n.modo || 'activo';
+  return `<div class="interruptor ${esc(modo)}" role="group" aria-label="Estado del bot">
+    ${MODOS.map(m => `<button data-modo="${m.id}" data-id="${esc(n.id)}"
+      ${m.id === modo ? 'data-on' : ''} title="${esc(m.pista)}">${esc(m.rot)}</button>`).join('')}
+  </div>`;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    CONTEXTO: ¿desde dónde estoy mirando?
 
@@ -1582,6 +1622,7 @@ function tarjetaNegocio(n) {
       ${(n.politicas||[]).length?`<span class="placa ojo">${(n.politicas||[]).length} regla(s)</span>`:''}
       <span class="placa"><code>${esc(n.slug)}</code></span>
     </div>
+    ${enLinea && n.id && !n.ejemplo ? interruptorDe(n) : ''}
     <div class="acciones-neg">${accionesDe(n, estado)}</div>
   </article>`;
 }
@@ -1641,6 +1682,23 @@ async function copiarTexto(texto) {
 /* Un solo oyente para toda la lista: las tarjetas se repintan seguido y
    volver a enganchar oyentes en cada repintado los deja duplicados. */
 $('#lista-negocios').addEventListener('click', async (ev) => {
+  const sw = ev.target.closest('[data-modo]');
+  if (sw) {
+    if (sw.hasAttribute('data-on')) return;         // ya está en ese estado
+    const grupo = sw.closest('.interruptor');
+    grupo.querySelectorAll('button').forEach(x => x.disabled = true);
+    try {
+      await api('empresas.modo', { id: sw.dataset.id, modo: sw.dataset.modo });
+      const n = negocios.find(x => x.id === sw.dataset.id);
+      if (n) n.modo = sw.dataset.modo;
+      pintarNegocios();
+    } catch (e) {
+      grupo.querySelectorAll('button').forEach(x => x.disabled = false);
+      alert(traducirError(e.message));
+    }
+    return;
+  }
+
   const b = ev.target.closest('[data-hacer]');
   if (!b) return;
   const { hacer, slug, id } = b.dataset;
@@ -1657,6 +1715,7 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
   }
 
   if (hacer === 'qr') { await mostrarQR(slug); return; }
+
 
   if (hacer === 'copiar') {
     const ok = await copiarTexto(fragmentoDe(slug));
