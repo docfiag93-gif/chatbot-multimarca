@@ -340,8 +340,14 @@ export async function manejar(req, context) {
       case 'empresas.suspender': {
         if (!esSuper) return negar();
         const activa = !!datos.activa;
+        // El `estado` tiene que ir junto: suspender dejaba `activa=false` con
+        // `estado='publicado'`, así que la tarjeta decía «publicado» mientras
+        // el bot contestaba «fuera de servicio». Una contradicción que desde
+        // el panel no hay forma de diagnosticar.
         const g = await sb.actualizar('empresas', `id=eq.${datos.id}`, {
-          activa, suspendida_at: activa ? null : new Date().toISOString(),
+          activa,
+          estado: activa ? 'publicado' : 'suspendido',
+          suspendida_at: activa ? null : new Date().toISOString(),
         });
         await sb.bitacora({ actor: yo.id, empresa_id: datos.id,
                             accion: activa ? 'empresa.reactivar' : 'empresa.suspender', detalle: {} });
@@ -395,9 +401,11 @@ export async function manejar(req, context) {
                         atendido: f.atendido, created_at: f.created_at, datos: datosClaros, error });
         }
         // Ver datos de contacto es justo lo que hay que poder auditar después.
-        await sb.bitacora({ actor: yo.id, empresa_id: datos.empresa_id || null,
+        // Si la anotación falla, se DICE: leer datos de personas sin dejar
+        // rastro es exactamente el momento en que hay que enterarse.
+        const anotado = await sb.bitacora({ actor: yo.id, empresa_id: datos.empresa_id || null,
                             accion: 'leads.ver', detalle: { cuantos: leidos.length } });
-        return json({ leads: leidos });
+        return json({ leads: leidos, auditoria: anotado.ok ? undefined : 'no se pudo anotar' });
       }
 
       case 'leads.atendido': {
@@ -548,11 +556,12 @@ export async function manejar(req, context) {
         // Abrir conversaciones de pacientes es exactamente lo que hay que
         // poder auditar después. Se anota SIEMPRE, también cuando lo hace
         // el dueño de la plataforma.
-        await sb.bitacora({ actor: yo.id, empresa_id: datos.empresa_id || null,
+        const anotado = await sb.bitacora({ actor: yo.id, empresa_id: datos.empresa_id || null,
                             accion: 'conversaciones.ver',
                             detalle: { cuantas: abiertas.length,
                                        soloUrgencias: !!datos.soloUrgencias } });
-        return json({ conversaciones: abiertas });
+        return json({ conversaciones: abiertas,
+                      auditoria: anotado.ok ? undefined : 'no se pudo anotar' });
       }
 
       case 'bitacora.listar': {

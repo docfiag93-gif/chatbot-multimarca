@@ -66,9 +66,28 @@ export function clienteSupabase({ url, llave, token }) {
 
     // Registrar en bitácora nunca debe tumbar la operación principal: si el
     // registro falla, se pierde una línea de historial, no la acción.
+    /**
+     * Anota en la bitácora. NO tumba la acción del usuario si falla —pero
+     * tampoco se calla.
+     *
+     * La versión anterior era `catch (e) { /* silencio *\/ }`. La intención
+     * era buena: que un fallo del registro no le rompa la operación a nadie.
+     * El efecto fue otro: la tabla NO tenía política de INSERT, cada anotación
+     * se rechazaba, y durante meses la bitácora estuvo vacía mientras el panel
+     * la presentaba como garantía de que todo queda registrado.
+     *
+     * Un silencio que convierte una promesa de auditoría en una mentira no es
+     * tolerancia a fallos: es el fallo. Ahora devuelve si pudo o no, y quien
+     * llama decide qué hacer con eso.
+     */
     async bitacora(fila) {
-      try { await pedir('/bitacora', { method: 'POST', body: JSON.stringify(fila) }); }
-      catch (e) { /* silencio a propósito */ }
+      try {
+        await pedir('/bitacora', { method: 'POST', body: JSON.stringify(fila) });
+        return { ok: true };
+      } catch (e) {
+        // El mensaje crudo puede traer detalles del esquema: se recorta.
+        return { ok: false, razon: String(e.message || e).slice(0, 120) };
+      }
     },
   };
 }

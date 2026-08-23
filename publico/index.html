@@ -2565,6 +2565,7 @@ async function cargarCharlas() {
     });
     charlas = d.conversaciones || [];
     pintarCharlas();
+    avisarSinAuditoria(caja, d.auditoria);
   } catch (e) {
     caja.innerHTML = `<div class="aviso mal">No pude leerlas: ${esc(e.message)}</div>`;
   }
@@ -2768,6 +2769,7 @@ async function cargarSolicitudes() {
     const d = await api('leads.listar', contexto ? { empresa_id: contexto } : {});
     solicitudes = d.leads || [];
     pintarSolicitudes();
+    avisarSinAuditoria(caja, d.auditoria);
   } catch (e) {
     caja.innerHTML = `<div class="aviso mal">No pude leerlas: ${esc(e.message)}</div>`;
   }
@@ -2816,6 +2818,22 @@ function pintarSolicitudes() {
       </div>
     </div>`;
   }).join('');
+}
+
+/**
+ * Avisa cuando una lectura de datos de personas NO quedó anotada.
+ *
+ * El panel promete que abrir esto queda registrado. Si el registro falla y
+ * nadie se entera, la promesa se vuelve mentira — y esa es justo la mentira
+ * que importa, porque se trata de datos de pacientes. Se dice arriba, donde
+ * estorba, no en una esquina.
+ */
+function avisarSinAuditoria(caja, aviso) {
+  if (!aviso) return;
+  caja.insertAdjacentHTML('afterbegin',
+    `<div class="aviso ojo" style="margin-bottom:12px"><b>Esta consulta no quedó
+     registrada en la bitácora.</b> Los datos se abrieron igual, pero sin dejar
+     rastro de quién los vio. Avísale a quien administra la plataforma.</div>`);
 }
 
 function fecha(iso) {
