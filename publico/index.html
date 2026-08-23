@@ -68,6 +68,15 @@ body{margin:0;background:var(--fondo);color:var(--tinta);
    de pantalla y el contenido recupera todo el ancho. */
 body:not(.sin-cajon) .hoja{margin-left:246px;max-width:calc(1120px + 246px)}
 @media (max-width:900px){
+  /* OJO CON LA ESPECIFICIDAD: esto tiene que igualar o superar a
+     `body:not(.sin-cajon) .hoja` de arriba, que vale dos clases. Escrito
+     como `body .hoja` —una clase— PERDÍA, y el margen de 246 px del cajón
+     se quedaba puesto en el celular: la consola entera se aplastaba a
+     129 px de ancho en una pantalla de 375. Todo se desbordaba y la página
+     se arrastraba de lado.
+
+     No se ve al mirar el CSS: se ve midiendo. */
+  body:not(.sin-cajon) .hoja,
   body .hoja{margin-left:0;max-width:1120px}
   .pest{transform:translateX(-100%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
     box-shadow:0 0 40px rgba(0,0,0,.28);width:270px}
@@ -373,6 +382,24 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
   .navpaso{flex-direction:column-reverse}
   .navpaso .btn{width:100%;justify-content:center}
 }
+/* ══ TOQUE ═══════════════════════════════════════════════════════════
+   En pantalla táctil los botones subían a 31–37 px de alto. La guía de
+   Apple y la de Google coinciden en 44: no es capricho, es el ancho del
+   pulgar de una persona. Un médico contestando de pie entre paciente y
+   paciente no tiene puntería de mouse.
+
+   Se aplica solo donde no hay cursor fino, para no engordar la interfaz
+   en escritorio, donde 34 px está bien. */
+@media (pointer:coarse){
+  .btn,.tema,.hamburguesa{min-height:44px}
+  .btn.chico{min-height:40px}
+  input,select,textarea{min-height:44px}
+  .pest button{min-height:44px}
+  .enlace,.demo-pie button,.plegable{min-height:44px;display:inline-flex;
+    align-items:center;justify-content:center}
+  .interruptor button{min-height:40px}
+}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* ══ PORTADA ═══════════════════════════════════════════════════════════
@@ -384,10 +411,25 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
    Todo lo visual es SVG y CSS: ni una imagen externa. Una portada que
    depende de un archivo alojado en otro lado se ve rota el día que ese
    lado falle, y además cuesta ancho de banda en cada visita. */
-.portada{padding:8px 0 0}
+/* `overflow-x: clip` y no `hidden`: clip recorta sin volver esto un
+   contenedor con scroll propio, que rompería el `position:sticky` de
+   cualquier cosa que se ponga dentro más adelante.
+
+   Hace falta porque el resplandor del héroe (`.heroe::before`) se extiende
+   un 20% más allá por cada lado a propósito — y ese exceso, aunque sea
+   decorativo y no exista en el DOM, hacía que el celular se pudiera
+   arrastrar 55 px de lado. Un adorno que se sale no se ve; se mide. */
+.portada{padding:8px 0 0;overflow-x:clip}
 
 .heroe{display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center;
   padding:34px 0 46px;position:relative}
+/* Sin esto la portada se desbordaba 55 px en un celular y la página se
+   arrastraba de lado. Es el defecto clásico de grid: un hijo NO se encoge por
+   debajo de su contenido a menos que se le diga, y `min-width:auto` es lo que
+   trae por omisión. Se ve como si la app estuviera rota, y cuesta una línea. */
+.heroe>*{min-width:0}
+.muestra{max-width:100%}
+.muestra .charla{overflow-wrap:anywhere}
 .heroe::before{content:'';position:absolute;inset:-40px -20% auto -20%;height:420px;
   background:radial-gradient(60% 70% at 30% 30%, var(--acento-suave) 0%, transparent 70%);
   opacity:.75;z-index:-1;pointer-events:none;border-radius:50%}

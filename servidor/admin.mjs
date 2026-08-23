@@ -410,6 +410,10 @@ export async function manejar(req, context) {
       }
 
       case 'leads.atendido': {
+        // permiso: cualquier cuenta activa. Marcar atendida una solicitud es
+        // justo el trabajo de quien atiende, no del dueño. RLS lo encierra en
+        // su propia empresa; el portero de arriba ya rechazó a las cuentas
+        // pendientes o desactivadas.
         const g = await sb.actualizar('leads', `id=eq.${datos.id}`, { atendido: !!datos.atendido });
         return json({ lead: g[0] });
       }
@@ -444,6 +448,9 @@ export async function manejar(req, context) {
       }
 
       case 'avisos.visto': {
+        // permiso: dueño. Los avisos son de la plataforma hacia el negocio;
+        // marcarlos como vistos no es tarea de quien atiende el mostrador.
+        if (!esDueno) return negar();
         const g = await sb.actualizar('avisos', `id=eq.${datos.id}`,
           { visto_at: datos.visto ? new Date().toISOString() : null });
         return json({ aviso: g[0] });
@@ -471,6 +478,10 @@ export async function manejar(req, context) {
       }
 
       case 'reportes.crear': {
+        // permiso: A PROPÓSITO cualquiera con sesión, incluidas las cuentas
+        // sin activar — ver ABIERTAS_A_PENDIENTES arriba. Quien no puede
+        // entrar es justo quien necesita reportarlo. RLS obliga a que el
+        // autor sea uno mismo.
         const asunto = String(datos.asunto || '').trim().slice(0, 140);
         const texto  = String(datos.texto  || '').trim().slice(0, 4000);
         if (!asunto || !texto) return json({ error: 'Falta el asunto o el mensaje.' }, 400);
