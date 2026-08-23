@@ -53,7 +53,8 @@ import { construirPrompt, accionValida } from '../servidor/nucleo/cerebro.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 import { POLITICAS_UI, ACCIONES_UI } from '../publico/cerebro/catalogos-ui.mjs';
 import { obtenerMarca } from '../servidor/nucleo/marcas.mjs';
-import { revisarAnclaje, afirmacionesDe, corpusDe, revisarRedaccion,
+import { revisarAnclaje, afirmacionesDe, corpusDe, revisarRedaccion, pulir,
+         recortarAFrases, unaSolaPregunta,
          limpiarMuletillas, respuestaSinDato } from '../servidor/nucleo/anclaje.mjs';
 import { firmar, verificar, enviarEvento, generarSecreto, catalogoDeEventos,
          VENTANA_SEGUNDOS } from '../servidor/nucleo/enlaces.mjs';
@@ -962,6 +963,48 @@ await suite('Teléfonos inventados', async () => {
   // Falsos positivos: lo que NO es un teléfono no debe degradar la respuesta.
   ok('un horario no se confunde con teléfono', revisarAnclaje(consultorio, 'Abrimos de 16:00 a 20:00 el lunes.').anclado);
   ok('un precio del catálogo no se confunde',  revisarAnclaje(consultorio, 'La primera vez cuesta $800.').anclado);
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  PULIR  ·  medir sin actuar es una alarma desconectada
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Pulir la respuesta', async () => {
+  // Tres preguntas encimadas: la persona no contesta ninguna.
+  const tresPreguntas = 'Claro, tenemos cita el jueves. ¿Te agendo? ¿O prefieres llamar? ¿Qué día te queda mejor?';
+  const p1 = pulir(tresPreguntas);
+  ok('deja una sola pregunta', (p1.texto.match(/\?/g) || []).length === 1, p1.texto);
+  ok('conserva la última, que es la que cierra', /qué día te queda mejor/i.test(p1.texto), p1.texto);
+  ok('no pierde la parte informativa', /jueves/i.test(p1.texto), p1.texto);
+  ok('reporta qué arregló', p1.arreglos.includes('preguntas'));
+
+  // Largo: se corta por frase completa, nunca a media palabra.
+  const largo = Array.from({ length: 40 }, (_, i) => `Esta es la frase número ${i}.`).join(' ');
+  const p2 = pulir(largo, { maxPalabras: 30 });
+  ok('recorta lo largo', p2.texto.split(/\s+/).length <= 32, p2.texto.split(/\s+/).length + ' palabras');
+  ok('termina en punto, no a media frase', /\.$/.test(p2.texto.trim()), p2.texto.slice(-40));
+  ok('reporta el recorte', p2.arreglos.includes('largo'));
+
+  // Una sola frase larguísima entra igual: devolver vacío sería peor.
+  const unaFrase = 'palabra '.repeat(60).trim() + '.';
+  ok('nunca devuelve vacío', pulir(unaFrase, { maxPalabras: 10 }).texto.length > 0);
+
+  // Las muletillas de robot de manual.
+  const conMuletilla = 'Como asistente de IA, con gusto te ayudo. La consulta cuesta $800.';
+  const p3 = pulir(conMuletilla);
+  ok('quita la muletilla de robot', !/asistente de ia/i.test(p3.texto), p3.texto);
+  ok('deja el dato que importa', /\$800/.test(p3.texto), p3.texto);
+
+  // Y lo que ya está bien NO se toca: un pulidor que reescribe siempre
+  // acaba estropeando respuestas correctas.
+  const buena = 'La primera consulta cuesta $800 y dura unos 40 minutos. ¿Te agendo una?';
+  const p4 = pulir(buena);
+  ok('una respuesta buena queda intacta', p4.texto === buena, p4.texto);
+  ok('y no reporta arreglos', p4.arreglos.length === 0, JSON.stringify(p4.arreglos));
+
+  // Las piezas por separado
+  ok('recortarAFrases respeta la frase', recortarAFrases('Uno dos. Tres cuatro. Cinco seis.', 4) === 'Uno dos. Tres cuatro.');
+  ok('unaSolaPregunta sin preguntas no rompe', unaSolaPregunta('Hola. Todo bien.') === 'Hola. Todo bien.');
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

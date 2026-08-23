@@ -18,7 +18,7 @@ import { MARCAS } from './nucleo/marcas.mjs';
 import { construirPrompt, respuestaInmediata, accionValida, decidirSinIA } from './nucleo/cerebro.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
 import { revisarEntorno, explicarFallo, probarBase } from './nucleo/diagnostico.mjs';
-import { revisarAnclaje, revisarRedaccion, limpiarMuletillas, respuestaSinDato }
+import { revisarAnclaje, pulir, respuestaSinDato }
   from './nucleo/anclaje.mjs';
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
@@ -266,9 +266,11 @@ export async function manejar(req, context) {
     //
     // Es la diferencia entre un bot que suena bien y uno en el que se puede
     // confiar: inventar un horario manda a alguien a una cortina cerrada.
-    let texto = limpiarMuletillas(String(datos.texto || '')).slice(0, 1200);
+    // Se pule ANTES de anclar: recortar puede quitar la frase que traía un
+    // precio inventado, y entonces ya no hay nada que degradar.
+    const pulido = pulir(String(datos.texto || '').slice(0, 1200));
+    const texto = pulido.texto;
     const anclaje = revisarAnclaje(marca, texto);
-    const redaccion = revisarRedaccion(texto);
 
     let salida;
     if (!anclaje.anclado) {
@@ -285,7 +287,10 @@ export async function manejar(req, context) {
         accion: accionValida(marca, datos.accion),
         via,
       };
-      if (redaccion.largo || redaccion.muchasPreguntas) salida.redaccion = 'floja';
+      // Se deja constancia de lo que hubo que arreglar. Antes esto decía
+      // «floja» y nadie lo leía; ahora nombra QUÉ se corrigió, que es lo
+      // único que sirve para ajustar el tono del negocio.
+      if (pulido.arreglos.length) salida.pulido = pulido.arreglos;
     }
 
     // Cuando hubo un fallo antes de acertar, se deja constancia: es la señal

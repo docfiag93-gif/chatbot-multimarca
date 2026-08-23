@@ -22,7 +22,7 @@
 import { env } from './nucleo/entorno.mjs';
 import { construirPrompt, decidirSinIA } from './nucleo/cerebro.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
-import { revisarAnclaje, limpiarMuletillas, respuestaSinDato } from './nucleo/anclaje.mjs';
+import { revisarAnclaje, pulir, respuestaSinDato } from './nucleo/anclaje.mjs';
 import { explicarFallo } from './nucleo/diagnostico.mjs';
 import { empresaPorWhatsapp, guardarConversacion, avisar } from './nucleo/datos.mjs';
 
@@ -176,7 +176,9 @@ export async function manejar(req, context = {}) {
       const { datos, via } = await preguntar({
         marca, prompt: construirPrompt(marca, mensajes), leerEntorno: env,
       });
-      const texto = limpiarMuletillas(datos.texto || '');
+      // El MISMO pulido que la web. Cuando cada canal tenía el suyo, este
+      // ya se había quedado sin la revisión de redacción.
+      const texto = pulir(datos.texto || '').texto;
       const anclaje = revisarAnclaje(marca, texto);
       salida = anclaje.anclado
         ? { ...datos, texto, via }

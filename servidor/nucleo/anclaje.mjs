@@ -250,3 +250,83 @@ export function respuestaSinDato(perfil, inventadas) {
     accion: hayContacto ? 'derivar_humano' : 'capturar_contacto',
   };
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   PULIR LA RESPUESTA  ·  lo que se hace con lo que el modelo contestó
+
+   Existe por dos defectos que estaban a la vista y nadie veía:
+
+   1. `revisarRedaccion` medía y no hacía nada. Detectaba que la respuesta
+      venía larga o con tres preguntas encimadas, lo apuntaba en un campo
+      `redaccion: 'floja'` que nadie leía, y la mandaba igual. Medir sin
+      actuar es el equivalente a una alarma desconectada — y ese era
+      exactamente el «se aloca al contestar» del que se quejó Fernando.
+
+   2. La web y WhatsApp ya habían empezado a separarse: la web limpiaba
+      muletillas y revisaba redacción, WhatsApp solo lo primero. Dos
+      canales con distinto criterio es como acaban diciendo cosas
+      distintas.
+
+   Así que el pulido vive AQUÍ, en un solo lugar, y los dos canales llaman
+   a lo mismo.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Corta un texto largo por la última frase completa que quepa.
+ *
+ * Nunca a media palabra ni a media frase: una respuesta cortada con «…»
+ * se lee como si el bot se hubiera caído, y eso preocupa más que un
+ * párrafo de sobra.
+ */
+export function recortarAFrases(texto, maxPalabras) {
+  const frases = String(texto).split(/(?<=[.!?])\s+/);
+  const salida = [];
+  let cuenta = 0;
+
+  for (const f of frases) {
+    const n = f.trim().split(/\s+/).filter(Boolean).length;
+    // Siempre entra al menos una frase, aunque ella sola pase del límite:
+    // devolver vacío sería peor que devolver de más.
+    if (salida.length && cuenta + n > maxPalabras) break;
+    salida.push(f.trim());
+    cuenta += n;
+  }
+  return salida.join(' ');
+}
+
+/**
+ * Deja UNA sola pregunta: la última.
+ *
+ * Un bot que remata con «¿te agendo? ¿o prefieres llamar? ¿qué día te
+ * queda?» obliga a elegir entre tres cosas a la vez, y lo normal es que
+ * la persona no conteste ninguna. La última suele ser la que cierra.
+ */
+export function unaSolaPregunta(texto) {
+  const frases = String(texto).split(/(?<=[.!?])\s+/).map(f => f.trim()).filter(Boolean);
+  const conPregunta = frases.filter(f => f.includes('?'));
+  if (conPregunta.length <= 1) return frases.join(' ');
+
+  const ultima = conPregunta[conPregunta.length - 1];
+  return frases.filter(f => !f.includes('?') || f === ultima).join(' ');
+}
+
+/**
+ * El pulido completo, en el orden que importa.
+ *
+ * Las muletillas primero: quitarlas cambia el número de palabras, así que
+ * medir antes de limpiarlas daría un largo que no es el real.
+ */
+export function pulir(texto, { maxPalabras = 90 } = {}) {
+  let t = limpiarMuletillas(String(texto || '')).trim();
+  const antes = revisarRedaccion(t, { maxPalabras });
+  const arreglos = [];
+
+  if (antes.muchasPreguntas) { t = unaSolaPregunta(t); arreglos.push('preguntas'); }
+  if (revisarRedaccion(t, { maxPalabras }).largo) {
+    t = recortarAFrases(t, maxPalabras); arreglos.push('largo');
+  }
+  if (antes.muletillas) arreglos.push('muletillas');
+
+  return { texto: t.trim(), arreglos, antes };
+}
