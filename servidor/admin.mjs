@@ -25,6 +25,7 @@ import { normalizarPerfil, revisarPerfil, aSlug, IDIOMAS, TIPOS_OFERTA }
 import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
 import { catalogoDePoliticas } from './nucleo/politicas.mjs';
 import { catalogoDeAcciones } from './nucleo/acciones.mjs';
+import { preguntar } from './nucleo/proveedores.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -562,6 +563,34 @@ export async function manejar(req, context) {
                                        soloUrgencias: !!datos.soloUrgencias } });
         return json({ conversaciones: abiertas,
                       auditoria: anotado.ok ? undefined : 'no se pudo anotar' });
+      }
+
+      /* ── ¿por qué falló la IA? ─────────────────────────────────────────
+         El endpoint del chat es público y anónimo, así que cuando todos los
+         proveedores fallan solo contesta «se me trabó la conexión». Está
+         bien: a un desconocido no se le informa que el sitio está a medio
+         montar.
+
+         El problema es que ese detalle no lo veía NADIE — tampoco el dueño.
+         Un bot que falla sin dejar forma de saber por qué obliga a adivinar,
+         y adivinar sobre proveedores de IA es carísimo en tiempo.
+
+         Aquí sí se cuenta todo, porque de este lado hay una sesión. Los
+         mensajes ya vienen limpios de llaves desde `proveedores.mjs`. */
+      case 'bot.diagnosticar': {
+        if (!esDueno) return negar();
+        const arranque = Date.now();
+        try {
+          const r = await preguntar({
+            prompt: 'Contesta exactamente: ok',
+            leerEntorno: env,
+          });
+          return json({ ok: true, via: r.via, origen: r.origen,
+                        ms: Date.now() - arranque, intentos: r.intentos || [] });
+        } catch (e) {
+          return json({ ok: false, codigo: e.codigo || 'FALLO',
+                        ms: Date.now() - arranque, intentos: e.intentos || [] });
+        }
       }
 
       case 'bitacora.listar': {

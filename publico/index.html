@@ -1101,6 +1101,15 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <div id="salida-llave"></div>
     </div>
     <div class="tarjeta">
+      <h2 class="sec">Probar la IA</h2>
+      <p class="pista">Le manda una pregunta de verdad a cada proveedor y dice
+      cuál contestó, cuánto tardó y —si falló— con qué error. Cuando el chat dice
+      «se me trabó la conexión», esto responde por qué.</p>
+      <div class="fila" style="margin-top:12px"><button class="btn" id="btn-diagnosticar">Probar ahora</button></div>
+      <div id="salida-diagnostico"></div>
+    </div>
+
+    <div class="tarjeta">
       <h2 class="sec">Probar el cifrado</h2>
       <p class="pista">Corre las pruebas del módulo en vivo: ida y vuelta, aislamiento
       entre negocios, detección de manipulación y rotación de llave.</p>
@@ -2958,6 +2967,43 @@ $('#ver-clave').addEventListener('click', () => {
 });
 
 /* ── herramientas ─────────────────────────────────────────────────── */
+
+/**
+ * Por qué falló la IA.
+ *
+ * El chat es público, así que cuando todo falla solo dice «se me trabó la
+ * conexión» — correcto para un visitante, inútil para quien tiene que
+ * arreglarlo. Aquí, con sesión, se cuenta todo.
+ */
+$('#btn-diagnosticar').addEventListener('click', async () => {
+  const caja = $('#salida-diagnostico');
+  if (!enLinea) { caja.innerHTML = '<div class="aviso info">Hace falta iniciar sesión.</div>'; return; }
+
+  const b = $('#btn-diagnosticar'); b.disabled = true; b.textContent = 'Probando…';
+  caja.innerHTML = '<p class="pista">Preguntándole a cada proveedor…</p>';
+  try {
+    const d = await api('bot.diagnosticar');
+    const filas = (d.intentos || []).map(i => `
+      <tr><td><b>${esc(i.proveedor)}</b></td>
+          <td>${i.estado ? esc(String(i.estado)) : '—'}</td>
+          <td class="pista">${esc(i.detalle || '')}</td></tr>`).join('');
+
+    caja.innerHTML = d.ok
+      ? `<div class="aviso ok" style="margin-top:12px">Contestó <b>${esc(d.via)}</b>
+           en ${d.ms} ms${(d.intentos||[]).length ? ' — después de ' + d.intentos.length + ' intento(s) fallido(s)' : ''}.</div>
+         ${filas ? `<div class="desliza"><table><tr><th>Proveedor</th><th>Estado</th><th>Qué pasó</th></tr>${filas}</table></div>` : ''}`
+      : `<div class="aviso mal" style="margin-top:12px">Ninguno contestó
+           (<code>${esc(d.codigo)}</code>, ${d.ms} ms). Esto es lo que dijo cada uno:</div>
+         <div class="desliza"><table><tr><th>Proveedor</th><th>Estado</th><th>Qué pasó</th></tr>${filas}</table></div>
+         <p class="pista" style="margin-top:10px">Un <b>429</b> es cuota agotada: espera o
+         cambia de proveedor. Un <b>401/403</b> es llave mala. Un <b>408</b> es que no
+         contestó a tiempo.</p>`;
+  } catch (e) {
+    caja.innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
+  }
+  b.disabled = false; b.textContent = 'Probar ahora';
+});
+
 $('#btn-llave').addEventListener('click', async () => {
   const { generarLlaveMaestra } = await import('./cerebro/cifrado.mjs');
   const llave = generarLlaveMaestra();
