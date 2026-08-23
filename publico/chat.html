@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat</title>
+<!-- ════════════════════════════════════════════════════════════════════
+     LA PÁGINA QUE VE UN PACIENTE.
+
+     Existe porque el QR llevaba a `index.html`, que es la CONSOLA DE
+     ADMINISTRACIÓN. Quien escaneaba un código pegado en la sala de espera
+     aterrizaba en el panel donde se dan de alta negocios, con un widget de
+     demostración que ni siquiera mostraba el consultorio correcto.
+
+     Aquí no hay panel, ni pestañas, ni ejemplos: el negocio sale del
+     parámetro `?marca=` y lo único que hay es el chat, ya abierto.
+     ════════════════════════════════════════════════════════════════════ -->
+<style>
+  :root{color-scheme:light dark}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;display:grid;place-items:center;padding:24px;
+    background:#f2f4f7;color:#141b25;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6}
+  @media (prefers-color-scheme:dark){ body{background:#0b1017;color:#eef2f7} }
+  .centro{text-align:center;max-width:34ch}
+  .glifo{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;
+    font-size:26px;margin:0 auto 16px;background:#e8e7fb;color:#5b54d6}
+  @media (prefers-color-scheme:dark){ .glifo{background:#272a54;color:#a5a0ff} }
+  h1{font-size:20px;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+  p{margin:0;font-size:14.5px;opacity:.7}
+  .pista{margin-top:22px;font-size:13px;opacity:.55}
+</style>
+</head>
+<body>
+  <div class="centro">
+    <div class="glifo" id="glifo">💬</div>
+    <h1 id="titulo">Cargando…</h1>
+    <p id="bajada"></p>
+    <p class="pista" id="pista">Toca el botón de abajo a la derecha para escribir.</p>
+  </div>
+
+<script>
+(function () {
+  var marca = new URLSearchParams(location.search).get('marca') || '';
+
+  if (!marca) {
+    document.getElementById('titulo').textContent = 'Falta decir de qué negocio';
+    document.getElementById('bajada').textContent =
+      'Este enlace necesita el nombre del negocio al final: ?marca=mi-negocio';
+    document.getElementById('pista').style.display = 'none';
+    return;
+  }
+
+  // El nombre y el avatar se piden al servidor: la página no sabe nada del
+  // negocio de antemano, igual que el widget.
+  fetch('/api/bot?config=1&marca=' + encodeURIComponent(marca))
+    .then(function (r) { return r.json(); })
+    .then(function (c) {
+      document.title = c.nombre || 'Chat';
+      document.getElementById('titulo').textContent = c.nombre || 'Chat';
+      document.getElementById('bajada').textContent = c.suspendida
+        ? 'Este chat está fuera de servicio por el momento.'
+        : (c.descripcion || '');
+      var av = (c.marca || c.identidad || {}).avatar;
+      if (av) document.getElementById('glifo').textContent = av;
+      if (c.suspendida) document.getElementById('pista').style.display = 'none';
+    })
+    .catch(function () {
+      document.getElementById('titulo').textContent = 'Chat';
+    });
+
+  var s = document.createElement('script');
+  s.src = 'widget.js';
+  s.dataset.marca = marca;
+  s.defer = true;
+  document.body.appendChild(s);
+
+  // Se abre solo: quien llega escaneando un código viene a escribir, no a
+  // buscar dónde tocar.
+  s.addEventListener('load', function () {
+    setTimeout(function () {
+      var raiz = document.querySelector('[data-chatbot], #chatbot-isa') ||
+                 [].slice.call(document.body.children).filter(function (n) { return n.shadowRoot; })[0];
+      var boton = raiz && raiz.shadowRoot && raiz.shadowRoot.querySelector('button');
+      if (boton) boton.click();
+    }, 400);
+  });
+})();
+</script>
+</body>
+</html>
