@@ -131,6 +131,28 @@ function repartirLlaves(blob) {
 }
 
 /**
+ * Encuentra el negocio por su número de WhatsApp.
+ *
+ * WhatsApp no manda el slug: manda a QUÉ número le escribieron. El
+ * `phone_number_id` que da Meta es lo único que llega, así que es lo que se
+ * guarda en cada empresa y por lo que se busca aquí.
+ */
+export async function empresaPorWhatsapp(phoneId) {
+  const sb = servicio();
+  if (!sb || !phoneId) return null;
+
+  let fila;
+  try {
+    const filas = await sb.seleccionar('empresas', '*',
+      `whatsapp_id=eq.${encodeURIComponent(phoneId)}&limit=1`);
+    fila = filas?.[0];
+  } catch (e) { return null; }
+  if (!fila) return null;
+
+  return empresaPorSlug(fila.slug);
+}
+
+/**
  * La marca que va a usar el bot: base primero, archivo después.
  * `origen` sirve para depurar sin adivinar de dónde salió la configuración.
  */

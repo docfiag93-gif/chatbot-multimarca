@@ -1776,6 +1776,10 @@ function accionesDe(n, estado) {
   b.push(`<button class="btn sec chico" data-hacer="probar" data-slug="${esc(n.slug)}">Probar</button>`);
   b.push(`<button class="btn fantasma chico" data-hacer="copiar" data-slug="${esc(n.slug)}">Copiar código</button>`);
   b.push(`<button class="btn fantasma chico" data-hacer="qr" data-slug="${esc(n.slug)}">QR</button>`);
+  if (enLinea && n.id && !n.ejemplo) {
+    b.push(`<button class="btn fantasma chico" data-hacer="whatsapp" data-id="${esc(n.id)}">${
+      n.whatsapp_id ? '✓ WhatsApp' : 'WhatsApp'}</button>`);
+  }
 
   if (enLinea && n.id && !n.ejemplo) {
     if (estado !== 'publicado')
@@ -1846,6 +1850,8 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
   }
 
   if (hacer === 'qr') { await mostrarQR(slug); return; }
+
+  if (hacer === 'whatsapp') { mostrarWhatsapp(id); return; }
 
 
   if (hacer === 'copiar') {
@@ -2348,6 +2354,83 @@ async function cargarTablero() {
    SUPERUSUARIO
    ══════════════════════════════════════════════════════════════════════ */
 /**
+ * Vincular el WhatsApp del negocio.
+ *
+ * Lo que se guarda NO es el teléfono: es el `phone_number_id` que da Meta.
+ * Confundirlos es el error más común de este trámite, así que la pantalla lo
+ * dice antes de que se escriba nada.
+ */
+function mostrarWhatsapp(id) {
+  const n = negocios.find(x => x.id === id) || {};
+  const yaEsta = !!n.whatsapp_id;
+
+  const caja = document.createElement('div');
+  caja.className = 'velo';
+  caja.innerHTML = `<div class="cuadro" role="dialog" aria-modal="true" aria-label="Vincular WhatsApp">
+      <div class="fila" style="justify-content:space-between;align-items:flex-start">
+        <div><h2 class="sec" style="margin:0">WhatsApp de ${esc(n.nombre || '')}</h2>
+        <p class="pista" style="margin:2px 0 0">${yaEsta
+          ? 'Vinculado. El bot ya contesta ahí.'
+          : 'Para que el bot conteste dentro de WhatsApp.'}</p></div>
+        <button class="btn sec chico" data-cerrar>Cerrar</button>
+      </div>
+
+      <div id="wa-msg" style="margin-top:14px"></div>
+
+      <div class="campo" style="margin-top:14px">
+        <label for="wa-id">Identificador del número (phone_number_id)</label>
+        <input id="wa-id" inputmode="numeric" placeholder="123456789012345"
+               value="${esc(n.whatsapp_id || '')}">
+        <p class="pista"><b>No es tu teléfono.</b> Es el número largo que da Meta
+        en el panel de tu app, junto al número de WhatsApp. Confundirlos es el
+        error más común de este trámite.</p>
+      </div>
+
+      <div class="fila">
+        <button class="btn" id="wa-guardar">${yaEsta ? 'Actualizar' : 'Vincular'}</button>
+        ${yaEsta ? '<button class="btn fantasma" id="wa-quitar">Desvincular</button>' : ''}
+      </div>
+
+      <div class="tarjeta" style="margin-top:18px;background:var(--hundido)">
+        <h3 style="margin:0 0 10px;font-size:14px">Lo que hay que poner en Meta</h3>
+        <p class="pista" style="margin:0 0 8px">En tu app de Meta, sección WhatsApp →
+        Configuración → Webhook:</p>
+        <pre style="white-space:pre-wrap;word-break:break-all">URL de devolución de llamada
+${esc(location.origin)}/api/whatsapp
+
+Token de verificación
+el valor que pusiste en WHATSAPP_VERIFY_TOKEN</pre>
+        <p class="pista" style="margin-top:8px">Y suscribir el campo <code>messages</code>.
+        Sin eso, Meta recibe los mensajes y nunca nos los manda.</p>
+      </div>
+    </div>`;
+  document.body.appendChild(caja);
+
+  const cerrar = () => caja.remove();
+  caja.querySelector('[data-cerrar]').addEventListener('click', cerrar);
+  caja.addEventListener('click', e => { if (e.target === caja) cerrar(); });
+
+  const guardar = async (valor) => {
+    const b = caja.querySelector('#wa-guardar');
+    b.disabled = true;
+    try {
+      await api('empresas.whatsapp', { id, whatsapp_id: valor });
+      await cargarNegocios();
+      caja.querySelector('#wa-msg').innerHTML =
+        `<div class="aviso ok">${valor ? 'Vinculado.' : 'Desvinculado.'}</div>`;
+      setTimeout(cerrar, 1200);
+    } catch (e) {
+      caja.querySelector('#wa-msg').innerHTML = `<div class="aviso mal">${esc(traducirError(e.message))}</div>`;
+      b.disabled = false;
+    }
+  };
+
+  caja.querySelector('#wa-guardar').addEventListener('click',
+    () => guardar(caja.querySelector('#wa-id').value.trim()));
+  caja.querySelector('#wa-quitar')?.addEventListener('click', () => guardar(''));
+}
+
+/**
  * El QR de un negocio, para imprimirlo o escanearlo desde el celular.
  *
  * El código se dibuja AQUÍ, con `cerebro/qr.mjs`. Los generadores en línea
@@ -2363,7 +2446,9 @@ async function mostrarQR(slug) {
   const destinos = [
     { id: 'chat', rot: 'Abrir el chat',
       pista: 'Para pegar en el mostrador o en la sala de espera.',
-      url: location.origin + '/?marca=' + encodeURIComponent(slug) },
+      // A `chat.html`, NO a la consola: quien escanea es un paciente, no
+      // quien administra. Antes llevaba al panel de administración.
+      url: location.origin + '/chat.html?marca=' + encodeURIComponent(slug) },
   ];
   if (wa) {
     destinos.push({ id: 'wa', rot: 'Escribir por WhatsApp',

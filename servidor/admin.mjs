@@ -108,7 +108,7 @@ export async function manejar(req, context) {
         // Sin filtro: RLS ya decide. El superadmin ve todas, un dueño ve la
         // suya. No se filtra aquí a propósito — que mande la base.
         const filas = await sb.seleccionar('empresas',
-          'id,slug,nombre,categoria,plan,activa,estado,modo,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
+          'id,slug,nombre,categoria,plan,activa,estado,modo,whatsapp_id,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
           'order=created_at.desc');
         return json({ empresas: filas });
       }
@@ -306,6 +306,35 @@ export async function manejar(req, context) {
         await sb.bitacora({ actor: yo.id, empresa_id: datos.id, accion: 'empresa.modo',
                             detalle: { modo: datos.modo } });
         return json({ empresa: g[0] });
+      }
+
+      /* Vincular el número de WhatsApp del negocio.
+         El `phone_number_id` NO es el teléfono: es el identificador que da
+         Meta. Se guarda porque es lo único que llega en un mensaje entrante,
+         y es como se sabe a qué negocio pertenece.
+
+         Es del DUEÑO: es su número. El índice único de la base impide que
+         dos negocios compartan uno, que es como se cruzarían las
+         conversaciones de dos clientes distintos. */
+      case 'empresas.whatsapp': {
+        if (!esDueno) return negar();
+        const wid = String(datos.whatsapp_id || '').trim();
+        if (wid && !/^\d{5,32}$/.test(wid)) {
+          return json({ error: 'El identificador de Meta son solo dígitos.' }, 400);
+        }
+        try {
+          const g = await sb.actualizar('empresas', `id=eq.${datos.id}`,
+            { whatsapp_id: wid || null });
+          if (!g?.[0]) return json({ error: 'Esa empresa no existe o no es tuya.' }, 404);
+          await sb.bitacora({ actor: yo.id, empresa_id: datos.id, accion: 'empresa.whatsapp',
+                              detalle: { vinculado: !!wid } });
+          return json({ empresa: g[0] });
+        } catch (e) {
+          if (/23505|duplicate key/i.test(String(e.message))) {
+            return json({ error: 'Ese número de WhatsApp ya está vinculado a otro negocio.' }, 409);
+          }
+          throw e;
+        }
       }
 
       case 'empresas.suspender': {
