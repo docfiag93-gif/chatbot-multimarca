@@ -119,6 +119,37 @@ Decisiones que conviene no deshacer:
 aprobados falsos una vez): superadmin ve 2, el otro usuario ve 1 suyo y
 **0 ajenos**. Datos de prueba borrados.
 
+## 🔌 Interruptor del bot — HECHO (22-ago)
+
+Columna `modo` en `empresas`, **ya migrada** (`db/03-modo-del-bot.sql` es
+respaldo, no hay que correrlo). Tres estados en la tarjeta de cada negocio:
+
+| | Qué hace |
+|---|---|
+| **Contestando** | Normal, con IA |
+| **Solo recados** | No llama a la IA. Dice que contesta una persona y toma nombre y teléfono |
+| **Apagado** | No contesta. Manda a escribir directo |
+
+Es del **dueño**, no solo del superadmin: quien recibe la queja del paciente
+es el médico, de noche.
+
+⚠️ **La urgencia clínica corre en los TRES estados.** La primera versión
+cortaba por «apagado» antes del filtro y un «me duele el pecho» se habría ido
+sin el 911. Por eso el orden vive en `decidirSinIA()` (pura, probada) y no
+suelto en el manejador. Si alguien mueve ese orden, seis pruebas se ponen
+rojas.
+
+## 🚨 Pendiente de comprobar en cuanto se despliegue
+
+El bot **no puede leer los negocios de la base**: `?config=1&marca=…` de su
+consultorio devuelve la marca neutral (`id: null`, «Asistente»). La sospecha
+firme es que `SUPABASE_SERVICE_KEY` trae la llave PUBLICABLE: con esa,
+PostgREST no falla, devuelve CERO FILAS. Prueba con MCP (service_role): la
+fila sí existe y sí es visible. Por eso el bot no actúa como service_role.
+
+Ya está el instrumento para confirmarlo: `?ping=1` ahora trae
+`baseResponde` y `negociosVisibles`.
+
 ## 🔴 Lo que Fernando pidió y NO está hecho
 
 Por orden en que lo dijo. Nada de esto está construido todavía.
