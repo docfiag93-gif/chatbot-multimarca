@@ -434,6 +434,22 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 .hilo .msj .en{display:block;font-size:10.5px;opacity:.7;margin-top:5px}
 .hilo .responder{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
 .hilo .responder textarea{flex:1;min-width:190px;min-height:56px}
+
+/* Cuadro emergente del QR. */
+.velo{position:fixed;inset:0;background:rgba(8,12,18,.55);display:grid;
+  place-items:center;padding:20px;z-index:50;overflow:auto}
+.cuadro{background:var(--panel);border:1px solid var(--linea);border-radius:16px;
+  padding:22px;max-width:620px;width:100%;box-shadow:var(--sombra)}
+.qrs{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:16px;margin-top:18px}
+.qr-uno{text-align:center;background:var(--hundido);border:1px solid var(--linea-sutil);
+  border-radius:12px;padding:16px}
+.qr-uno h3{margin:0 0 10px;font-size:14px}
+.qr-uno .lienzo{background:#fff;border-radius:8px;padding:10px;display:inline-block;
+  min-height:60px}
+.qr-uno svg{display:block;width:100%;height:auto;max-width:220px}
+.qr-uno code{display:block;font-size:10.5px;margin-top:10px;word-break:break-all;
+  color:var(--tenue)}
 </style>
 </head>
 <body>
@@ -1588,6 +1604,7 @@ function accionesDe(n, estado) {
   }
   b.push(`<button class="btn sec chico" data-hacer="probar" data-slug="${esc(n.slug)}">Probar</button>`);
   b.push(`<button class="btn fantasma chico" data-hacer="copiar" data-slug="${esc(n.slug)}">Copiar código</button>`);
+  b.push(`<button class="btn fantasma chico" data-hacer="qr" data-slug="${esc(n.slug)}">QR</button>`);
 
   if (enLinea && n.id && !n.ejemplo) {
     if (estado !== 'publicado')
@@ -1638,6 +1655,8 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
     b.disabled = false; b.textContent = antes;
     return;
   }
+
+  if (hacer === 'qr') { await mostrarQR(slug); return; }
 
   if (hacer === 'copiar') {
     const ok = await copiarTexto(fragmentoDe(slug));
@@ -2135,6 +2154,69 @@ async function cargarTablero() {
 /* ══════════════════════════════════════════════════════════════════════
    SUPERUSUARIO
    ══════════════════════════════════════════════════════════════════════ */
+/**
+ * El QR de un negocio, para imprimirlo o escanearlo desde el celular.
+ *
+ * El código se dibuja AQUÍ, con `cerebro/qr.mjs`. Los generadores en línea
+ * reciben el texto como parámetro de la URL, y en un QR de WhatsApp ese
+ * texto lleva el teléfono dentro: usarlos sería mandarle el número de cada
+ * médico a un servidor ajeno para dibujar cuadritos.
+ */
+async function mostrarQR(slug) {
+  const n = negocios.find(x => x.slug === slug) || {};
+  const wa = (n.contactos || {}).principal?.whatsapp
+          || Object.values(n.contactos || {})[0]?.whatsapp || '';
+
+  const destinos = [
+    { id: 'chat', rot: 'Abrir el chat',
+      pista: 'Para pegar en el mostrador o en la sala de espera.',
+      url: location.origin + '/?marca=' + encodeURIComponent(slug) },
+  ];
+  if (wa) {
+    destinos.push({ id: 'wa', rot: 'Escribir por WhatsApp',
+      pista: 'El mismo enlace que da el bot al pedir hablar con una persona.',
+      url: 'https://wa.me/' + String(wa).replace(/[^\d]/g, '') +
+           '?text=' + encodeURIComponent('Hola, vengo del chat') });
+  }
+
+  const caja = document.createElement('div');
+  caja.className = 'velo';
+  caja.innerHTML = `<div class="cuadro" role="dialog" aria-modal="true" aria-label="Código QR">
+      <div class="fila" style="justify-content:space-between;align-items:flex-start">
+        <div><h2 class="sec" style="margin:0">Código QR</h2>
+        <p class="pista" style="margin:2px 0 0">${esc(n.nombre || slug)}</p></div>
+        <button class="btn sec chico" data-cerrar>Cerrar</button>
+      </div>
+      <div class="qrs">${destinos.map(d => `
+        <div class="qr-uno">
+          <h3>${esc(d.rot)}</h3>
+          <div class="lienzo" data-qr="${esc(d.id)}"></div>
+          <p class="pista">${esc(d.pista)}</p>
+          <code>${esc(d.url)}</code>
+        </div>`).join('')}</div>
+      <p class="pista" style="margin-top:16px">Se dibuja en tu navegador. El
+      número no se le manda a ningún servicio de terceros.</p>
+    </div>`;
+  document.body.appendChild(caja);
+
+  const cerrar = () => caja.remove();
+  caja.querySelector('[data-cerrar]').addEventListener('click', cerrar);
+  caja.addEventListener('click', e => { if (e.target === caja) cerrar(); });
+  document.addEventListener('keydown', function esc2(e) {
+    if (e.key === 'Escape') { cerrar(); document.removeEventListener('keydown', esc2); }
+  });
+
+  try {
+    const { svgQR } = await import('./cerebro/qr.mjs');
+    destinos.forEach(d => {
+      caja.querySelector(`[data-qr="${d.id}"]`).innerHTML = svgQR(d.url, { tamano: 220 });
+    });
+  } catch (e) {
+    caja.querySelector('.qrs').innerHTML =
+      `<div class="aviso mal">No pude dibujarlo: ${esc(e.message)}</div>`;
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    SOPORTE
 
