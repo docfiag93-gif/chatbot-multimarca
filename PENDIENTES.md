@@ -71,6 +71,54 @@ que la portada, el buzón y Google.
 **Ya está:** pestaña «Solicitudes», con nombre, WhatsApp en un clic, motivo,
 filtro de pendientes y «Marcar atendido». Respeta el selector de contexto.
 
+## 🔧 El bloqueo real: no se podía EDITAR un negocio
+
+Fernando: «no hay nada, ni cómo vincular el WhatsApp ni cómo ponerle
+contexto». Tenía razón, y el motivo era otro: **el asistente solo servía para
+CREAR.** Una vez creado el negocio no había botón para volver a abrirlo, así
+que los campos existían pero eran inalcanzables.
+
+`empresas.detalle` (que además descifra) estaba en el servidor desde el
+principio y ninguna pantalla lo llamaba — el mismo patrón que con `leads.listar`.
+
+**Ya está:** botón **Editar** en cada tarjeta, primero y en sólido. Trae el
+negocio al asistente con todo lleno y al guardar actualiza en vez de duplicar.
+
+⚠️ **Trampa esquivada:** el asistente NO pregunta horarios, ubicaciones ni
+objetivos, pero el perfil sí los guarda. Guardar desde el formulario los
+habría borrado en silencio. Se conservan en `extrasDelNegocio` y solo se pisa
+lo que el formulario controla. Si algún día se agregan campos de horarios al
+asistente, hay que quitarlos de ahí.
+
+**También:** el campo de WhatsApp estaba hasta el fondo del paso 5, debajo de
+dos listas de casillas. Ahora abre el paso. Y el paso 4 trae ejemplos
+desplegables para un consultorio (tratamientos, diabetes, primera visita,
+costos, horarios).
+
+## ✅ Buzón de soporte — HECHO (22-ago)
+
+Tabla `reportes` **ya creada en Supabase** (migración `buzon_de_reportes`).
+El archivo `db/02-reportes.sql` queda como respaldo; no hay que volver a correrlo.
+
+Una sola pestaña **Soporte** para los dos lados: quien usa la plataforma abre
+hilos y ve los suyos; el superadmin los ve todos, contesta y mueve el estado
+(abierto → en proceso → resuelto).
+
+Decisiones que conviene no deshacer:
+
+- **El hilo va cifrado.** Quien reporta una falla cuenta qué estaba haciendo,
+  y ahí se cuelan nombres de pacientes sin que nadie lo note.
+- **Una cuenta `pendiente` SÍ puede escribir al buzón.** Es justo quien más
+  necesita reportar («llevo tres días esperando que me activen»). Dejarla
+  fuera convertía un trámite lento en un callejón sin salida.
+- **Un dueño NO ve los reportes de su equipo.** Si un empleado se queja de su
+  jefe, el jefe no debe leerlo desde el panel donde administra su negocio.
+
+**Aislamiento probado contra la base real**, no supuesto: corriendo como
+`authenticated` (no como dueño de la tabla — ese se salta RLS y ya dio
+aprobados falsos una vez): superadmin ve 2, el otro usuario ve 1 suyo y
+**0 ajenos**. Datos de prueba borrados.
+
 ## 🔴 Lo que Fernando pidió y NO está hecho
 
 Por orden en que lo dijo. Nada de esto está construido todavía.
@@ -82,8 +130,6 @@ Por orden en que lo dijo. Nada de esto está construido todavía.
    negocio) o con SQL.
 2. **Rediseñar la portada** — «no me gusta». Falta saber qué no le gusta.
 3. **Conectar Google** y que no pida confirmar el correo.
-4. **Buzón de quejas** — un chat de los usuarios hacia el administrador para
-   reportar fallas.
 5. **Mejorar la interacción del panel de usuario.**
 
 ## ✅ Arreglado el 22-ago (tercera tanda) — sin subir

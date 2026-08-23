@@ -411,6 +411,29 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 .solicitud .motivo{font-size:14px;color:var(--suave);margin:7px 0 0;line-height:1.5}
 .solicitud .cuando{font-size:11.5px;color:var(--tenue);margin-top:6px}
 .solicitud .mano{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+
+/* Hilos de soporte. Se ven como lo que son: una conversación. */
+.hilo{background:var(--panel);border:1px solid var(--linea);border-radius:13px;
+  padding:15px 17px}
+.hilo+.hilo{margin-top:11px}
+.hilo.sin-leer{border-left:3px solid var(--acento)}
+.hilo>summary{cursor:pointer;list-style:none;display:flex;gap:11px;
+  align-items:flex-start;flex-wrap:wrap}
+.hilo>summary::-webkit-details-marker{display:none}
+.hilo .asunto{flex:1;min-width:190px}
+.hilo .asunto b{font-size:15px;display:block;letter-spacing:-.01em}
+.hilo .quien-abrio{font-size:12px;color:var(--tenue);margin-top:3px}
+.hilo .charla{display:flex;flex-direction:column;gap:9px;margin:15px 0 0;
+  padding-top:15px;border-top:1px solid var(--linea-sutil)}
+.hilo .msj{max-width:86%;padding:10px 13px;font-size:14px;line-height:1.5;
+  border-radius:13px;white-space:pre-wrap;word-break:break-word}
+.hilo .msj.usuario{align-self:flex-start;background:var(--hundido);
+  border:1px solid var(--linea-sutil);border-bottom-left-radius:4px}
+.hilo .msj.admin{align-self:flex-end;background:var(--acento);
+  color:var(--acento-tinta);border-bottom-right-radius:4px}
+.hilo .msj .en{display:block;font-size:10.5px;opacity:.7;margin-top:5px}
+.hilo .responder{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
+.hilo .responder textarea{flex:1;min-width:190px;min-height:56px}
 </style>
 </head>
 <body>
@@ -440,6 +463,7 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     <button data-vista="alta" role="tab">Agregar negocio</button>
     <button data-vista="probar" role="tab">Probar el widget</button>
     <button data-vista="solicitudes" role="tab" class="oculto" id="pest-solicitudes">Solicitudes</button>
+    <button data-vista="soporte" role="tab" class="oculto" id="pest-soporte">Soporte</button>
     <button data-vista="herramientas" role="tab">Herramientas</button>
     <button data-vista="super" role="tab" class="oculto" id="pest-super">Superusuario</button>
   </nav>
@@ -661,8 +685,24 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <!-- 4 · conocimiento -->
       <div class="paso" data-paso="conocimiento">
         <h3>Lo que el asistente sabe</h3>
-        <p class="pista" style="margin-bottom:14px">Horarios, formas de pago, políticas
-        de envío. Lo que no esté aquí, el asistente dirá que no lo sabe — en vez de inventarlo.</p>
+        <p class="pista" style="margin-bottom:6px"><b>Aquí es donde le cargas la
+        información de tu negocio.</b> Un tema por renglón: a la izquierda de qué
+        trata, a la derecha lo que debe contestar. Lo que no esté aquí, dirá que
+        no lo sabe — en vez de inventarlo.</p>
+        <details class="pista" style="margin-bottom:14px">
+          <summary style="cursor:pointer">Ver ejemplos para un consultorio</summary>
+          <div style="margin-top:8px;line-height:1.7">
+            <b>tratamientos</b> · Control de diabetes, hipertensión, obesidad y
+            dislipidemia. También certificados médicos.<br>
+            <b>diabetes</b> · Es una enfermedad en la que el azúcar en sangre se
+            mantiene alta. Se controla con dieta, actividad física y a veces
+            medicamento. El control se revisa cada 3 meses con hemoglobina glucosilada.<br>
+            <b>primera visita</b> · Trae estudios recientes si los tienes y la lista
+            de medicamentos que tomas. Dura unos 40 minutos.<br>
+            <b>costos</b> · Primera vez $800, subsecuente $500. Efectivo, tarjeta o transferencia.<br>
+            <b>horarios</b> · Lunes a viernes de 16:00 a 20:00. Sábados de 9:00 a 13:00.
+          </div>
+        </details>
         <div id="conocimiento"></div>
         <button class="btn sec chico" id="btn-mas-saber">+ Agregar tema</button>
 
@@ -675,15 +715,26 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 
       <!-- 5 · comportamiento -->
       <div class="paso" data-paso="comportamiento">
-        <h3>Qué puede hacer</h3>
+        <!-- Este campo vivía hasta el final del paso, debajo de dos listas de
+             casillas. Fernando lo buscó y no lo encontró: «no hay nada, ni cómo
+             vincular el WhatsApp». Lo que se busca va arriba. -->
+        <h3>Tu WhatsApp</h3>
+        <div class="campo" style="margin-bottom:6px">
+          <label for="f-contacto">Número al que mandar a quien pida hablar con una persona</label>
+          <input id="f-contacto" placeholder="521961XXXXXXX" inputmode="tel">
+          <p class="pista">Con lada de país y sin espacios ni guiones: <code>52</code>
+          + <code>1</code> + tus diez dígitos. Para Tuxtla queda
+          <code>521961</code> y los siete restantes. No hace falta nada de Meta:
+          el botón abre el WhatsApp de quien te escribe, con su pregunta ya redactada.</p>
+        </div>
+
+        <h3 style="margin-top:24px">Qué puede hacer</h3>
         <div id="acciones"></div>
         <h3 style="margin-top:24px">Reglas especiales</h3>
         <p class="pista" style="margin-bottom:12px">Ninguna viene encendida.
         Actívalas solo si tu giro las necesita.</p>
         <div id="politicas"></div>
-        <div class="campo" style="margin-top:18px"><label for="f-contacto">WhatsApp de contacto</label>
-          <input id="f-contacto" placeholder="521961XXXXXXX">
-          <p class="pista">A dónde mandar a quien pida hablar con una persona.</p></div>
+
       </div>
 
       <!-- 6 · proveedores -->
@@ -743,6 +794,57 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     <div class="tarjeta">
       <h2 class="sec">Cómo se pega en un sitio</h2>
       <pre id="fragmento">&lt;script src="/widget.js" data-marca="mi-negocio" defer&gt;&lt;/script&gt;</pre>
+    </div>
+  </section>
+
+  <!-- ══════════ SOPORTE ══════════
+       Una sola pantalla para los dos lados. Quien usa la plataforma abre
+       hilos; quien la administra los contesta. Separarlos en dos pantallas
+       obligaría a mantener dos veces la misma conversación. -->
+  <section id="v-soporte" class="oculto">
+    <div class="tarjeta" id="caja-nuevo-reporte">
+      <h2 class="sec">Reportar algo</h2>
+      <p class="pista" style="margin-top:-8px">Una falla, una queja o una idea.
+      Lo lee el administrador de la plataforma y te contesta aquí mismo.</p>
+
+      <div id="reporte-msg"></div>
+
+      <div class="fila" style="margin:14px 0 0">
+        <div class="campo" style="flex:2;min-width:200px">
+          <label for="r-asunto">¿De qué se trata?</label>
+          <input id="r-asunto" maxlength="140" placeholder="El chat no contesta en las noches">
+        </div>
+        <div class="campo" style="flex:1;min-width:130px">
+          <label for="r-tipo">Tipo</label>
+          <select id="r-tipo">
+            <option value="falla">Una falla</option>
+            <option value="queja">Una queja</option>
+            <option value="idea">Una idea</option>
+            <option value="otro">Otra cosa</option>
+          </select>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="r-texto">Cuéntame qué pasó</label>
+        <textarea id="r-texto" rows="4" maxlength="4000"
+          placeholder="Qué estabas haciendo, qué esperabas y qué pasó en vez de eso."></textarea>
+        <p class="pista">Se guarda cifrado. Evita escribir nombres de pacientes:
+        para entender la falla casi nunca hacen falta.</p>
+      </div>
+      <button class="btn" id="btn-enviar-reporte">Enviar</button>
+    </div>
+
+    <div class="tarjeta">
+      <h2 class="sec" id="titulo-hilos">Mis reportes</h2>
+      <div class="fila oculto" id="filtro-reportes" style="margin:12px 0">
+        <select id="r-filtro-estado">
+          <option value="">Todos</option>
+          <option value="abierto">Abiertos</option>
+          <option value="en_proceso">En proceso</option>
+          <option value="resuelto">Resueltos</option>
+        </select>
+      </div>
+      <div id="lista-reportes" aria-live="polite"></div>
     </div>
   </section>
 
@@ -961,13 +1063,14 @@ $('#btn-tema').addEventListener('click', () => {
 });
 
 /* ── pestañas ─────────────────────────────────────────────────────── */
-const VISTAS = ['negocios','alta','probar','solicitudes','herramientas','super'];
+const VISTAS = ['negocios','alta','probar','solicitudes','soporte','herramientas','super'];
 $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   $$('#pestanas button').forEach(x => delete x.dataset.on);
   b.dataset.on = '1';
   VISTAS.forEach(v => $('#v-'+v).classList.toggle('oculto', v !== b.dataset.vista));
   if (b.dataset.vista === 'alta') pintarPaso();
   if (b.dataset.vista === 'solicitudes') cargarSolicitudes();
+  if (b.dataset.vista === 'soporte') cargarReportes();
 }));
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1190,10 +1293,21 @@ function refrescarPrevio() {
    ══════════════════════════════════════════════════════════════════════ */
 let altaId = null, altaSlug = null;
 
+/* Lo que el negocio TIENE pero el asistente no pregunta: horarios,
+   ubicaciones, objetivos, límites, destinos de aviso.
+ *
+ * Sin esto, editar para corregir un precio habría borrado los horarios en
+ * silencio, porque al guardar se manda el perfil completo armado desde el
+ * formulario y ahí esos campos no existen. Se conserva lo que venía y solo
+ * se pisa lo que el formulario sí controla. */
+let extrasDelNegocio = {};
+
 async function crearOAdoptar(p) {
   if (altaId && altaSlug === p.slug) return altaId;
   try {
     const { empresa } = await api('empresas.crear', p);
+    // Negocio nuevo: no hereda los horarios del que se estuviera editando.
+    extrasDelNegocio = {};
     altaId = empresa.id; altaSlug = p.slug;
     return altaId;
   } catch (e) {
@@ -1212,9 +1326,20 @@ async function crearOAdoptar(p) {
 
 /** Los datos que van cifrados, aparte de los que viajan en claro. */
 function secretosDe(p) {
-  return { persona: p.tono, conocimiento: p.conocimiento, limites: p.limites,
-           perfil: { catalogo: p.catalogo, atributos: p.atributos, horarios: p.horarios,
-                     ubicaciones: p.ubicaciones, objetivos: p.objetivos, tono: p.tono } };
+  const e = extrasDelNegocio;
+  return {
+    persona: p.tono,
+    conocimiento: p.conocimiento,
+    limites: p.limites?.length ? p.limites : (e.limites || []),
+    perfil: {
+      catalogo: p.catalogo, atributos: p.atributos, tono: p.tono,
+      // Estos tres no se preguntan en el asistente: se conservan tal cual
+      // venían. Ver `extrasDelNegocio`.
+      horarios:    p.horarios    && Object.keys(p.horarios).length    ? p.horarios    : (e.horarios || {}),
+      ubicaciones: p.ubicaciones && p.ubicaciones.length              ? p.ubicaciones : (e.ubicaciones || []),
+      objetivos:   p.objetivos   && p.objetivos.length                ? p.objetivos   : (e.objetivos || []),
+    },
+  };
 }
 
 async function publicar() {
@@ -1256,6 +1381,98 @@ $('#btn-borrador').addEventListener('click', async () => {
     await cargarNegocios();
   } catch (e) { $('#alta-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`; }
 });
+
+/**
+ * Trae un negocio que ya existe al asistente de alta.
+ *
+ * El servidor sabía dar el detalle descifrado desde el principio
+ * (`empresas.detalle`); no había botón que lo pidiera. Sin esto, corregir un
+ * precio o pegar el WhatsApp significaba volver a llenar los siete pasos, y
+ * cada intento chocaba contra el identificador que ya estaba ocupado.
+ */
+async function abrirParaEditar(id) {
+  const { empresa, secretos } = await api('empresas.detalle', { id });
+
+  // Lo cifrado y lo que viaja en claro se juntan aquí, en el mismo orden que
+  // usa el servidor al guardar: primero el bulto, luego las columnas sueltas.
+  const p = normalizarPerfil({
+    ...(secretos?.perfil || {}),
+    ...empresa,
+    identidad: empresa.marca || {},
+    tono: secretos?.persona || (secretos?.perfil || {}).tono || '',
+    conocimiento: secretos?.conocimiento || [],
+    limites: secretos?.limites || [],
+  });
+
+  // Lo que el asistente no pregunta se guarda aparte para no perderlo.
+  const bulto = secretos?.perfil || {};
+  extrasDelNegocio = {
+    horarios: bulto.horarios || {}, ubicaciones: bulto.ubicaciones || [],
+    objetivos: bulto.objetivos || [], limites: secretos?.limites || [],
+  };
+
+  // Que guardar actualice en vez de crear otro.
+  altaId = empresa.id; altaSlug = p.slug;
+  llenarFormulario(p);
+
+  $('#alta-msg').innerHTML = `<div class="aviso info">Editando
+    <b>${esc(p.nombre)}</b>. Lo que guardes reemplaza lo que estaba.</div>`;
+  document.querySelector('[data-vista=alta]').click();
+  pasoActual = 0; pintarPaso();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function llenarFormulario(p) {
+  const i = p.identidad || {};
+  $('#f-nombre').value = p.nombre || '';
+  $('#f-slug').value   = p.slug || '';
+  slugTocado = true;                    // no re-derivar el identificador
+  $('#f-desc').value   = p.descripcion || '';
+  $('#f-idioma').value = p.idioma || 'es-MX';
+  $('#f-primario').value = i.primario || NEUTRO.identidad.primario;
+  $('#f-acento').value   = i.acento   || NEUTRO.identidad.acento;
+  $('#f-avatar').value   = i.avatar   || '';
+  $('#f-logo').value     = i.logo     || '';
+  $('#f-saludo').value   = p.saludo || '';
+  $('#f-tono').value     = p.tono || '';
+  $('#f-sug').value      = (p.sugerencias || []).join('\n');
+
+  // La categoría puede ser texto libre: si no está en la lista, va en "Otro".
+  const cats = [...$('#f-cat').options].map(o => o.value);
+  if (p.categoria && cats.includes(p.categoria)) {
+    $('#f-cat').value = p.categoria;
+    $('#campo-cat-otro').classList.add('oculto');
+  } else {
+    $('#f-cat').value = p.categoria ? 'Otro' : '';
+    $('#f-cat-otro').value = p.categoria || '';
+    $('#campo-cat-otro').classList.toggle('oculto', !p.categoria);
+  }
+
+  $('#catalogo').innerHTML = '';
+  (p.catalogo || []).forEach(o => $('#catalogo').appendChild(renglonOferta(o)));
+  if (!$('#catalogo').children.length) $('#catalogo').appendChild(renglonOferta());
+
+  $('#conocimiento').innerHTML = '';
+  (p.conocimiento || []).forEach(k => $('#conocimiento').appendChild(
+    renglonPar('k', 'Tema (ej. envíos)', 'Qué debe saber', { a: k.tema, b: k.texto })));
+  if (!$('#conocimiento').children.length) {
+    $('#conocimiento').appendChild(renglonPar('k', 'Tema (ej. envíos)', 'Qué debe saber'));
+  }
+
+  $('#atributos').innerHTML = '';
+  Object.entries(p.atributos || {}).forEach(([a, bb]) => $('#atributos').appendChild(
+    renglonPar('a', 'Dato (ej. garantía)', 'Valor', { a, b: bb })));
+
+  $$('.ac').forEach(c => { if (!c.disabled) c.checked = (p.acciones || []).includes(c.value); });
+  $$('.po').forEach(c => { c.checked = (p.politicas || []).includes(c.value); });
+
+  const wa = (p.contactos || {}).principal?.whatsapp
+          || Object.values(p.contactos || {})[0]?.whatsapp || '';
+  $('#f-contacto').value = wa;
+
+  if ($('#f-orden')) $('#f-orden').value = (p.proveedores || []).join(',');
+  refrescarPrevio();
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    CONTEXTO: ¿desde dónde estoy mirando?
@@ -1363,12 +1580,18 @@ function tarjetaNegocio(n) {
  */
 function accionesDe(n, estado) {
   const b = [];
+  if (enLinea && n.id && !n.ejemplo) {
+    // Va PRIMERO y en sólido: editar es lo que más se hace con un negocio.
+    // Sin este botón, cambiar un precio obligaba a rehacer el asistente de
+    // siete pasos desde cero, y hasta hoy no había otra forma.
+    b.push(`<button class="btn chico" data-hacer="editar" data-id="${esc(n.id)}">Editar</button>`);
+  }
   b.push(`<button class="btn sec chico" data-hacer="probar" data-slug="${esc(n.slug)}">Probar</button>`);
   b.push(`<button class="btn fantasma chico" data-hacer="copiar" data-slug="${esc(n.slug)}">Copiar código</button>`);
 
   if (enLinea && n.id && !n.ejemplo) {
     if (estado !== 'publicado')
-      b.push(`<button class="btn chico" data-hacer="publicar" data-id="${esc(n.id)}">Publicar</button>`);
+      b.push(`<button class="btn sec chico" data-hacer="publicar" data-id="${esc(n.id)}">Publicar</button>`);
     if (yo?.esSuper) {
       b.push(estado === 'suspendido'
         ? `<button class="btn sec chico" data-hacer="reactivar" data-id="${esc(n.id)}">Reactivar</button>`
@@ -1406,6 +1629,15 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
   const { hacer, slug, id } = b.dataset;
 
   if (hacer === 'probar') { location.search = '?marca=' + encodeURIComponent(slug); return; }
+
+  if (hacer === 'editar') {
+    const antes = b.textContent;
+    b.disabled = true; b.textContent = 'Abriendo…';
+    try { await abrirParaEditar(id); }
+    catch (e) { alert(traducirError(e.message)); }
+    b.disabled = false; b.textContent = antes;
+    return;
+  }
 
   if (hacer === 'copiar') {
     const ok = await copiarTexto(fragmentoDe(slug));
@@ -1806,6 +2038,7 @@ async function arrancar() {
       yo = perfil; enLinea = true;
       $('#btn-salir').classList.remove('oculto');
       $('#pest-solicitudes').classList.remove('oculto');
+      $('#pest-soporte').classList.remove('oculto');
       modoConsola();
     } catch (e) {
       // Puede que solo haya caducado el acceso: se intenta una renovación
@@ -1818,6 +2051,7 @@ async function arrancar() {
           yo = perfil; enLinea = true;
           $('#btn-salir').classList.remove('oculto');
           $('#pest-solicitudes').classList.remove('oculto');
+          $('#pest-soporte').classList.remove('oculto');
           modoConsola();
           listo = true;
         } catch (e2) { /* el pase tampoco sirvió */ }
@@ -1901,6 +2135,135 @@ async function cargarTablero() {
 /* ══════════════════════════════════════════════════════════════════════
    SUPERUSUARIO
    ══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   SOPORTE
+
+   Una pantalla, dos lados. Quien usa la plataforma abre hilos y ve los
+   suyos; quien la administra los ve todos y contesta. Lo que cambia es la
+   consulta y quién puede mover el estado — no la pantalla.
+   ══════════════════════════════════════════════════════════════════════ */
+let reportes = [];
+
+async function cargarReportes() {
+  const caja = $('#lista-reportes');
+  if (!enLinea) { caja.innerHTML = '<p class="pista">Hace falta iniciar sesión.</p>'; return; }
+
+  const soyAdmin = !!yo?.esSuper;
+  $('#titulo-hilos').textContent = soyAdmin ? 'Lo que reporta la gente' : 'Mis reportes';
+  $('#filtro-reportes').classList.toggle('oculto', !soyAdmin);
+  // El administrador también puede abrir un hilo, pero no es lo que viene a
+  // hacer: el formulario queda plegado para que la lista mande.
+  $('#caja-nuevo-reporte').classList.toggle('oculto', soyAdmin && reportes.length > 0);
+
+  caja.innerHTML = '<div class="esqueleto" style="height:60px"></div>';
+  try {
+    const estado = soyAdmin ? ($('#r-filtro-estado').value || '') : '';
+    const d = soyAdmin
+      ? await api('reportes.listar', estado ? { estado } : {})
+      : await api('reportes.mios');
+    reportes = d.reportes || [];
+    pintarReportes();
+  } catch (e) {
+    caja.innerHTML = `<div class="aviso mal">No pude leerlos: ${esc(e.message)}</div>`;
+  }
+}
+
+const ROTULO_ESTADO = { abierto:'abierto', en_proceso:'en proceso', resuelto:'resuelto' };
+const PLACA_ESTADO  = { abierto:'ojo', en_proceso:'info', resuelto:'ok' };
+
+function pintarReportes() {
+  const caja = $('#lista-reportes');
+  const soyAdmin = !!yo?.esSuper;
+
+  if (!reportes.length) {
+    caja.innerHTML = `<div class="tarjeta vacio"><span class="ico">◻︎</span>
+      <h3>${soyAdmin ? 'Nadie ha reportado nada' : 'No has reportado nada'}</h3>
+      <p>${soyAdmin
+        ? 'Cuando alguien escriba desde su panel, el hilo aparece aquí.'
+        : 'Si algo no funciona como esperas, cuéntalo arriba.'}</p></div>`;
+    return;
+  }
+
+  caja.innerHTML = reportes.map(r => {
+    // «Sin leer» significa cosas distintas de cada lado: para el admin, que
+    // el último en hablar fue el usuario; para el usuario, al revés.
+    const sinLeer = soyAdmin ? r.ultimo_de === 'usuario' : r.ultimo_de === 'admin';
+    const mensajes = (r.hilo || []).map(m => `
+      <div class="msj ${m.de === 'admin' ? 'admin' : 'usuario'}">${esc(m.texto)}
+        <span class="en">${esc(m.de === 'admin' ? 'Soporte' : 'Quien reportó')} · ${esc(fecha(m.en))}</span>
+      </div>`).join('');
+
+    return `<details class="hilo ${sinLeer ? 'sin-leer' : ''}" data-r="${esc(r.id)}">
+      <summary>
+        <div class="asunto">
+          <b>${esc(r.asunto)}</b>
+          <div class="quien-abrio">${esc(fecha(r.created_at))} · ${esc(r.tipo)}${
+            (r.hilo || []).length ? ' · ' + r.hilo.length + ' mensaje(s)' : ''}</div>
+        </div>
+        <span class="placa ${PLACA_ESTADO[r.estado] || ''}">${esc(ROTULO_ESTADO[r.estado] || r.estado)}</span>
+      </summary>
+
+      ${r.error ? '<p class="pista" style="margin-top:12px">Este hilo se guardó con otra llave maestra y no se puede abrir.</p>' : ''}
+      <div class="charla">${mensajes}</div>
+
+      <div class="responder">
+        <textarea data-resp="${esc(r.id)}" rows="2"
+          placeholder="${soyAdmin ? 'Contestar…' : 'Agregar algo…'}"></textarea>
+        <button class="btn chico" data-enviar="${esc(r.id)}">Enviar</button>
+      </div>
+      ${soyAdmin ? `<div class="fila" style="margin-top:10px">
+        ${['abierto','en_proceso','resuelto'].filter(e => e !== r.estado).map(e =>
+          `<button class="btn fantasma chico" data-estado="${e}" data-r2="${esc(r.id)}">Marcar ${esc(ROTULO_ESTADO[e])}</button>`).join('')}
+      </div>` : ''}
+    </details>`;
+  }).join('');
+}
+
+$('#r-filtro-estado').addEventListener('change', cargarReportes);
+
+$('#btn-enviar-reporte').addEventListener('click', async () => {
+  const asunto = $('#r-asunto').value.trim(), texto = $('#r-texto').value.trim();
+  const aviso = (clase, t) => { $('#reporte-msg').innerHTML = `<div class="aviso ${clase}">${esc(t)}</div>`; };
+
+  if (!asunto) { $('#r-asunto').focus(); return aviso('ojo', 'Ponle un asunto, aunque sea corto.'); }
+  if (texto.length < 10) { $('#r-texto').focus(); return aviso('ojo', 'Cuéntame un poco más: con una palabra no se puede arreglar nada.'); }
+
+  const b = $('#btn-enviar-reporte'); b.disabled = true; b.textContent = 'Enviando…';
+  try {
+    await api('reportes.crear', { asunto, texto, tipo: $('#r-tipo').value });
+    $('#r-asunto').value = ''; $('#r-texto').value = '';
+    aviso('ok', 'Listo, ya quedó. Te contestamos por aquí mismo.');
+    await cargarReportes();
+  } catch (e) {
+    aviso('mal', traducirError(e.message));
+  }
+  b.disabled = false; b.textContent = 'Enviar';
+});
+
+$('#lista-reportes').addEventListener('click', async (ev) => {
+  const env = ev.target.closest('[data-enviar]');
+  if (env) {
+    const ta = $(`textarea[data-resp="${env.dataset.enviar}"]`);
+    const texto = (ta?.value || '').trim();
+    if (!texto) { ta?.focus(); return; }
+    env.disabled = true; env.textContent = '…';
+    try {
+      await api('reportes.responder', { id: env.dataset.enviar, texto });
+      await cargarReportes();
+    } catch (e) { env.disabled = false; env.textContent = 'Enviar'; alert(traducirError(e.message)); }
+    return;
+  }
+
+  const est = ev.target.closest('[data-estado]');
+  if (est) {
+    est.disabled = true;
+    try {
+      await api('reportes.estado', { id: est.dataset.r2, estado: est.dataset.estado });
+      await cargarReportes();
+    } catch (e) { est.disabled = false; alert(traducirError(e.message)); }
+  }
+});
+
 /* ══════════════════════════════════════════════════════════════════════
    SOLICITUDES
 
@@ -2178,7 +2541,7 @@ async function ajustarMetodosDeEntrada() {
    —antes se ofrecía sola, y una consola con el tablero en blanco y filtros
    que no filtran nada se lee como un panel roto, no como una demostración.
    ────────────────────────────────────────────────────────────────────── */
-const SECCIONES_CONSOLA = ['negocios','alta','probar','solicitudes','herramientas','super'];
+const SECCIONES_CONSOLA = ['negocios','alta','probar','solicitudes','soporte','herramientas','super'];
 
 function modoPortada() {
   $('#pestanas').classList.add('oculto');

@@ -86,7 +86,13 @@ export async function manejar(req, context) {
   // Una cuenta recién registrada no ve nada hasta que alguien la asigne.
   // Se le contesta con claridad en vez de con un error seco: la persona no
   // hizo nada mal, solo le falta que la den de alta.
-  if (accion !== 'sesion' && (!yo.activo || yo.rol === 'pendiente')) {
+  // Excepción a propósito: una cuenta sin activar SÍ puede escribir al buzón
+  // y leer sus propios hilos. Es justo quien más necesita reportar algo —
+  // «llevo tres días esperando que me activen» — y dejarla fuera del único
+  // canal de soporte convierte un trámite lento en un callejón sin salida.
+  const ABIERTAS_A_PENDIENTES = ['sesion', 'reportes.crear', 'reportes.mios', 'reportes.responder'];
+
+  if (!ABIERTAS_A_PENDIENTES.includes(accion) && (!yo.activo || yo.rol === 'pendiente')) {
     return json({ error: 'Tu cuenta todavía no está activada. Pídele al administrador que te asigne a una empresa.' }, 403);
   }
 
@@ -380,6 +386,84 @@ export async function manejar(req, context) {
         return json({ aviso: g[0] });
       }
 
+      /* ── buzón de soporte ────────────────────────────────────────────
+         Un hilo por reporte, cifrado con la llave derivada del AUTOR.
+         Quien reporta una falla cuenta lo que estaba haciendo, y ahí se
+         cuelan nombres de pacientes y teléfonos sin que nadie lo note.
+         Un buzón de quejas en claro acaba siendo el rincón peor cuidado
+         donde viven los datos más delicados. */
+
+      case 'reportes.mios': {
+        const filas = await sb.seleccionar('reportes', '*',
+          `autor=eq.${yo.id}&order=updated_at.desc&limit=50`);
+        return json({ reportes: await abrirHilos(filas) });
+      }
+
+      case 'reportes.listar': {
+        if (!esSuper) return negar();
+        const filtro = datos.estado ? `estado=eq.${encodeURIComponent(datos.estado)}&` : '';
+        const filas = await sb.seleccionar('reportes', '*',
+          filtro + 'order=updated_at.desc&limit=100');
+        return json({ reportes: await abrirHilos(filas) });
+      }
+
+      case 'reportes.crear': {
+        const asunto = String(datos.asunto || '').trim().slice(0, 140);
+        const texto  = String(datos.texto  || '').trim().slice(0, 4000);
+        if (!asunto || !texto) return json({ error: 'Falta el asunto o el mensaje.' }, 400);
+
+        const tipo = ['falla','queja','idea','otro'].includes(datos.tipo) ? datos.tipo : 'falla';
+        const hilo = [{ de: 'usuario', texto, en: new Date().toISOString() }];
+
+        const filas = await sb.insertar('reportes', [{
+          autor: yo.id,
+          empresa_id: yo.empresa_id || null,
+          asunto, tipo, estado: 'abierto', ultimo_de: 'usuario',
+          hilo_cifrado: await cifrar(MAESTRA, yo.id, hilo),
+        }]);
+        await sb.bitacora({ actor: yo.id, empresa_id: yo.empresa_id || null,
+                            accion: 'reporte.abrir', detalle: { tipo } });
+        return json({ reporte: { ...filas[0], hilo, hilo_cifrado: undefined } });
+      }
+
+      case 'reportes.responder': {
+        const texto = String(datos.texto || '').trim().slice(0, 4000);
+        if (!texto) return json({ error: 'Escribe el mensaje.' }, 400);
+
+        const fila = (await sb.seleccionar('reportes', '*', `id=eq.${datos.id}&limit=1`))?.[0];
+        if (!fila) return json({ error: 'No encontré ese reporte.' }, 404);
+        // Solo el superadmin, o quien abrió el hilo. Sin esto, cualquiera con
+        // un id ajeno podría escribir dentro de la conversación de otro.
+        if (!esSuper && fila.autor !== yo.id) return negar();
+
+        const de = esSuper ? 'admin' : 'usuario';
+        let hilo = [];
+        try { hilo = await descifrar(MAESTRA, fila.autor, fila.hilo_cifrado) || []; } catch (e) {}
+        hilo.push({ de, texto, en: new Date().toISOString() });
+
+        const g = await sb.actualizar('reportes', `id=eq.${datos.id}`, {
+          hilo_cifrado: await cifrar(MAESTRA, fila.autor, hilo),
+          ultimo_de: de,
+          // Que el admin conteste no lo cierra: cerrar es una decisión, no
+          // una consecuencia de haber escrito.
+          estado: fila.estado === 'abierto' && esSuper ? 'en_proceso' : fila.estado,
+          updated_at: new Date().toISOString(),
+        });
+        return json({ reporte: { ...g[0], hilo, hilo_cifrado: undefined } });
+      }
+
+      case 'reportes.estado': {
+        if (!esSuper) return negar();
+        if (!['abierto','en_proceso','resuelto'].includes(datos.estado)) {
+          return json({ error: 'Estado inválido.' }, 400);
+        }
+        const g = await sb.actualizar('reportes', `id=eq.${datos.id}`,
+          { estado: datos.estado, updated_at: new Date().toISOString() });
+        await sb.bitacora({ actor: yo.id, empresa_id: null, accion: 'reporte.estado',
+                            detalle: { reporte: datos.id, estado: datos.estado } });
+        return json({ reporte: g[0] });
+      }
+
       case 'bitacora.listar': {
         const filas = await sb.seleccionar('bitacora',
           'id,actor,empresa_id,accion,detalle,created_at', 'order=created_at.desc&limit=100');
@@ -392,4 +476,23 @@ export async function manejar(req, context) {
   } catch (e) {
     return json({ error: String(e.message || e).slice(0, 250) }, 500);
   }
+}
+
+/**
+ * Abre los hilos de una lista de reportes.
+ *
+ * Un hilo que no se puede descifrar NO tumba la lista: se marca y los demás
+ * se muestran igual. Perder el buzón entero porque un registro viejo quedó
+ * con otra llave sería cambiar un problema chico por uno grande.
+ */
+async function abrirHilos(filas) {
+  const salida = [];
+  for (const f of filas || []) {
+    let hilo = null, error = null;
+    try { hilo = await descifrar(MAESTRA, f.autor, f.hilo_cifrado); }
+    catch (e) { error = 'no se pudo abrir'; }
+    const { hilo_cifrado, ...resto } = f;
+    salida.push({ ...resto, hilo: hilo || [], error });
+  }
+  return salida;
 }
