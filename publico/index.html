@@ -64,17 +64,95 @@ body{margin:0;background:var(--fondo);color:var(--tinta);
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
 .hoja{max-width:1120px;margin:0 auto;padding:0 20px 96px}
+/* Con el cajón fijo, el contenido se recorre. En celular el cajón se sale
+   de pantalla y el contenido recupera todo el ancho. */
+body:not(.sin-cajon) .hoja{margin-left:246px;max-width:calc(1120px + 246px)}
+@media (max-width:900px){
+  body .hoja{margin-left:0;max-width:1120px}
+  .pest{transform:translateX(-100%);transition:transform .22s cubic-bezier(.2,.8,.3,1);
+    box-shadow:0 0 40px rgba(0,0,0,.28);width:270px}
+  body.menu-abierto .pest{transform:translateX(0)}
+}
+@media (prefers-reduced-motion:reduce){ .pest{transition:none} }
 
 /* ── cabecera ── */
 .top{display:flex;align-items:center;gap:14px;padding:22px 0 16px;flex-wrap:wrap}
+.barra h1{font-size:19px;margin:0;letter-spacing:-.01em}
+.barra .sub{color:var(--suave);font-size:13px;margin:2px 0 0;font-weight:400}
 .top h1{font-size:19px;margin:0;letter-spacing:-.01em;flex:1;min-width:180px}
 .top .sub{color:var(--suave);font-size:13px;margin:2px 0 0;font-weight:400}
-.pest{display:flex;gap:2px;border-bottom:1px solid var(--linea);margin-bottom:24px;overflow-x:auto}
-.pest button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;
-  font-size:14px;font-weight:600;cursor:pointer;color:var(--suave);margin-bottom:-1px;
-  white-space:nowrap;font-family:inherit}
-.pest button[data-on]{color:var(--acento);border-bottom-color:var(--acento)}
-.pest button:hover:not([data-on]){color:var(--tinta)}
+/* ══ NAVEGACIÓN LATERAL ═══════════════════════════════════════════════
+   Cajón fijo en pantalla ancha, deslizable en celular.
+
+   Sustituye a la tira de pestañas horizontal, que en un teléfono había que
+   arrastrar: las últimas —donde viven las solicitudes de gente esperando
+   respuesta— quedaban fuera de la pantalla. Aquí todo se ve de un vistazo,
+   agrupado por a quién le sirve: lo del negocio arriba, lo de la
+   plataforma abajo. ══════════════════════════════════════════════════ */
+.pest{display:flex;flex-direction:column;gap:4px;background:var(--panel);
+  border-right:1px solid var(--linea);padding:18px 12px 14px;
+  position:fixed;inset:0 auto 0 0;width:246px;overflow-y:auto;z-index:40}
+
+.marca-lateral{display:flex;align-items:center;gap:10px;padding:2px 10px 18px}
+.marca-lateral .glifo{width:34px;height:34px;border-radius:10px;flex:none;
+  background:var(--acento);color:var(--acento-tinta);display:grid;place-items:center;
+  font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,.14)}
+.marca-lateral b{display:block;font-size:14.5px;letter-spacing:-.01em;line-height:1.2}
+.marca-lateral small{display:block;font-size:11px;color:var(--tenue);line-height:1.3;margin-top:1px}
+
+.pest .grupo{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+.pest .rotulo{font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--tenue);padding:8px 10px 5px}
+.pest .grupo:has(button:not(.oculto)):empty{display:none}
+
+.pest button{display:flex;align-items:center;gap:10px;background:none;border:0;
+  padding:9px 10px;border-radius:9px;font-size:14px;font-weight:500;cursor:pointer;
+  color:var(--suave);font-family:inherit;text-align:left;width:100%;
+  transition:background .13s,color .13s}
+.pest button svg{width:17px;height:17px;flex:none;opacity:.85}
+.pest button[data-on]{background:var(--acento-suave);color:var(--acento);font-weight:600}
+.pest button[data-on] svg{opacity:1}
+.pest button:hover:not([data-on]){background:var(--hundido);color:var(--tinta)}
+
+.pest .globo{margin-left:auto;background:var(--alerta);color:#fff;font-size:11px;
+  font-weight:700;min-width:19px;height:19px;border-radius:999px;display:grid;
+  place-items:center;padding:0 5px}
+
+.pie-lateral{margin-top:auto;padding-top:14px;display:flex;flex-direction:column;gap:10px}
+
+/* El estado del bot, donde se ve sin buscarlo. El de la competencia dice
+   siempre "en línea"; este dice la verdad, incluida la incómoda. */
+.estado-bot{display:flex;align-items:flex-start;gap:9px;background:var(--hundido);
+  border:1px solid var(--linea);border-radius:11px;padding:11px 12px;font-size:12px}
+.estado-bot .punto{width:8px;height:8px;border-radius:50%;flex:none;margin-top:4px}
+.estado-bot b{display:block;font-size:12.5px;letter-spacing:-.01em}
+.estado-bot small{display:block;color:var(--tenue);line-height:1.4;margin-top:2px}
+.estado-bot.activo  .punto{background:var(--ok);box-shadow:0 0 0 3px var(--ok-suave)}
+.estado-bot.activo  b{color:var(--ok)}
+.estado-bot.recados .punto{background:var(--alerta);box-shadow:0 0 0 3px var(--alerta-suave)}
+.estado-bot.recados b{color:var(--alerta)}
+.estado-bot.apagado .punto{background:var(--mal);box-shadow:0 0 0 3px var(--mal-suave)}
+.estado-bot.apagado b{color:var(--mal)}
+.estado-bot.mezcla  .punto{background:var(--tenue)}
+
+/* En una columna de 246 px, un correo y un rol no caben en la misma línea
+   que un botón: el texto se partía en cuatro renglones y «Salir» quedaba
+   encajado en medio. Van apilados, y los dos recortados. */
+.quien{display:flex;flex-direction:column;gap:8px;padding:4px}
+.quien>div{min-width:0}
+.quien b,.quien small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quien b{font-size:12.5px}
+.quien small{font-size:11px;color:var(--tenue);margin-top:1px}
+.quien .btn{width:100%;justify-content:center;border:1px solid var(--linea)}
+
+/* ── barra de arriba y contenido ── */
+.hamburguesa{background:none;border:1px solid var(--linea);border-radius:9px;
+  width:36px;height:36px;display:grid;place-items:center;cursor:pointer;color:var(--tinta);flex:none}
+.hamburguesa svg{width:19px;height:19px}
+.velo-menu{position:fixed;inset:0;background:rgba(8,12,18,.5);z-index:39}
+
+.barra{display:flex;align-items:center;gap:12px;padding:20px 0 18px;flex-wrap:wrap}
+.barra #titulo-top{flex:1;min-width:150px}
 .oculto{display:none !important}
 
 /* ── superficies ── */
@@ -471,17 +549,26 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 <body>
 <div class="hoja">
 
-  <header class="top">
-    <div style="flex:1;min-width:180px" id="titulo-top">
+  <!-- ══════════ ARMAZÓN ══════════
+       Antes esto era una fila de pestañas horizontal. En un celular se
+       convertía en una tira que había que arrastrar, y las últimas —donde
+       viven las solicitudes de personas esperando— quedaban fuera de la
+       pantalla. Una navegación que esconde lo urgente no está ordenando:
+       está estorbando. -->
+  <header class="barra">
+    <button class="hamburguesa oculto" id="btn-menu" aria-label="Abrir el menú" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div id="titulo-top">
       <h1>Consola de negocios</h1>
       <p class="sub">Un motor, cualquier giro.</p>
     </div>
-    <button class="tema" id="btn-tema" aria-label="Cambiar entre tema claro y oscuro">◐</button>
     <label class="contexto oculto" id="caja-contexto">
       <span>Viendo</span>
       <select id="sel-contexto" aria-label="Elegir qué estás viendo"></select>
     </label>
-    <button class="btn sec chico oculto" id="btn-salir">Salir</button>
+    <button class="tema" id="btn-tema" aria-label="Cambiar entre tema claro y oscuro">◐</button>
   </header>
 
   <div id="banda-acceso" class="aviso info oculto" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
@@ -490,14 +577,36 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     <button class="btn chico" id="btn-mostrar-acceso">Iniciar sesión</button>
   </div>
 
-  <nav class="pest" id="pestanas" role="tablist">
-    <button data-vista="negocios" data-on role="tab">Negocios</button>
-    <button data-vista="alta" role="tab">Agregar negocio</button>
-    <button data-vista="probar" role="tab">Probar el widget</button>
-    <button data-vista="solicitudes" role="tab" class="oculto" id="pest-solicitudes">Solicitudes</button>
-    <button data-vista="soporte" role="tab" class="oculto" id="pest-soporte">Soporte</button>
-    <button data-vista="herramientas" role="tab">Herramientas</button>
-    <button data-vista="super" role="tab" class="oculto" id="pest-super">Superusuario</button>
+  <div class="velo-menu oculto" id="velo-menu"></div>
+
+  <nav class="pest" id="pestanas" role="tablist" aria-label="Secciones">
+    <div class="marca-lateral">
+      <span class="glifo">◍</span>
+      <div><b>Consola</b><small>Un motor, cualquier giro</small></div>
+    </div>
+
+    <div class="grupo">
+      <span class="rotulo">Tu negocio</span>
+      <button data-vista="negocios" data-on role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Negocios</button>
+      <button data-vista="solicitudes" role="tab" class="oculto" id="pest-solicitudes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>Solicitudes<span class="globo oculto" id="cuantas-solicitudes"></span></button>
+      <button data-vista="alta" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Agregar negocio</button>
+      <button data-vista="probar" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 4 11.5a8.5 8.5 0 0 1 8.5-8.5 8.4 8.4 0 0 1 8.5 8.5z"/></svg>Probar el widget</button>
+    </div>
+
+    <div class="grupo">
+      <span class="rotulo">Plataforma</span>
+      <button data-vista="soporte" role="tab" class="oculto" id="pest-soporte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>Soporte</button>
+      <button data-vista="herramientas" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.8 2.8 0 0 1-4-4z"/><path d="M18 2l4 4"/></svg>Herramientas</button>
+      <button data-vista="super" role="tab" class="oculto" id="pest-super"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 6 6 .9-4.5 4.3 1.1 6.3L12 16.5 6.4 19.5l1.1-6.3L3 8.9 9 8z"/></svg>Superusuario</button>
+    </div>
+
+    <div class="pie-lateral">
+      <div class="estado-bot oculto" id="estado-bot"></div>
+      <div class="quien oculto" id="quien-soy">
+        <div><b id="mi-correo"></b><small id="mi-rol"></small></div>
+        <button class="btn fantasma chico" id="btn-salir">Salir</button>
+      </div>
+    </div>
   </nav>
 
 
@@ -1094,6 +1203,16 @@ $('#btn-tema').addEventListener('click', () => {
   localStorage.setItem('consola:tema', nuevo);
 });
 
+/* ── el cajón en celular ──────────────────────────────────────────── */
+function cajon(abrir) {
+  document.body.classList.toggle('menu-abierto', abrir);
+  $('#velo-menu').classList.toggle('oculto', !abrir);
+  $('#btn-menu').setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+$('#btn-menu').addEventListener('click', () => cajon(!document.body.classList.contains('menu-abierto')));
+$('#velo-menu').addEventListener('click', () => cajon(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cajon(false); });
+
 /* ── pestañas ─────────────────────────────────────────────────────── */
 const VISTAS = ['negocios','alta','probar','solicitudes','soporte','herramientas','super'];
 $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
@@ -1103,6 +1222,7 @@ $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.vista === 'alta') pintarPaso();
   if (b.dataset.vista === 'solicitudes') cargarSolicitudes();
   if (b.dataset.vista === 'soporte') cargarReportes();
+  cajon(false);
 }));
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1593,6 +1713,7 @@ $('#sel-contexto').addEventListener('change', async () => {
   } catch (e) {}
   pintarContexto();
   pintarNegocios();
+  pintarPieLateral();
   await cargarTablero();
 });
 
@@ -1692,6 +1813,7 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
       const n = negocios.find(x => x.id === sw.dataset.id);
       if (n) n.modo = sw.dataset.modo;
       pintarNegocios();
+      pintarPieLateral();
     } catch (e) {
       grupo.querySelectorAll('button').forEach(x => x.disabled = false);
       alert(traducirError(e.message));
@@ -1800,6 +1922,7 @@ async function cargarNegocios() {
   pintarContexto();
   pintarNegocios();
   pintarBotonesMarca();
+  pintarPieLateral();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -2116,6 +2239,7 @@ async function arrancar() {
       yo = perfil; enLinea = true;
       $('#btn-salir').classList.remove('oculto');
       $('#pest-solicitudes').classList.remove('oculto');
+      $('#btn-menu').classList.remove('oculto');
       $('#pest-soporte').classList.remove('oculto');
       modoConsola();
     } catch (e) {
@@ -2129,6 +2253,7 @@ async function arrancar() {
           yo = perfil; enLinea = true;
           $('#btn-salir').classList.remove('oculto');
           $('#pest-solicitudes').classList.remove('oculto');
+      $('#btn-menu').classList.remove('oculto');
           $('#pest-soporte').classList.remove('oculto');
           modoConsola();
           listo = true;
@@ -2685,6 +2810,8 @@ async function ajustarMetodosDeEntrada() {
 const SECCIONES_CONSOLA = ['negocios','alta','probar','solicitudes','soporte','herramientas','super'];
 
 function modoPortada() {
+  document.body.classList.add('sin-cajon');
+  cajon(false);
   $('#pestanas').classList.add('oculto');
   $('#banda-acceso').classList.add('oculto');
   SECCIONES_CONSOLA.forEach(v => $('#v-'+v)?.classList.add('oculto'));
@@ -2692,7 +2819,42 @@ function modoPortada() {
   $('#v-acceso').classList.remove('oculto');
 }
 
+/**
+ * El pie del cajón: quién entró y cómo está su bot.
+ *
+ * El estado NO es un adorno fijo que siempre dice «en línea». Se lee del
+ * modo real de los negocios: si uno está callado, aquí se ve sin abrir
+ * nada. Un tablero que siempre dice que todo va bien no informa.
+ */
+function pintarPieLateral() {
+  const quien = $('#quien-soy'), caja = $('#estado-bot');
+  quien.classList.toggle('oculto', !enLinea);
+  if (enLinea) {
+    $('#mi-correo').textContent = yo?.email || yo?.nombre || 'Tu cuenta';
+    $('#mi-rol').textContent = yo?.esSuper ? 'Administrador'
+                             : yo?.rol === 'dueno' ? 'Dueño del negocio'
+                             : yo?.rol === 'staff' ? 'Equipo' : (yo?.rol || '');
+  }
+
+  const propios = negociosVisibles().filter(n => n.id && !n.ejemplo);
+  if (!enLinea || !propios.length) { caja.classList.add('oculto'); return; }
+
+  const modos = [...new Set(propios.map(n => n.modo || 'activo'))];
+  const clase = modos.length > 1 ? 'mezcla' : modos[0];
+  const texto = {
+    activo:  ['Bot en línea', 'Respondiendo automáticamente.'],
+    recados: ['Solo recados', 'No contesta por su cuenta: toma nombre y teléfono.'],
+    apagado: ['Bot apagado', 'No está contestando a nadie.'],
+    mezcla:  ['Estados mezclados', propios.length + ' negocios en modos distintos.'],
+  }[clase];
+
+  caja.className = 'estado-bot ' + clase;
+  caja.innerHTML = `<span class="punto"></span><div><b>${esc(texto[0])}</b>
+    <small>${esc(texto[1])}</small></div>`;
+}
+
 function modoConsola({ demostracion = false } = {}) {
+  document.body.classList.remove('sin-cajon');
   $('#pestanas').classList.remove('oculto');
   $('#v-portada').classList.add('oculto');
   $('#v-acceso').classList.add('oculto');
@@ -2722,6 +2884,7 @@ $('#btn-mostrar-acceso').addEventListener('click', () => {
 });
 
 function modoRecuperar() {
+  document.body.classList.add('sin-cajon');
   $('#pestanas').classList.add('oculto');
   $('#banda-acceso').classList.add('oculto');
   $('#v-portada').classList.add('oculto');
