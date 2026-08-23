@@ -42,6 +42,66 @@ Guía completa: https://claude.ai/code/artifact/a3647cc8-4522-4873-81a3-5b16702e
 
 ---
 
+## ⚠️ Sin subir todavía (segunda tanda del 22-ago)
+
+| Qué | Por qué |
+|---|---|
+| El asistente ya no duplica | Guardar dos veces daba `409 empresas_slug_key`. Ahora adopta el negocio que ya existe |
+| «Guardar borrador» guarda TODO | Antes solo guardaba cuatro campos; el catálogo y los horarios se perdían |
+| La sesión sobrevive al cierre | Se guarda el pase de renovación. Ya no pide enlace nuevo cada vez |
+| Selector «Viendo: …» en el encabezado | Para ser dueño de su consultorio Y administrador de la plataforma sin confundirlos |
+
+**El consultorio ya está en la base pero VACÍO** (`consultorio-dr-fernandoisa`,
+borrador, sin perfil ni conocimiento). Hay que volver a pasar el asistente
+después de subir esto — ya no va a chocar.
+
+---
+
+## 🚨 Hallazgo del 22-ago que ordenó todo lo demás
+
+**Las solicitudes se guardaban y NADIE podía leerlas.** El servidor tenía
+`leads.listar` (que además descifra) desde el principio; ninguna pantalla lo
+llamaba. El tablero decía «3 personas esperan» y el botón «Ver y responder»
+llevaba al panel de plataforma, donde no había ninguna lista de solicitudes.
+
+Alguien pudo llenar el formulario esperando una llamada que nunca iba a
+llegar, y desde el panel todo se veía en orden. Por eso esto se hizo antes
+que la portada, el buzón y Google.
+
+**Ya está:** pestaña «Solicitudes», con nombre, WhatsApp en un clic, motivo,
+filtro de pendientes y «Marcar atendido». Respeta el selector de contexto.
+
+## 🔴 Lo que Fernando pidió y NO está hecho
+
+Por orden en que lo dijo. Nada de esto está construido todavía.
+
+1. **Dos cuentas separadas** — DECIDIDO 22-ago: `doc.fiag93@gmail.com` se
+   queda de **superadmin**. Él crea la segunda cuenta con otro correo y esa
+   será la dueña del consultorio. Yo no puedo crear cuentas; una vez que
+   exista, se asigna desde el panel de plataforma (Usuarios → rol `dueno` +
+   negocio) o con SQL.
+2. **Rediseñar la portada** — «no me gusta». Falta saber qué no le gusta.
+3. **Conectar Google** y que no pida confirmar el correo.
+4. **Buzón de quejas** — un chat de los usuarios hacia el administrador para
+   reportar fallas.
+5. **Mejorar la interacción del panel de usuario.**
+
+## ✅ Arreglado el 22-ago (tercera tanda) — sin subir
+
+| Qué | Detalle |
+|---|---|
+| **El bot ya no se traba 30 s** | Medido en producción: 30.7 s antes de rendirse. Ahora hay presupuesto total de 9 s y 6 s por intento |
+| El cliente ya no elige la IA | El paso «Modelo» solo lo ve la plataforma. Se asigna; si una falla entra la otra |
+| El asistente ya no duplica | El `409 empresas_slug_key` de antes |
+| «Guardar borrador» guarda todo | Antes perdía catálogo y horarios |
+| La sesión sobrevive al cierre | Ya no pide enlace nuevo cada vez |
+| Selector «Viendo: …» | Ser dueño y administrador sin confundirlos |
+| **Pantalla de solicitudes** | Ver el hallazgo de arriba |
+
+Las 229 pruebas pasan.
+
+---
+
 ## ⏳ PASO SIGUIENTE · Dar de alta el primer negocio
 
 La base está vacía a propósito: los cuatro negocios que ves en el sitio

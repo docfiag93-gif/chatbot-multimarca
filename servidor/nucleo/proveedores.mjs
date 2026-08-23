@@ -31,7 +31,18 @@ export const ORDEN_POR_OMISION = 'gemini,groq';
 // Tiempo máximo por intento. Corto a propósito: si un proveedor no contestó
 // en 15 s, esperar más no mejora la respuesta, solo retrasa el respaldo que
 // sí va a contestar. La persona del otro lado está viendo puntos suspensivos.
-export const MS_LIMITE = 15000;
+// Quince segundos por intento sonaba prudente y era exactamente el defecto:
+// con dos proveedores y un reintento cada uno, alguien esperaba TREINTA
+// SEGUNDOS antes de enterarse de que nada funcionó. Medido en producción:
+// 30.7 s. Nadie espera eso en un chat; se va mucho antes.
+//
+// Ahora hay dos relojes. Uno por intento —corto, para poder cambiar de
+// proveedor rápido— y otro para TODA la cadena, que es el que de verdad
+// protege a quien está escribiendo. Cuando el presupuesto total se acaba,
+// se deja de intentar aunque queden proveedores: más vale decir "no pude"
+// en ocho segundos que acertar en treinta.
+export const MS_LIMITE = 6000;
+export const MS_PRESUPUESTO = 9000;
 
 // Un reintento, no más. Dos reintentos por proveedor y cuatro proveedores
 // dan dieciséis intentos: el usuario abandona mucho antes de que terminen.
@@ -347,7 +358,11 @@ export function planDeProveedores({ marca = {}, leerEntorno }) {
  * secretos. Sirve para depurar en el panel sin abrir los registros del
  * servidor — y para que el mensaje de error al usuario pueda ser honesto.
  */
-export async function preguntar({ marca = {}, prompt, leerEntorno, msLimite = MS_LIMITE, reintentos = REINTENTOS, opciones = {} }) {
+export async function preguntar({ marca = {}, prompt, leerEntorno, msLimite = MS_LIMITE,
+                                  msPresupuesto = MS_PRESUPUESTO,
+                                  reintentos = REINTENTOS, opciones = {} }) {
+  const arranque = Date.now();
+  const queda = () => msPresupuesto - (Date.now() - arranque);
   const plan = planDeProveedores({ marca, leerEntorno });
 
   if (!plan.length) {
@@ -361,8 +376,18 @@ export async function preguntar({ marca = {}, prompt, leerEntorno, msLimite = MS
 
   for (const { nombre, key, origen } of plan) {
     for (let vuelta = 0; vuelta <= reintentos; vuelta++) {
+      // Si ya casi no queda presupuesto, no vale la pena empezar otro intento:
+      // se abortaría a media respuesta y habría gastado la espera para nada.
+      const resto = queda();
+      if (resto < 1200) {
+        intentos.push({ proveedor: nombre, origen, vuelta, estado: 0,
+                        detalle: 'sin tiempo: presupuesto agotado' });
+        break;
+      }
+
       try {
-        const datos = await CATALOGO[nombre].fn(key, prompt, msLimite, opciones);
+        // El intento nunca puede durar más de lo que le queda a la cadena.
+        const datos = await CATALOGO[nombre].fn(key, prompt, Math.min(msLimite, resto), opciones);
         return { datos, via: nombre, origen, intentos };
       } catch (e) {
         const detalle = limpiar(e?.message || String(e)).slice(0, 120);
@@ -370,6 +395,9 @@ export async function preguntar({ marca = {}, prompt, leerEntorno, msLimite = MS
 
         // Solo se reintenta lo pasajero, y solo si queda vuelta.
         if (!e?.reintentable || vuelta === reintentos) break;
+        // Un proveedor que se quedó callado hasta agotar su reloj no merece
+        // segunda vuelta: conviene más pasar al siguiente de inmediato.
+        if (e?.estado === 408) break;
         // Espera corta antes del reintento: suficiente para que un pico pase,
         // no tanta como para que la persona crea que se colgó.
         await new Promise(r => setTimeout(r, 400 * (vuelta + 1)));

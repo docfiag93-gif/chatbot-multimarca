@@ -127,7 +127,13 @@ export async function manejar(req, context) {
         if (!/^[a-z0-9-]{2,40}$/.test(slug)) {
           return json({ error: 'El identificador solo admite minúsculas, números y guiones (2 a 40).' }, 400);
         }
-        const filas = await sb.insertar('empresas', [{
+        // Si el identificador ya está tomado, Postgres contesta 23505 y el
+        // mensaje crudo trae el nombre del índice: "empresas_slug_key". Eso
+        // no le dice nada a quien está dando de alta su negocio, y suena a
+        // que la aplicación se rompió cuando en realidad ya está guardado.
+        let filas;
+        try {
+        filas = await sb.insertar('empresas', [{
           slug,
           nombre: String(datos.nombre || slug).slice(0, 120),
           // Categoría LIBRE: cualquier texto, incluido "Otro". No hay lista
@@ -143,6 +149,13 @@ export async function manejar(req, context) {
           politicas: Array.isArray(datos.politicas) ? datos.politicas : [],
           acciones: Array.isArray(datos.acciones) ? datos.acciones : ['derivar_humano'],
         }]);
+        } catch (e) {
+          if (/23505|duplicate key/i.test(String(e.message))) {
+            return json({ error: 'Ya hay un negocio con el identificador «' + slug + '».',
+                          codigo: 'slug_ocupado', slug }, 409);
+          }
+          throw e;
+        }
         await sb.bitacora({ actor: yo.id, empresa_id: filas[0].id, accion: 'empresa.crear',
                             detalle: { slug, categoria: datos.categoria || '' } });
         return json({ empresa: filas[0] });
