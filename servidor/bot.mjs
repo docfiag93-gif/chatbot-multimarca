@@ -17,10 +17,11 @@ import { env } from './nucleo/entorno.mjs';
 import { MARCAS } from './nucleo/marcas.mjs';
 import { construirPrompt, respuestaInmediata, accionValida } from './nucleo/cerebro.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
-import { revisarEntorno, explicarFallo } from './nucleo/diagnostico.mjs';
+import { revisarEntorno, explicarFallo, probarBase } from './nucleo/diagnostico.mjs';
 import { revisarAnclaje, revisarRedaccion, limpiarMuletillas, respuestaSinDato }
   from './nucleo/anclaje.mjs';
 import { enviarEvento } from './nucleo/enlaces.mjs';
+import { servicio } from './nucleo/datos.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar }
   from './nucleo/datos.mjs';
 
@@ -68,14 +69,53 @@ export async function manejar(req, context) {
   // ── Salud: qué está configurado, sin revelar ningún valor ────────────
   if (req.method === 'GET' && url.searchParams.get('ping')) {
     const d = revisarEntorno(env);
+
+    // No basta con que la variable esté puesta: hay que preguntarle a la
+    // base. Una llave equivocada no da error, da CERO FILAS — y eso se ve
+    // igual que una base vacía. Distinguirlo aquí evita perder una tarde
+    // buscando el problema en el lado equivocado.
+    const prueba = d.capacidades.base ? await probarBase(servicio()) : null;
+    const problemas = [...d.problemas];
+
+    if (prueba && !prueba.lee) {
+      problemas.unshift({
+        gravedad: 'critico',
+        clave: 'base_no_responde',
+        titulo: 'La base no contesta',
+        detalle: {
+          llave_rechazada: 'La llave de servicio no fue aceptada.',
+          sin_permiso: 'La llave entró pero no tiene permiso de leer.',
+          sin_conexion: 'No hubo conexión con la base.',
+        }[prueba.razon] || 'La consulta falló.',
+        arreglo: 'Revisa SUPABASE_SERVICE_KEY: va la llave SECRETA, no la publicable. Después vuelve a desplegar.',
+        variables: ['SUPABASE_SERVICE_KEY'],
+      });
+    } else if (prueba && prueba.lee && prueba.filas === 0) {
+      problemas.unshift({
+        gravedad: 'aviso',
+        clave: 'base_vacia_o_sin_permiso',
+        titulo: 'La base contesta pero no se ve ningún negocio',
+        detalle: 'O todavía no hay negocios dados de alta, o la llave puesta ' +
+                 'es la PUBLICABLE en vez de la secreta: con esa, la base ' +
+                 'contesta sin error pero devuelve cero filas.',
+        arreglo: 'Si ya diste de alta un negocio, cambia SUPABASE_SERVICE_KEY por la llave secreta y vuelve a desplegar.',
+        variables: ['SUPABASE_SERVICE_KEY'],
+      });
+    }
+
     return json({
       ok: true,
-      listo: d.listo,
+      listo: d.listo && !(prueba && !prueba.lee),
       marcasArchivo: Object.keys(MARCAS),
       proveedores: d.proveedores,
       orden: d.orden,
-      capacidades: d.capacidades,
-      problemas: d.problemas,
+      capacidades: {
+        ...d.capacidades,
+        // «configurada» y «responde» son cosas distintas.
+        baseResponde: prueba ? prueba.lee : false,
+        negociosVisibles: prueba ? prueba.filas : 0,
+      },
+      problemas,
     });
   }
 

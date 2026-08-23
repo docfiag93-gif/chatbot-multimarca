@@ -28,6 +28,15 @@ export function revisarEntorno(leerEntorno) {
     Object.entries(CATALOGO).map(([n, p]) => [n, hay(p.variable)]));
   const conProveedor = Object.values(proveedores).some(Boolean);
 
+  // OJO: esto dice que la VARIABLE está puesta, no que la llave sirva. Son
+  // cosas distintas y confundirlas costó una tarde: el panel decía
+  // `base: true` mientras el bot no podía leer un solo negocio, porque la
+  // variable traía la llave publicable en vez de la secreta. Con la
+  // publicable, PostgREST no falla: contesta CERO FILAS, que es lo que ve
+  // alguien sin permiso. Cero filas y "no existe" se ven igual desde aquí.
+  //
+  // Por eso existe `probarBase()` más abajo, y por eso el panel muestra
+  // «configurada» y «responde» como dos cosas separadas.
   const base    = hay('SUPABASE_URL') && hay('SUPABASE_SERVICE_KEY');
   const panel   = hay('SUPABASE_URL') && hay('SUPABASE_ANON_KEY');
   const cifrado = hay('CHATBOT_CLAVE');
@@ -160,4 +169,29 @@ export function explicarFallo(error, { hayContacto = false } = {}) {
     arreglo: 'Revisa el registro del servidor.',
     codigo, intentos,
   };
+}
+
+/**
+ * Le pregunta a la base de verdad, en vez de creerle a una variable.
+ *
+ * Devuelve `lee` (si contestó) y `filas` (cuántas vio). Un `lee: true` con
+ * `filas: 0` teniendo negocios dados de alta es la firma de una llave
+ * equivocada: la publicable entra, pero RLS no la deja ver nada, y desde
+ * fuera se confunde con una base vacía.
+ *
+ * REGLA: nunca devuelve el error crudo — puede traer la llave dentro.
+ */
+export async function probarBase(cliente) {
+  if (!cliente) return { lee: false, filas: 0, razon: 'sin_configurar' };
+  try {
+    const filas = await cliente.seleccionar('empresas', 'id', 'limit=5');
+    return { lee: true, filas: (filas || []).length, razon: null };
+  } catch (e) {
+    const m = String(e?.message || '');
+    const razon =
+      /401|invalid.*api.*key|jwt/i.test(m) ? 'llave_rechazada' :
+      /403|permission/i.test(m)            ? 'sin_permiso'     :
+      /fetch|network|timeout/i.test(m)     ? 'sin_conexion'    : 'error';
+    return { lee: false, filas: 0, razon };
+  }
 }

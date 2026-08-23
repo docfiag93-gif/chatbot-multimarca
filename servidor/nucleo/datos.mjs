@@ -22,7 +22,7 @@ import { marcaPublica, obtenerMarca } from './marcas.mjs';
 import { normalizarPerfil, perfilPublico } from '../../publico/cerebro/perfil.mjs';
 import { enviarAviso, recortar } from './avisos.mjs';
 
-function servicio() {
+export function servicio() {
   const url = env('SUPABASE_URL');
   const llave = env('SUPABASE_SERVICE_KEY');
   if (!url || !llave) return null;              // sin base: se trabaja con archivo
