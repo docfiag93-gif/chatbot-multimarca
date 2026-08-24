@@ -43,6 +43,7 @@ import {
 } from '../servidor/nucleo/proveedores.mjs';
 import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
+import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agenda.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
 import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
@@ -1056,6 +1057,74 @@ await suite('Firma del webhook', async () => {
   ok('comparación constante: acepta la buena', igualConstante(firma, firma));
   ok('comparación constante: rechaza la mala', !igualConstante(firma, 'f'+firma.slice(1)));
   ok('comparación constante: rechaza distinto largo', !igualConstante(firma, firma.slice(0,-1)));
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  AGENDA  ·  lo que convierte al bot en agente
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Agenda', async () => {
+  const horarios = {
+    lunes:{abre:'16:00',cierra:'18:00'}, martes:{abre:'16:00',cierra:'18:00'},
+    miercoles:{abre:'16:00',cierra:'18:00'}, jueves:{abre:'16:00',cierra:'18:00'},
+    viernes:{abre:'16:00',cierra:'18:00'},
+    sabado:{abre:'09:00',cierra:'11:00'}, domingo:{cerrado:true},
+  };
+  // Un lunes a las 8 de la mañana, para que el día completo esté por delante.
+  const lunes = new Date(2026, 7, 24, 8, 0);
+
+  const libres = huecosLibres({ horarios, desde: lunes, dias: 7 });
+  ok('genera huecos', libres.length > 0, libres.length + ' huecos');
+  ok('respeta la hora de apertura', libres[0].hora === '16:00', libres[0].hora);
+  ok('no pasa de la hora de cierre', libres.every(h => h.hora < '18:00' || h.hora <= '10:30'));
+  ok('salta el domingo', !libres.some(h => h.dia === '2026-08-30'), JSON.stringify(libres.filter(h=>h.dia==='2026-08-30')));
+  ok('el sábado usa SU horario', libres.some(h => h.dia === '2026-08-29' && h.hora === '09:00'));
+
+  // Lo ocupado no se ofrece. Es lo mínimo que se le pide a una agenda.
+  const conOcupados = huecosLibres({ horarios, desde: lunes,
+    ocupados: [{ dia:'2026-08-24', hora:'16:00' }, { dia:'2026-08-24', hora:'16:30' }] });
+  ok('no ofrece lo ya apartado',
+     !conOcupados.some(h => h.dia === '2026-08-24' && (h.hora === '16:00' || h.hora === '16:30')));
+  ok('sí ofrece lo que sigue libre',
+     conOcupados.some(h => h.dia === '2026-08-24' && h.hora === '17:00'));
+
+  /* HOY NO SE OFRECE LO QUE YA PASÓ. Un bot que a las siete de la tarde te
+     ofrece las cuatro no está agendando: está leyendo una tabla. */
+  const tarde = new Date(2026, 7, 24, 17, 15);
+  const desdeTarde = huecosLibres({ horarios, desde: tarde, dias: 1 });
+  ok('no ofrece horas que ya pasaron',
+     !desdeTarde.some(h => h.dia === '2026-08-24' && h.hora <= '17:15'), JSON.stringify(desdeTarde));
+
+  // Ni la hora en curso: nadie llega en cero minutos.
+  const casi = new Date(2026, 7, 24, 16, 50);
+  ok('deja colchón para llegar',
+     !huecosLibres({ horarios, desde: casi, dias: 1 }).some(h => h.hora === '17:00'));
+
+  // Negocio sin horarios cargados: no inventa disponibilidad.
+  ok('sin horarios no ofrece nada', huecosLibres({ horarios: {}, desde: lunes }).length === 0);
+  ok('un horario al revés se ignora',
+     huecosLibres({ horarios: { lunes:{abre:'18:00',cierra:'16:00'} }, desde: lunes }).length === 0);
+
+  /* TRES opciones, y de días distintos cuando se puede: ofrecer tres huecos
+     seguidos del mismo jueves es ofrecer un día disfrazado de tres. */
+  const tres = tresOpciones(libres);
+  ok('ofrece exactamente tres', tres.length === 3);
+  ok('reparte entre días distintos', new Set(tres.map(t => t.dia)).size === 3,
+     JSON.stringify(tres.map(t=>t.dia)));
+
+  const unSoloDia = huecosLibres({ horarios: { lunes: horarios.lunes }, desde: lunes, dias: 1 });
+  ok('con un solo día abierto, completa con ese día', tresOpciones(unSoloDia).length === 3);
+
+  // Entender qué eligió la persona
+  ok('entiende el texto del botón', cualEligio(tres[0].comoSeDice, tres) === tres[0]);
+  ok('entiende solo la hora si es única',
+     cualEligio('me sirve a las ' + tres[0].hora, [tres[0]]) === tres[0]);
+  ok('no adivina si es ambiguo', cualEligio('mañana', tres) === null);
+  ok('no adivina con texto vacío', cualEligio('', tres) === null);
+
+  /* LO QUE NO SE OFRECIÓ, NO SE APARTA. Si alguien pide una hora que no
+     estaba entre las opciones, quizá se la ganaron mientras escribía. */
+  ok('no aparta algo que no se ofreció', cualEligio('el jueves a las 23:00', tres) === null);
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

@@ -26,7 +26,7 @@ import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
 import { catalogoDePoliticas } from './nucleo/politicas.mjs';
 import { catalogoDeAcciones } from './nucleo/acciones.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
-import { responderComoHumano } from './nucleo/datos.mjs';
+import { responderComoHumano, citasDe, moverCita } from './nucleo/datos.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -634,6 +634,33 @@ export async function manejar(req, context) {
         await sb.bitacora({ actor: yo.id, empresa_id: yo.empresa_id || null,
                             accion: 'conversacion.responder', detalle: {} });
         return json({ ok: true });
+      }
+
+      /* ── agenda ───────────────────────────────────────────────────────
+         permiso: cualquier cuenta activa. Ver y confirmar citas es el
+         trabajo de quien atiende. RLS la encierra en su empresa. */
+      case 'citas.listar': {
+        const citas = await citasDe({
+          empresaId: esSuper ? (datos.empresa_id || null) : yo.empresa_id,
+          desde: datos.desde,
+        });
+        const anotado = await sb.bitacora({ actor: yo.id, empresa_id: yo.empresa_id || null,
+                            accion: 'citas.ver', detalle: { cuantas: citas.length } });
+        return json({ citas, auditoria: anotado.ok ? undefined : 'no se pudo anotar' });
+      }
+
+      /* Confirmar y cancelar los hace una PERSONA. El bot solo aparta: es lo
+         reversible. Confirmar significa que alguien va a reacomodar su día. */
+      case 'citas.mover': {
+        if (!['confirmada','cancelada','apartada'].includes(datos.estado)) {
+          return json({ error: 'Estado inválido.' }, 400);
+        }
+        const r = await moverCita({
+          empresaId: esSuper ? null : yo.empresa_id, id: datos.id, estado: datos.estado });
+        if (!r.ok) return json({ error: 'Esa cita no existe o no es de tu negocio.' }, 404);
+        await sb.bitacora({ actor: yo.id, empresa_id: yo.empresa_id || null,
+                            accion: 'cita.' + datos.estado, detalle: { cita: datos.id } });
+        return json({ cita: r.cita });
       }
 
       case 'bitacora.listar': {

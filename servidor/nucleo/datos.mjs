@@ -325,3 +325,86 @@ export async function recogerHumanos({ empresa, sesion }) {
 
   return nuevos.map(m => ({ texto: m.texto, en: m.en }));
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   CITAS  ·  el bot aparta, una persona confirma
+   ══════════════════════════════════════════════════════════════════════ */
+
+/** Lo ya apartado, para no ofrecerlo dos veces. */
+export async function huecosOcupados(empresaId) {
+  const sb = servicio();
+  if (!sb || !empresaId) return [];
+  try {
+    const hoy = new Date().toISOString().slice(0, 10);
+    return (await sb.seleccionar('citas', 'dia,hora',
+      `empresa_id=eq.${empresaId}&estado=neq.cancelada&dia=gte.${hoy}&limit=500`)) || [];
+  } catch (e) { return []; }
+}
+
+/**
+ * Aparta un hueco.
+ *
+ * Nace SIEMPRE como «apartada», nunca confirmada. Apartar es reversible: si
+ * el bot se equivocó, se libera y no pasó nada. Confirmar no lo es —
+ * alguien ya reacomodó su día.
+ *
+ * Si dos personas piden el mismo hueco a la vez, gana quien llegó primero y
+ * la otra recibe un no honesto. Eso lo decide el índice único de la base, no
+ * este código: comprobar «¿está libre?» y luego insertar deja una rendija
+ * entre las dos cosas, y en esa rendija caben dos citas.
+ */
+export async function apartarCita({ empresa, dia, hora, datos, sesion }) {
+  const sb = servicio(); const clave = MAESTRA();
+  if (!sb || !empresa?.id) return { ok: false, razon: 'sin_base' };
+
+  try {
+    const filas = await sb.insertar('citas', [{
+      empresa_id: empresa.id, dia, hora, estado: 'apartada',
+      sesion: String(sesion || '').slice(0, 64),
+      datos_cifrados: clave ? await cifrar(clave, empresa.id, datos || {}) : null,
+    }]);
+    return { ok: true, id: filas?.[0]?.id };
+  } catch (e) {
+    if (/23505|duplicate key/i.test(String(e.message))) {
+      return { ok: false, razon: 'ya_tomado' };
+    }
+    return { ok: false, razon: 'error' };
+  }
+}
+
+/** La agenda, ya descifrada, para el panel. */
+export async function citasDe({ empresaId, desde }) {
+  const sb = servicio(); const clave = MAESTRA();
+  if (!sb) return [];
+
+  const partes = [];
+  if (empresaId) partes.push(`empresa_id=eq.${empresaId}`);
+  partes.push(`dia=gte.${desde || new Date().toISOString().slice(0, 10)}`);
+  partes.push('order=dia.asc,hora.asc', 'limit=200');
+
+  let filas = [];
+  try { filas = await sb.seleccionar('citas', '*', partes.join('&')) || []; }
+  catch (e) { return []; }
+
+  const salida = [];
+  for (const f of filas) {
+    let datos = null;
+    try { datos = clave ? await descifrar(clave, f.empresa_id, f.datos_cifrados) : null; }
+    catch (e) { datos = null; }
+    const { datos_cifrados, ...resto } = f;
+    salida.push({ ...resto, datos });
+  }
+  return salida;
+}
+
+/** Confirmar o cancelar. Lo hace una persona, nunca el bot. */
+export async function moverCita({ empresaId, id, estado }) {
+  const sb = servicio();
+  if (!sb) return { ok: false };
+  const filtro = empresaId ? `id=eq.${id}&empresa_id=eq.${empresaId}` : `id=eq.${id}`;
+  try {
+    const g = await sb.actualizar('citas', filtro, { estado });
+    return { ok: !!g?.[0], cita: g?.[0] };
+  } catch (e) { return { ok: false }; }
+}

@@ -58,6 +58,10 @@
   var cfg = RESPALDO;
   var mensajes = [];        // [{ rol:'usuario'|'bot', texto }]
   var abierto = false;
+  // Los horarios que el servidor acaba de ofrecer. Vive aquí y no en el
+  // historial porque es estado de UN turno: si la persona pregunta otra cosa
+  // y luego dice «el jueves», ese jueves ya no significa nada.
+  var horariosOfrecidos = [];
   var ocupado = false;
   var modoLocal = false;
   var raiz, caja, lista, entrada, chips, boton;
@@ -562,7 +566,12 @@
     fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ marca: MARCA, mensajes: mensajes, sesion: idSesion() }),
+      // Se devuelven los horarios que el servidor ofreció en el turno
+      // anterior. Sin esto, «sí, el jueves» no tendría contra qué compararse
+      // y habría que preguntarle a la IA qué quiso decir — justo donde no
+      // puede haber azar: al escribir en la agenda de alguien.
+      body: JSON.stringify({ marca: MARCA, mensajes: mensajes, sesion: idSesion(),
+                             horarios: horariosOfrecidos }),
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -584,6 +593,7 @@
         // Cualquier acción que recoja datos abre el formulario. La lista
         // vive en el servidor: agregar una acción nueva no obliga a tocar
         // este archivo ni a que los clientes actualicen su widget.
+        horariosOfrecidos = Array.isArray(d.horarios) ? d.horarios : [];
         if (ACCIONES_CON_FORMULARIO.indexOf(d.accion) > -1 && cfg.captura.activa) formulario();
         else if (d.accion === 'derivar_humano') enlaceWhatsapp('general');
         else pintarChips(d.sugerencias);

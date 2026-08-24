@@ -631,6 +631,27 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
   position:relative}
 .charla-guardada .msj.humano .quien{display:block;font-size:10.5px;opacity:.75;
   margin-top:4px;text-transform:uppercase;letter-spacing:.08em}
+
+/* Una cita apartada es un compromiso a medias: se ve como pendiente hasta
+   que alguien la confirma. */
+.cita{background:var(--panel);border:1px solid var(--linea);border-radius:13px;
+  padding:15px 17px;display:flex;gap:15px;align-items:center;flex-wrap:wrap}
+.cita+.cita{margin-top:10px}
+.cita.apartada{border-left:3px solid var(--alerta)}
+.cita.confirmada{border-left:3px solid var(--ok)}
+.cita.cancelada{opacity:.55}
+.cita .cuando{flex:none;text-align:center;min-width:82px;background:var(--hundido);
+  border-radius:10px;padding:9px 11px}
+.cita .cuando .dia{display:block;font-size:20px;font-weight:700;line-height:1;
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cita .cuando .mes{display:block;font-size:10.5px;color:var(--tenue);
+  text-transform:uppercase;letter-spacing:.08em;margin-top:3px}
+.cita .cuando .hora{display:block;font-size:13px;font-weight:600;margin-top:5px;
+  font-variant-numeric:tabular-nums}
+.cita .quien{flex:1;min-width:160px}
+.cita .quien b{display:block;font-size:15px;letter-spacing:-.01em}
+.cita .quien span{display:block;font-size:12.5px;color:var(--suave);margin-top:2px}
+.cita .mano{display:flex;gap:7px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -677,6 +698,7 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <button data-vista="negocios" data-on role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Negocios</button>
       <button data-vista="solicitudes" role="tab" class="oculto" id="pest-solicitudes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>Solicitudes<span class="globo oculto" id="cuantas-solicitudes"></span></button>
       <button data-vista="charlas" role="tab" class="oculto" id="pest-charlas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 4 11.5a8.5 8.5 0 0 1 8.5-8.5 8.4 8.4 0 0 1 8.5 8.5z"/><path d="M8 10h8M8 14h5"/></svg>Conversaciones</button>
+      <button data-vista="agenda" role="tab" class="oculto" id="pest-agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>Agenda<span class="globo oculto" id="cuantas-citas"></span></button>
       <button data-vista="alta" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Agregar negocio</button>
       <button data-vista="probar" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.1A8.4 8.4 0 0 1 4 11.5a8.5 8.5 0 0 1 8.5-8.5 8.4 8.4 0 0 1 8.5 8.5z"/></svg>Probar el widget</button>
     </div>
@@ -1077,6 +1099,22 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     </div>
   </section>
 
+  <!-- ══════════ AGENDA ══════════
+       El bot APARTA, una persona CONFIRMA. Apartar es reversible; si el bot
+       se equivocó se libera el hueco y no pasó nada. Confirmar significa que
+       alguien ya reacomodó su día. -->
+  <section id="v-agenda" class="oculto">
+    <div class="tarjeta">
+      <h2 class="sec">Lo que el bot apartó</h2>
+      <p class="pista" style="margin-top:-8px">Nada de esto está confirmado
+      todavía. El bot solo guarda el lugar; confirmar lo haces tú.</p>
+      <div class="fila" style="margin:14px 0">
+        <button class="btn sec chico" id="btn-recargar-citas">Actualizar</button>
+      </div>
+      <div id="lista-citas" aria-live="polite"></div>
+    </div>
+  </section>
+
   <!-- ══════════ CONVERSACIONES ══════════
        Lo que la gente le escribió al bot. Se guardaban cifradas desde el
        primer día y no había NADA para leerlas: ni pantalla ni endpoint. El
@@ -1334,7 +1372,7 @@ $('#velo-menu').addEventListener('click', () => cajon(false));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cajon(false); });
 
 /* ── pestañas ─────────────────────────────────────────────────────── */
-const VISTAS = ['negocios','alta','probar','charlas','solicitudes','soporte','herramientas','super'];
+const VISTAS = ['negocios','alta','probar','agenda','charlas','solicitudes','soporte','herramientas','super'];
 $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   $$('#pestanas button').forEach(x => delete x.dataset.on);
   b.dataset.on = '1';
@@ -1343,6 +1381,7 @@ $$('#pestanas button').forEach(b => b.addEventListener('click', () => {
   if (b.dataset.vista === 'solicitudes') cargarSolicitudes();
   if (b.dataset.vista === 'soporte') cargarReportes();
   if (b.dataset.vista === 'charlas') cargarCharlas();
+  if (b.dataset.vista === 'agenda') cargarCitas();
   cajon(false);
 }));
 
@@ -2378,6 +2417,7 @@ async function arrancar() {
       $('#btn-menu').classList.remove('oculto');
       $('#pest-soporte').classList.remove('oculto');
       $('#pest-charlas').classList.remove('oculto');
+      $('#pest-agenda').classList.remove('oculto');
       modoConsola();
     } catch (e) {
       // Puede que solo haya caducado el acceso: se intenta una renovación
@@ -2393,6 +2433,7 @@ async function arrancar() {
       $('#btn-menu').classList.remove('oculto');
           $('#pest-soporte').classList.remove('oculto');
           $('#pest-charlas').classList.remove('oculto');
+          $('#pest-agenda').classList.remove('oculto');
           modoConsola();
           listo = true;
         } catch (e2) { /* el pase tampoco sirvió */ }
@@ -2679,6 +2720,87 @@ async function mostrarQR(slug) {
       `<div class="aviso mal">No pude dibujarlo: ${esc(e.message)}</div>`;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   AGENDA
+
+   Lo que el bot apartó. Nace todo como «apartada» y ahí se queda hasta que
+   una persona confirme: apartar es reversible, confirmar no.
+   ══════════════════════════════════════════════════════════════════════ */
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+let citas = [];
+
+async function cargarCitas() {
+  const caja = $('#lista-citas');
+  if (!enLinea) { caja.innerHTML = '<p class="pista">Hace falta iniciar sesión.</p>'; return; }
+  caja.innerHTML = '<div class="esqueleto" style="height:60px"></div>';
+  try {
+    const d = await api('citas.listar', contexto ? { empresa_id: contexto } : {});
+    citas = d.citas || [];
+    pintarCitas();
+    avisarSinAuditoria(caja, d.auditoria);
+  } catch (e) {
+    caja.innerHTML = `<div class="aviso mal">No pude leer la agenda: ${esc(e.message)}</div>`;
+  }
+}
+
+function pintarCitas() {
+  const caja = $('#lista-citas');
+  const vivas = citas.filter(c => c.estado !== 'cancelada');
+
+  if (!citas.length) {
+    caja.innerHTML = `<div class="tarjeta vacio"><span class="ico">◻︎</span>
+      <h3>Nada apartado todavía</h3>
+      <p>Cuando alguien elija un horario en el chat, aparece aquí para que lo confirmes.</p></div>`;
+    return;
+  }
+
+  caja.innerHTML = citas.map(c => {
+    // La fecha se parte a mano: `new Date('2026-08-27')` la interpreta como
+    // UTC y en México sale el día anterior.
+    const [a, m, d] = String(c.dia).split('-').map(Number);
+    const negocio = negocios.find(n => n.id === c.empresa_id);
+    const datos = c.datos || {};
+    return `<div class="cita ${esc(c.estado)}">
+      <div class="cuando">
+        <span class="dia">${d}</span>
+        <span class="mes">${esc(MESES[(m || 1) - 1])}</span>
+        <span class="hora">${esc(c.hora)}</span>
+      </div>
+      <div class="quien">
+        <b>${esc(datos.nombre || 'Sin nombre todavía')}</b>
+        <span>${datos.telefono ? esc(datos.telefono) + ' · ' : ''}${esc(c.estado)}${
+          negocio ? ' · ' + esc(negocio.nombre) : ''}</span>
+      </div>
+      <div class="mano">
+        ${c.estado === 'apartada'
+          ? `<button class="btn chico" data-cita="${esc(c.id)}" data-estado="confirmada">Confirmar</button>
+             <button class="btn fantasma chico" data-cita="${esc(c.id)}" data-estado="cancelada">Cancelar</button>`
+          : c.estado === 'confirmada'
+            ? `<span class="placa ok">confirmada</span>
+               <button class="btn fantasma chico" data-cita="${esc(c.id)}" data-estado="cancelada">Cancelar</button>`
+            : `<button class="btn fantasma chico" data-cita="${esc(c.id)}" data-estado="apartada">Reabrir</button>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  const globo = $('#cuantas-citas');
+  const porConfirmar = vivas.filter(c => c.estado === 'apartada').length;
+  globo.textContent = porConfirmar || '';
+  globo.classList.toggle('oculto', !porConfirmar);
+}
+
+$('#btn-recargar-citas').addEventListener('click', cargarCitas);
+
+$('#lista-citas').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-cita]');
+  if (!b) return;
+  b.disabled = true; b.textContent = '…';
+  try {
+    await api('citas.mover', { id: b.dataset.cita, estado: b.dataset.estado });
+    await cargarCitas();
+  } catch (e) { b.disabled = false; alert(traducirError(e.message)); }
+});
 
 /* ══════════════════════════════════════════════════════════════════════
    CONVERSACIONES
@@ -3261,7 +3383,7 @@ async function ajustarMetodosDeEntrada() {
    —antes se ofrecía sola, y una consola con el tablero en blanco y filtros
    que no filtran nada se lee como un panel roto, no como una demostración.
    ────────────────────────────────────────────────────────────────────── */
-const SECCIONES_CONSOLA = ['negocios','alta','probar','charlas','solicitudes','soporte','herramientas','super'];
+const SECCIONES_CONSOLA = ['negocios','alta','probar','agenda','charlas','solicitudes','soporte','herramientas','super'];
 
 function modoPortada() {
   document.body.classList.add('sin-cajon');

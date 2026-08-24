@@ -22,8 +22,10 @@ import { revisarAnclaje, pulir, respuestaSinDato }
   from './nucleo/anclaje.mjs';
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
-import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar, recogerHumanos }
+import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar, recogerHumanos,
+         huecosOcupados, apartarCita }
   from './nucleo/datos.mjs';
+import { huecosLibres, tresOpciones, cualEligio } from './nucleo/agenda.mjs';
 
 // ── Freno de mano ───────────────────────────────────────────────────────
 // Este endpoint es público y anónimo: cualquiera con la URL puede quemar la
@@ -229,6 +231,51 @@ export async function manejar(req, context) {
   // OJO CON EL ORDEN: esto va ANTES de atender el modo `recados`. Una
   // urgencia clínica se responde aunque el bot esté callado — el modo existe
   // para que no diga tonterías, no para que deje de mandar a alguien al 911.
+  /* ── EL AGENTE ──────────────────────────────────────────────────────
+     Aquí el bot deja de contestar y empieza a hacer.
+
+     Si en el turno anterior le ofrecimos tres horarios y ahora eligió uno,
+     se aparta AHORA, sin pasar por la IA. Preguntarle a un modelo «¿esto
+     significa que quiere el jueves a las 5?» es meter una moneda al aire en
+     el único punto donde no puede haber azar: el momento de escribir en la
+     agenda de alguien.
+
+     Se compara contra lo que SE OFRECIÓ, nunca contra el calendario entero:
+     si pide una hora que no estaba entre las opciones, quizá se la ganaron
+     mientras escribía. */
+  const ofrecidas = Array.isArray(cuerpo.horarios) ? cuerpo.horarios : [];
+  if (ofrecidas.length && marca.id) {
+    const elegida = cualEligio(ultimo, ofrecidas);
+    if (elegida) {
+      const r = await apartarCita({
+        empresa: marca, dia: elegida.dia, hora: elegida.hora, sesion,
+        datos: { desde: 'chat' },
+      });
+
+      if (r.ok) {
+        return json({
+          texto: 'Listo, te aparté el ' + elegida.comoSeDice + '. ' +
+                 'Todavía no es una cita confirmada: te contactan para confirmarla. ' +
+                 '¿Me dejas tu nombre y teléfono?',
+          sugerencias: [], accion: 'capturar_contacto', via: 'agenda', cita: elegida,
+        });
+      }
+      // Alguien más lo tomó entre que se ofreció y se eligió. Se dice, y se
+      // vuelve a ofrecer: dejarlo en «no se pudo» sería perder a la persona.
+      if (r.razon === 'ya_tomado') {
+        const otras = tresOpciones(huecosLibres({
+          horarios: marca.horarios || {}, ocupados: await huecosOcupados(marca.id) }));
+        return json({
+          texto: 'Se me acaba de ocupar ese horario, alguien lo tomó hace un momento. ' +
+                 (otras.length ? '¿Te sirve alguno de estos?' : 'Déjame tus datos y te buscamos.'),
+          sugerencias: otras.map(o => o.comoSeDice),
+          accion: otras.length ? 'ninguna' : 'capturar_contacto',
+          via: 'agenda', horarios: otras,
+        });
+      }
+    }
+  }
+
   const corte = decidirSinIA({ marca, modo, ultimo, hayContacto });
   const inmediata = corte?.corte === 'urgencia' ? corte : null;
 
@@ -306,6 +353,20 @@ export async function manejar(req, context) {
       // «floja» y nadie lo leía; ahora nombra QUÉ se corrigió, que es lo
       // único que sirve para ajustar el tono del negocio.
       if (pulido.arreglos.length) salida.pulido = pulido.arreglos;
+
+      /* Que el modelo pida «agendar» ya no abre un formulario a ciegas:
+         mira la agenda y ofrece TRES horas que de verdad están libres.
+         Esa es toda la diferencia entre «sí hacemos citas» y «¿te sirve el
+         jueves a las 5?». */
+      if (salida.accion === 'agendar' && marca.id && Object.keys(marca.horarios || {}).length) {
+        const opciones = tresOpciones(huecosLibres({
+          horarios: marca.horarios, ocupados: await huecosOcupados(marca.id) }));
+        if (opciones.length) {
+          salida.sugerencias = opciones.map(o => o.comoSeDice);
+          salida.horarios = opciones;      // el widget las devuelve al elegir
+          salida.accion = 'ninguna';       // primero elige, luego los datos
+        }
+      }
     }
 
     // Cuando hubo un fallo antes de acertar, se deja constancia: es la señal
