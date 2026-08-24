@@ -364,6 +364,11 @@ th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
   color:var(--tenue);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--linea)}
 td{padding:11px 10px;border-bottom:1px solid var(--linea-sutil);vertical-align:top}
 tr:last-child td{border-bottom:0}
+/* El renglón de quien está esperando entrar. La franja marca la fila entera,
+   no solo la placa: la tabla se lee de corrido y una etiqueta suelta a media
+   línea se pierde. El fondo va tenue a propósito — señala, no grita. */
+tr.espera td{background:var(--mal-suave)}
+tr.espera td:first-child{box-shadow:inset 3px 0 0 var(--mal)}
 
 code{background:var(--hundido);padding:1.5px 5px;border-radius:4px;font-size:12.8px;
   font-family:ui-monospace,Menlo,monospace}
@@ -3328,9 +3333,27 @@ $('#lista-solicitudes').addEventListener('click', async (ev) => {
 async function cargarSuper() {
   if (!yo?.esSuper) return;
 
+  /* Las cuentas se piden ANTES de pintar el tablero, y no es un detalle de
+     orden: quien se registró y nadie ha activado es la cifra MÁS urgente de
+     esta pantalla, no un renglón perdido en la tabla de abajo.
+
+     Un colega que se apunta y no recibe respuesta no manda un correo para
+     reclamar: se olvida del producto. Hasta hoy la única forma de enterarse
+     era bajar a la tabla y leerla persona por persona. */
+  let usuarios = [];
+  let falloUsuarios = '';
+  try { ({ usuarios } = await api('usuarios.listar')); }
+  catch (e) { falloUsuarios = e.message; usuarios = []; }
+
+  const esperando = (usuarios || []).filter(u => u.rol === 'pendiente' || !u.activo);
+
   try {
     const m = await api('metricas');
     $('#tablero-super').innerHTML = `
+      <div class="metrica ${esperando.length ? 'urge' : ''}">
+        <div class="n">${esperando.length}</div>
+        <div class="r">${esperando.length === 1 ? 'persona esperando que la actives'
+                                                : 'personas esperando que las actives'}</div></div>
       <div class="metrica"><div class="n">${negocios.length}</div><div class="r">negocios en la plataforma</div></div>
       <div class="metrica"><div class="n">${negocios.filter(n=>n.estado==='publicado').length}</div><div class="r">publicados</div></div>
       <div class="metrica"><div class="n">${negocios.filter(n=>n.ejemplo).length}</div><div class="r">ejemplos</div></div>
@@ -3338,15 +3361,25 @@ async function cargarSuper() {
   } catch (e) { $('#tablero-super').innerHTML = ''; }
 
   // ── usuarios ──
-  try {
-    const { usuarios } = await api('usuarios.listar');
+  if (falloUsuarios) {
+    $('#tabla-usuarios').innerHTML = `<tr><td class="pista">${esc(falloUsuarios)}</td></tr>`;
+  } else {
     const ops = e => negocios.map(x =>
       `<option value="${esc(x.id)}" ${x.id===e?'selected':''}>${esc(x.nombre)}</option>`).join('');
-    $('#tabla-usuarios').innerHTML = usuarios.length ? `
+
+    // Quien espera va primero. Una lista por fecha de registro entierra a la
+    // persona nueva justo debajo de las que ya están resueltas.
+    const espera = u => (u.rol === 'pendiente' || !u.activo) ? 0 : 1;
+    const enOrden = (usuarios || []).slice().sort((a, b) => espera(a) - espera(b));
+
+    $('#tabla-usuarios').innerHTML = enOrden.length ? `
       <tr><th>Persona</th><th>Rol</th><th>Negocio</th><th>Activo</th><th></th></tr>
-      ${usuarios.map(u => `
-        <tr data-u="${esc(u.id)}">
-          <td>${esc(u.nombre||'')}<div class="pista">${esc(u.email||'')}</div></td>
+      ${enOrden.map(u => `
+        <tr data-u="${esc(u.id)}" ${espera(u) === 0 ? 'class="espera"' : ''}>
+          <td>${esc(u.nombre||'')}
+            ${espera(u) === 0 ? '<span class="placa mal">esperando</span>' : ''}
+            <div class="pista">${esc(u.email||'')}${u.created_at
+              ? ' · se registró ' + new Date(u.created_at).toLocaleDateString('es-MX') : ''}</div></td>
           <td><select class="u-rol">${['pendiente','staff','dueno','superadmin'].map(r=>
             `<option value="${r}" ${r===u.rol?'selected':''}>${r}</option>`).join('')}</select></td>
           <td><select class="u-emp"><option value="">— ninguno —</option>${ops(u.empresa_id)}</select></td>
@@ -3365,13 +3398,15 @@ async function cargarSuper() {
           empresa_id: tr.querySelector('.u-emp').value || null,
           activo: tr.querySelector('.u-act').checked });
         b.textContent = '✓ listo';
-        setTimeout(() => { b.textContent = original; b.disabled = false; }, 1600);
+        // Se recarga la pantalla: activar a alguien cambia la cifra de
+        // arriba, y dejarla vieja haría dudar de si el botón sirvió.
+        setTimeout(() => { cargarSuper(); }, 900);
       } catch (e) {
         b.textContent = original; b.disabled = false;
         alert(e.message);
       }
     }));
-  } catch (e) { $('#tabla-usuarios').innerHTML = `<tr><td class="pista">${esc(e.message)}</td></tr>`; }
+  }
 
   // ── envíos a sistemas externos ──
   try {
