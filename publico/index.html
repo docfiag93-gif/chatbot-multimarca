@@ -367,6 +367,18 @@ tr:last-child td{border-bottom:0}
 /* El renglón de quien está esperando entrar. La franja marca la fila entera,
    no solo la placa: la tabla se lee de corrido y una etiqueta suelta a media
    línea se pierde. El fondo va tenue a propósito — señala, no grita. */
+/* El letrero de «esto es la copia local». Rojo y arriba de todo a
+   propósito: el aviso anterior decía «la consola se ve, pero el asistente no
+   responde» y estaba escondido en la sección de diagnóstico. Sonaba a que
+   solo fallaba la vista previa. En realidad no funciona NADA del panel, y esa
+   verdad a medias costó horas de buscar el problema en el login. */
+.sin-servidor{background:var(--mal);color:#fff;padding:14px 18px;font-size:14px;
+  line-height:1.55;position:sticky;top:0;z-index:3000;box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.sin-servidor b{display:block;font-size:15px;margin-bottom:3px}
+.sin-servidor a{color:#fff;font-weight:700}
+.sin-servidor .btn-ir{display:inline-block;margin-top:10px;clear:both;background:#fff;color:var(--mal);
+  padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:13.5px}
+
 /* La barrita del consumo del día. Va dentro de la tarjeta del número
    porque «47» no dice nada y «47 de 200» apenas: lo que se lee de un
    vistazo es cuánto falta para que se acabe. */
@@ -689,6 +701,11 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 </style>
 </head>
 <body>
+
+<!-- Se llena solo si la consola se abrió donde NO hay servidor. Vacío no
+     ocupa nada, así que no estorba en el caso normal. -->
+<div id="sin-servidor"></div>
+
 <div class="hoja">
 
   <!-- ══════════ ARMAZÓN ══════════
@@ -2288,9 +2305,59 @@ fetchReal('/api/bot?ping=1').then(r=>r.json()).then(d => {
      ${esc(p.detalle)}<br><small>${esc(p.arreglo)}</small></div>`).join('');
   $('#estado').innerHTML = filas + (probs || '<div class="aviso ok">Todo configurado.</div>');
 }).catch(() => {
-  $('#estado').innerHTML = `<div class="aviso ojo">Sin servidor. Es lo normal en local:
-    la consola se ve, pero el asistente no responde.</div>`;
+  /* No hay servidor detrás de esta página.
+     El mensaje que había aquí decía «la consola se ve, pero el asistente no
+     responde», y estaba escondido en la sección de diagnóstico. Sonaba a que
+     solo fallaba la vista previa del bot. La verdad es peor y hay que decirla
+     entera: SIN servidor no funciona nada del panel — ni entrar, ni ver
+     negocios, ni guardar. Quien abre el archivo local ve una pantalla de
+     acceso que parece buena, mete su contraseña, y aterriza en un panel vacío
+     creyendo que su cuenta está rota. Eso pasó, y costó horas. */
+  $('#estado').innerHTML = `<div class="aviso mal"><b>No hay servidor detrás de esta
+    página.</b><br>Nada del panel puede funcionar aquí: ni entrar, ni ver tus
+    negocios, ni guardar.</div>`;
+  avisarSinServidor();
 });
+
+/**
+ * El letrero grande de arriba. Aparece SOLO cuando no hay servidor, y dice a
+ * dónde ir. Un aviso que no da la salida obliga a adivinarla.
+ */
+function avisarSinServidor() {
+  const caja = document.getElementById('sin-servidor');
+  if (!caja || caja.dataset.puesto) return;
+  caja.dataset.puesto = '1';
+
+  // La copia local no sabe cuál es el sitio publicado, así que se le dice.
+  // Si algún día cambia el dominio, se cambia aquí y en ningún otro lado.
+  const SITIO = 'https://chatbot-multimarca.pages.dev/';
+  const esLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname)
+                  || location.protocol === 'file:';
+
+  caja.className = 'sin-servidor';
+  caja.innerHTML = esLocal
+    ? `<b>Esta es la copia local, no la aplicación.</b>
+       Aquí solo se ven las pantallas: no hay servidor que conteste, así que
+       <b>entrar no va a funcionar</b> aunque tu contraseña esté bien.
+       El enlace por correo tampoco te va a regresar aquí.<br>
+       <a class="btn-ir" href="${SITIO}">Ir a la aplicación de verdad →</a>`
+    : `<b>El servidor no está contestando.</b>
+       La pantalla se ve, pero nada del panel puede funcionar hasta que vuelva.
+       Si acabas de subir cambios, espera a que termine el despliegue.`;
+
+  /* Y se apagan los dos botones que dependen de que Supabase pueda devolverte
+     a esta dirección. En local NO puede: te manda a la dirección configurada
+     del proyecto, y ahí no está tu página. Dejarlos encendidos es mandar a
+     alguien a un correo que nunca lo va a traer de vuelta. */
+  if (esLocal) {
+    for (const id of ['#btn-enlace', '#btn-olvide']) {
+      const b = document.querySelector(id);
+      if (!b) continue;
+      b.disabled = true;
+      b.title = 'No funciona desde la copia local: el correo no puede devolverte aquí.';
+    }
+  }
+}
 
 /* ══════════════════════════════════════════════════════════════════
    ACCESO Y API
