@@ -665,6 +665,15 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 .dia-horario .cerrado-txt{font-size:12.5px;color:var(--tenue)}
 .interruptor-dia{display:flex;align-items:center;gap:7px;cursor:pointer;
   font-size:13px;color:var(--suave);flex:none}
+
+/* Enseñarle al bot, desde donde se ve la pregunta que no supo. */
+.ensenar{margin:0 17px 14px;background:var(--acento-suave);
+  border:1px solid var(--acento);border-radius:12px;padding:14px 16px}
+.ensenar .cabeza{margin-bottom:11px}
+.ensenar .cabeza b{display:block;font-size:14px;color:var(--acento)}
+.ensenar .cabeza span{display:block;font-size:12.5px;color:var(--suave);margin-top:2px;line-height:1.45}
+.ensenar .campo{margin-bottom:9px}
+.ensenar .campo label{font-size:12px}
 </style>
 </head>
 <body>
@@ -1316,6 +1325,7 @@ import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO, IDIOMAS,
 // Solo metadatos: el panel pinta nombres y resúmenes. El texto de los
 // prompts vive en el servidor y nunca baja al navegador.
 import { CATEGORIAS_SUGERIDAS, POLITICAS_UI, ACCIONES_UI } from './cerebro/catalogos-ui.mjs';
+import { temaSugerido } from './cerebro/temas.mjs';
 import { SEMILLAS } from './cerebro/semillas.mjs';
 
 const SB_URL  = 'https://gnhndbqbgvtoxhelikcy.supabase.co';
@@ -2992,6 +3002,19 @@ function pintarCharlas() {
           : ''}
       </summary>
       <div class="cuerpo">${cuerpo || '<p class="pista">Sin mensajes guardados.</p>'}</div>
+      ${c.sin_dato ? `<div class="ensenar" data-ensenar="${esc(c.id)}">
+        <div class="cabeza">
+          <b>Aquí el bot no supo qué contestar</b>
+          <span>Prefirió decirlo antes que inventarlo. Enséñale y no vuelve a pasar.</span>
+        </div>
+        <div class="campo"><label>Tema</label>
+          <input class="e-tema" placeholder="ej. estacionamiento"
+                 value="${esc(temaSugerido(primero))}"></div>
+        <div class="campo"><label>Qué debe contestar</label>
+          <textarea class="e-texto" rows="2" placeholder="La respuesta, en tus palabras."></textarea></div>
+        <button class="btn chico" data-guardar-saber="${esc(c.empresa_id || '')}">Enseñárselo</button>
+      </div>` : ''}
+
       <div class="responder-charla">
         <textarea data-resp-charla="${esc(c.id)}" rows="2"
           placeholder="Escribir como persona…"></textarea>
@@ -3010,6 +3033,27 @@ function pintarCharlas() {
    guardaba y nadie podía escribir dentro. El paciente quedaba esperando en
    una ventana que solo sabía contestar sola. */
 $('#lista-charlas').addEventListener('click', async (ev) => {
+  const ens = ev.target.closest('[data-guardar-saber]');
+  if (ens) {
+    const caja = ens.closest('.ensenar');
+    const tema = caja.querySelector('.e-tema').value.trim();
+    const texto = caja.querySelector('.e-texto').value.trim();
+    if (!tema)  { caja.querySelector('.e-tema').focus(); return; }
+    if (!texto) { caja.querySelector('.e-texto').focus(); return; }
+
+    ens.disabled = true; ens.textContent = 'Guardando…';
+    try {
+      const r = await api('empresas.aprender', { id: ens.dataset.guardarSaber, tema, texto });
+      caja.innerHTML = `<div class="aviso ok">${r.reemplazo
+        ? 'Actualizado. El bot ya contesta distinto sobre «' + esc(tema) + '».'
+        : 'Aprendido. La próxima vez que le pregunten esto, ya lo sabe.'}</div>`;
+    } catch (e) {
+      ens.disabled = false; ens.textContent = 'Enseñárselo';
+      alert(traducirError(e.message));
+    }
+    return;
+  }
+
   const b = ev.target.closest('[data-enviar-charla]');
   if (!b) return;
   const id = b.dataset.enviarCharla;

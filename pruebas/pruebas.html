@@ -44,6 +44,7 @@ import {
 import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agenda.mjs';
+import { temaSugerido } from '../publico/cerebro/temas.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
 import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
@@ -1125,6 +1126,46 @@ await suite('Agenda', async () => {
   /* LO QUE NO SE OFRECIÓ, NO SE APARTA. Si alguien pide una hora que no
      estaba entre las opciones, quizá se la ganaron mientras escribía. */
   ok('no aparta algo que no se ofreció', cualEligio('el jueves a las 23:00', tres) === null);
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  PROPONER EL TEMA  ·  el ciclo que hace que el bot aprenda
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Proponer el tema', async () => {
+  ok('saca el sustantivo de la pregunta',
+     temaSugerido('¿tienen estacionamiento para el coche?') === 'estacionamiento coche',
+     temaSugerido('¿tienen estacionamiento para el coche?'));
+
+  ok('ignora el saludo',
+     temaSugerido('hola buenas tardes, ¿aceptan tarjeta?') === 'aceptan tarjeta',
+     temaSugerido('hola buenas tardes, ¿aceptan tarjeta?'));
+
+  /* LOS ACENTOS NO SE QUITAN. «diseño» y «diseno» no son la misma palabra,
+     y partirla por el acento produce temas rotos que nadie reconoce.
+
+     La prueba mira ESO y no la frase exacta: pedir «diseño páginas» sería
+     exigir que se quite el verbo «hacen», y dos renglones más arriba se da
+     por buena «aceptan tarjeta». Quitar verbos en un caso y no en el otro
+     es una preferencia disfrazada de regla. */
+  const conAcentos = temaSugerido('¿hacen diseño de páginas?');
+  ok('conserva la ñ', conAcentos.includes('diseño'), conAcentos);
+  ok('conserva el acento', conAcentos.includes('páginas'), conAcentos);
+
+  ok('corta a tres palabras',
+     temaSugerido('quiero saber sobre garantía devolución cambios facturación envíos').split(' ').length <= 3);
+
+  // Una pregunta que es puro relleno no da tema: mejor vacío que basura.
+  ok('sin contenido devuelve vacío', temaSugerido('hola') === '', temaSugerido('hola'));
+  ok('vacío no truena', temaSugerido('') === '' && temaSugerido(null) === '');
+
+  ok('descarta números sueltos',
+     !temaSugerido('¿abren a las 9 los sábados?').split(' ').includes('9'),
+     temaSugerido('¿abren a las 9 los sábados?'));
+
+  ok('los guiones no pegan palabras',
+     temaSugerido('servicio post-venta') === 'servicio post venta',
+     temaSugerido('servicio post-venta'));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

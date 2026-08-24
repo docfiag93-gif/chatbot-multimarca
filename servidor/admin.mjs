@@ -563,7 +563,7 @@ export async function manejar(req, context) {
         partes.push('order=created_at.desc', 'limit=' + Math.min(+datos.limite || 40, 100));
 
         const filas = await sb.seleccionar('conversaciones',
-          'id,empresa_id,sesion,mensajes_cifrados,urgencia,motivo_urgencia,via,created_at',
+          'id,empresa_id,sesion,mensajes_cifrados,urgencia,motivo_urgencia,via,sin_dato,created_at',
           partes.join('&'));
 
         const abiertas = [];
@@ -573,7 +573,7 @@ export async function manejar(req, context) {
           catch (e) { error = 'no se pudo abrir'; }
           abiertas.push({
             id: f.id, empresa_id: f.empresa_id, sesion: f.sesion,
-            urgencia: f.urgencia, motivo_urgencia: f.motivo_urgencia,
+            urgencia: f.urgencia, motivo_urgencia: f.motivo_urgencia, sin_dato: f.sin_dato,
             via: f.via, created_at: f.created_at,
             mensajes: mensajes || [], error,
           });
@@ -669,6 +669,51 @@ export async function manejar(req, context) {
         await sb.bitacora({ actor: yo.id, empresa_id: yo.empresa_id || null,
                             accion: 'cita.' + datos.estado, detalle: { cita: datos.id } });
         return json({ cita: r.cita });
+      }
+
+      /* ── ENSEÑARLE ────────────────────────────────────────────────────
+         El ciclo que hacía falta cerrar.
+
+         El anclaje ya sabe cuándo el bot no supo algo, y el tablero lo
+         cuenta. Pero de ahí a que lo aprenda había que salir de la
+         conversación, entrar al asistente, encontrar el paso de
+         conocimiento, agregar el renglón y guardar. Cinco pasos y un cambio
+         de contexto: en la práctica nadie lo hace, y la lista de «no supo»
+         crece sin que nadie la baje.
+
+         Esto agrega el renglón desde donde se ve la pregunta. Es lo que hace
+         que el bot mejore solo con usarlo.
+
+         permiso: dueño. El conocimiento es lo que el bot va a decirle a
+         clientes reales; no es una nota suelta. */
+      case 'empresas.aprender': {
+        if (!esDueno) return negar();
+        const tema  = String(datos.tema  || '').trim().slice(0, 80);
+        const texto = String(datos.texto || '').trim().slice(0, 2000);
+        if (!tema || !texto) return json({ error: 'Falta el tema o la respuesta.' }, 400);
+
+        const id = esSuper ? datos.id : yo.empresa_id;
+        const fila = (await sb.seleccionar('empresas', 'id,conocimiento_cifrado',
+          `id=eq.${id}&limit=1`))?.[0];
+        if (!fila) return json({ error: 'Esa empresa no existe o no es tuya.' }, 404);
+
+        let previo = [];
+        try { previo = await descifrar(MAESTRA, fila.id, fila.conocimiento_cifrado) || []; }
+        catch (e) { previo = []; }
+
+        // Si el tema ya existe se REEMPLAZA en su lugar, no se agrega otro.
+        // Dos renglones con el mismo tema y respuestas distintas es peor que
+        // no tener ninguno: el bot elegiría cualquiera de los dos.
+        const i = previo.findIndex(k => (k.tema || '').toLowerCase() === tema.toLowerCase());
+        if (i >= 0) previo[i] = { tema, texto }; else previo.push({ tema, texto });
+
+        await sb.actualizar('empresas', `id=eq.${fila.id}`, {
+          conocimiento_cifrado: await cifrar(MAESTRA, fila.id, previo),
+          updated_at: new Date().toISOString(),
+        });
+        await sb.bitacora({ actor: yo.id, empresa_id: fila.id, accion: 'empresa.aprender',
+                            detalle: { tema, reemplazo: i >= 0 } });
+        return json({ ok: true, temas: previo.length, reemplazo: i >= 0 });
       }
 
       case 'bitacora.listar': {
