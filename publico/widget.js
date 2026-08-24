@@ -384,8 +384,44 @@
     }
   }
 
+  /* ── ¿me escribió una persona? ──────────────────────────────────────
+     Mientras el chat está abierto se le pregunta al servidor cada pocos
+     segundos si alguien del negocio escribió algo. Es lo que convierte
+     «te paso con una persona» en algo real: hasta ahora el mensaje se
+     guardaba y el visitante se quedaba esperando en una ventana que solo
+     sabía contestar sola.
+
+     SOLO mientras está abierto. Sondear con el chat cerrado —o con la
+     pestaña de fondo— sería quemar la cuota gratuita del negocio para
+     nada. Al cerrar se apaga. */
+  var reloj = null;
+  var CADA = 6000;
+
+  function empezarSondeo() {
+    if (reloj) return;
+    reloj = setInterval(function () {
+      if (document.hidden) return;   // pestaña de fondo: no se gasta
+      fetch(ENDPOINT + '?humanos=1&marca=' + encodeURIComponent(MARCA) +
+            '&sesion=' + encodeURIComponent(idSesion()))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          (d && d.mensajes ? d.mensajes : []).forEach(function (m) {
+            pintarBot(m.texto);
+            mensajes.push({ rol: 'bot', texto: m.texto });
+          });
+          if (d && d.mensajes && d.mensajes.length) guardar();
+        })
+        .catch(function () { /* sin conexión: se reintenta al siguiente */ });
+    }, CADA);
+  }
+
+  function pararSondeo() {
+    if (reloj) { clearInterval(reloj); reloj = null; }
+  }
+
   function alternar() {
     abierto = !abierto;
+    if (abierto) empezarSondeo(); else pararSondeo();
     caja.dataset.abierto = abierto ? '1' : '0';
     boton.dataset.abierto = abierto ? '1' : '0';
     if (cfg.marca.logo) {

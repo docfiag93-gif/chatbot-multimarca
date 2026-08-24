@@ -194,7 +194,7 @@ export async function guardarConversacion({ empresa, sesion, mensajes, urgencia,
       sesion: String(sesion || '').slice(0, 64),
       mensajes_cifrados: await cifrar(clave, empresa.id, mensajes),
       urgencia: !!urgencia,
-      // La CATEGORÍA clínica, nunca la frase del paciente: así el tablero
+      // La CATEGORÍA de la urgencia, nunca la frase de quien escribió: así
       // puede contar urgencias sin que nadie lea un síntoma de pasada.
       motivo_urgencia: urgencia ? String(motivo || '').slice(0, 80) : null,
       via: via || null,
@@ -220,7 +220,7 @@ export async function guardarLead({ empresa, lead }) {
 }
 
 /**
- * Avisa y deja constancia. Nunca lanza: si el aviso falla, el paciente ya
+ * Avisa y deja constancia. Nunca lanza: si el aviso falla, a quien escribió ya
  * recibió su respuesta y eso es lo que no se puede romper.
  */
 export async function avisar({ empresa, tipo, titulo, lineas, conversacionId }) {
@@ -242,4 +242,86 @@ export async function avisar({ empresa, tipo, titulo, lineas, conversacionId }) 
     } catch (e) { /* el registro es deseable, no indispensable */ }
   }
   return r;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CUANDO CONTESTA UNA PERSONA
+
+   Hasta ahora «te paso con un humano» era una promesa a medias: la
+   conversación se guardaba, pero nadie podía escribir dentro de ella. El
+   visitante quedaba esperando en una ventana que solo sabía contestar sola.
+
+   Los mensajes de la persona van en su propia columna, no revueltos con
+   los del bot. Dos razones, y las dos importan:
+
+     · El widget entrega solo lo nuevo. Si estuvieran mezclados habría que
+       mandarle la charla entera en cada sondeo para que encontrara la
+       diferencia.
+     · En el expediente queda claro qué dijo la máquina y qué dijo una
+       persona. Donde hay algo delicado en juego, eso no es formato.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/** Agrega un mensaje escrito por una persona del negocio. */
+export async function responderComoHumano({ empresaId, conversacionId, texto, autor }) {
+  const sb = servicio(); const clave = MAESTRA();
+  if (!sb || !clave || !conversacionId) return { ok: false, razon: 'sin_base' };
+
+  const fila = (await sb.seleccionar('conversaciones',
+    'id,empresa_id,humanos_cifrados', `id=eq.${conversacionId}&limit=1`))?.[0];
+  if (!fila) return { ok: false, razon: 'no_existe' };
+  if (empresaId && fila.empresa_id !== empresaId) return { ok: false, razon: 'ajena' };
+
+  let previos = [];
+  try { previos = await descifrar(clave, fila.empresa_id, fila.humanos_cifrados) || []; }
+  catch (e) { previos = []; }
+
+  previos.push({
+    texto: String(texto).slice(0, 2000),
+    en: new Date().toISOString(),
+    autor: String(autor || '').slice(0, 60),
+    entregado: false,
+  });
+
+  await sb.actualizar('conversaciones', `id=eq.${conversacionId}`, {
+    humanos_cifrados: await cifrar(clave, fila.empresa_id, previos),
+    humano_pendiente: true,
+  });
+  return { ok: true, cuantos: previos.length };
+}
+
+/**
+ * Lo que una persona escribió y el visitante todavía no ha visto.
+ *
+ * Se busca por la sesión del widget, no por el id de la conversación: el
+ * navegador conoce la suya y nada más. Pedirle el id sería darle una llave
+ * para asomarse a conversaciones ajenas.
+ */
+export async function recogerHumanos({ empresa, sesion }) {
+  const sb = servicio(); const clave = MAESTRA();
+  if (!sb || !clave || !empresa?.id || !sesion) return [];
+
+  const fila = (await sb.seleccionar('conversaciones', 'id,empresa_id,humanos_cifrados',
+    `empresa_id=eq.${empresa.id}&sesion=eq.${encodeURIComponent(sesion)}` +
+    '&humano_pendiente=is.true&order=created_at.desc&limit=1'))?.[0];
+  if (!fila) return [];
+
+  let mensajes = [];
+  try { mensajes = await descifrar(clave, fila.empresa_id, fila.humanos_cifrados) || []; }
+  catch (e) { return []; }
+
+  const nuevos = mensajes.filter(m => !m.entregado);
+  if (!nuevos.length) return [];
+
+  // Se marcan entregados ANTES de devolverlos. Si se hiciera al revés y la
+  // escritura fallara, el visitante vería el mismo mensaje una y otra vez
+  // en cada sondeo.
+  nuevos.forEach(m => { m.entregado = true; });
+  try {
+    await sb.actualizar('conversaciones', `id=eq.${fila.id}`, {
+      humanos_cifrados: await cifrar(clave, fila.empresa_id, mensajes),
+      humano_pendiente: false,
+    });
+  } catch (e) { return []; }
+
+  return nuevos.map(m => ({ texto: m.texto, en: m.en }));
 }

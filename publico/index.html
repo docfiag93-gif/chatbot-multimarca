@@ -620,6 +620,17 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 .pendiente .txt{flex:1;min-width:180px}
 .pendiente .txt b{display:block;font-size:14.5px;letter-spacing:-.01em}
 .pendiente .txt span{display:block;font-size:13px;color:var(--suave);margin-top:2px;line-height:1.45}
+
+/* Contestar dentro de una conversación guardada. */
+.responder-charla{display:flex;gap:8px;padding:0 17px 12px;flex-wrap:wrap}
+.responder-charla textarea{flex:1;min-width:190px;min-height:52px}
+/* Lo que escribe una persona se distingue de lo que dijo el bot. En un
+   expediente, confundir quién habló no es un detalle de formato. */
+.charla-guardada .msj.humano{align-self:flex-end;background:var(--ok-suave);
+  color:var(--ok);border:1px solid var(--ok);border-bottom-right-radius:4px;
+  position:relative}
+.charla-guardada .msj.humano .quien{display:block;font-size:10.5px;opacity:.75;
+  margin-top:4px;text-transform:uppercase;letter-spacing:.08em}
 </style>
 </head>
 <body>
@@ -2744,9 +2755,47 @@ function pintarCharlas() {
           : ''}
       </summary>
       <div class="cuerpo">${cuerpo || '<p class="pista">Sin mensajes guardados.</p>'}</div>
+      <div class="responder-charla">
+        <textarea data-resp-charla="${esc(c.id)}" rows="2"
+          placeholder="Escribir como persona…"></textarea>
+        <button class="btn chico" data-enviar-charla="${esc(c.id)}">Enviar</button>
+      </div>
+      <p class="pista" style="padding:0 17px 15px;margin:0">Le llega en el chat, en
+      unos segundos, <b>si todavía lo tiene abierto</b>. Si ya lo cerró, mejor
+      escríbele por WhatsApp.</p>
     </details>`;
   }).join('');
 }
+
+/* Contestar como persona dentro de una conversación.
+
+   Hasta ahora «te paso con un humano» era una promesa a medias: la charla se
+   guardaba y nadie podía escribir dentro. El paciente quedaba esperando en
+   una ventana que solo sabía contestar sola. */
+$('#lista-charlas').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('[data-enviar-charla]');
+  if (!b) return;
+  const id = b.dataset.enviarCharla;
+  const ta = $(`textarea[data-resp-charla="${id}"]`);
+  const texto = (ta?.value || '').trim();
+  if (!texto) { ta?.focus(); return; }
+
+  b.disabled = true; b.textContent = '…';
+  try {
+    await api('conversaciones.responder', { id, texto });
+    ta.value = '';
+    // Se pinta de inmediato, sin recargar: quien contesta necesita ver que
+    // salió, no esperar a que vuelva la lista entera.
+    const caja = ta.closest('.charla-guardada').querySelector('.cuerpo');
+    caja.insertAdjacentHTML('beforeend',
+      `<div class="msj humano">${esc(texto)}<span class="quien">tú</span></div>`);
+    b.textContent = '✓ Enviado';
+    setTimeout(() => { b.disabled = false; b.textContent = 'Enviar'; }, 1400);
+  } catch (e) {
+    b.disabled = false; b.textContent = 'Enviar';
+    alert(traducirError(e.message));
+  }
+});
 
 $('#solo-urgencias').addEventListener('change', cargarCharlas);
 $('#solo-sin-dato').addEventListener('change', cargarCharlas);

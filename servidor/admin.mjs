@@ -26,6 +26,7 @@ import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
 import { catalogoDePoliticas } from './nucleo/politicas.mjs';
 import { catalogoDeAcciones } from './nucleo/acciones.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
+import { responderComoHumano } from './nucleo/datos.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -607,6 +608,32 @@ export async function manejar(req, context) {
           return json({ ok: false, codigo: e.codigo || 'FALLO',
                         ms: Date.now() - arranque, intentos: e.intentos || [] });
         }
+      }
+
+      /* Contestar como persona dentro de una conversación.
+         permiso: cualquier cuenta activa — atender es justo su trabajo. RLS
+         encierra a cada quien en su empresa, y `responderComoHumano`
+         comprueba además que la conversación sea de esa empresa: sin eso,
+         un id adivinado dejaría escribir en la charla de otro cliente. */
+      case 'conversaciones.responder': {
+        const texto = String(datos.texto || '').trim();
+        if (!texto) return json({ error: 'Escribe el mensaje.' }, 400);
+
+        const r = await responderComoHumano({
+          empresaId: esSuper ? null : yo.empresa_id,
+          conversacionId: datos.id, texto,
+          autor: yo.nombre || yo.email || '',
+        });
+        if (!r.ok) {
+          return json({ error: {
+            sin_base: 'No hay base de datos configurada.',
+            no_existe: 'Esa conversación no existe.',
+            ajena: 'Esa conversación no es de tu negocio.',
+          }[r.razon] || 'No se pudo enviar.' }, r.razon === 'ajena' ? 403 : 400);
+        }
+        await sb.bitacora({ actor: yo.id, empresa_id: yo.empresa_id || null,
+                            accion: 'conversacion.responder', detalle: {} });
+        return json({ ok: true });
       }
 
       case 'bitacora.listar': {

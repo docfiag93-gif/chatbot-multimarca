@@ -22,7 +22,7 @@ import { revisarAnclaje, pulir, respuestaSinDato }
   from './nucleo/anclaje.mjs';
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
-import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar }
+import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar, recogerHumanos }
   from './nucleo/datos.mjs';
 
 // ── Freno de mano ───────────────────────────────────────────────────────
@@ -117,6 +117,21 @@ export async function manejar(req, context) {
       },
       problemas,
     });
+  }
+
+  /* ── ¿me escribió una persona? ──────────────────────────────────────
+     El widget pregunta esto cada pocos segundos mientras el chat está
+     abierto. Es deliberadamente barato: en la base hay un booleano
+     indexado, así que el caso normal —no hay nada— no descifra nada.
+
+     Se busca por la SESIÓN del navegador, nunca por el id de la
+     conversación: el visitante conoce la suya y nada más. Aceptar un id
+     sería regalar una llave para asomarse a charlas ajenas. */
+  if (req.method === 'GET' && url.searchParams.get('humanos')) {
+    const marca = await resolverMarca(url.searchParams.get('marca'));
+    const sesion = url.searchParams.get('sesion') || '';
+    if (!marca?.id || !sesion) return json({ mensajes: [] });
+    return json({ mensajes: await recogerHumanos({ empresa: marca, sesion }) });
   }
 
   if (req.method === 'GET' && url.searchParams.get('config')) {
