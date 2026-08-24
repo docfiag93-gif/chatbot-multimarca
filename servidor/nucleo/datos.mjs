@@ -52,7 +52,13 @@ export async function empresaPorSlug(slug, { incluirSuspendidas = false } = {}) 
   // `incluirSuspendidas` lo usa SOLO la vista previa del dueño, que ya
   // demostró con su sesión que el negocio es suyo. Para todos los demás la
   // suspensión sigue siendo un muro.
-  if (!fila.activa && !incluirSuspendidas) return { suspendida: true, nombre: fila.nombre };
+  // El `id` viaja aunque esté suspendida: sin él no hay contra qué comprobar
+  // si quien pregunta es el dueño, y la vista previa nunca se activaría. No
+  // sale al navegador — `configPublica` arma su propia respuesta para este
+  // caso y ahí el id va en null.
+  if (!fila.activa && !incluirSuspendidas) {
+    return { suspendida: true, id: fila.id, nombre: fila.nombre };
+  }
 
   const clave = MAESTRA();
   const abrir = async (campo) => {
@@ -162,7 +168,9 @@ export async function empresaPorWhatsapp(phoneId) {
  */
 export async function resolverMarca(slug, { incluirSuspendidas = false } = {}) {
   const dela = await empresaPorSlug(slug, { incluirSuspendidas });
-  if (dela?.suspendida) return { suspendida: true, nombre: dela.nombre, origen: 'base' };
+  if (dela?.suspendida) {
+    return { suspendida: true, id: dela.id, nombre: dela.nombre, origen: 'base' };
+  }
   if (dela) return { ...dela, origen: 'base' };
   return { ...obtenerMarca(slug), id: null, origen: 'archivo' };
 }
