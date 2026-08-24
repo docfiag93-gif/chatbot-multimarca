@@ -15,6 +15,41 @@ cambiarlos por los reales: Negocios → **Editar** → paso 4 y 5.
 ⚠️ **Está suspendido.** Alguien le dio a Suspender. Para revivirlo:
 Negocios → **Reactivar**.
 
+## 🔑 META · dónde quedó exactamente (24-ago)
+
+**Hecho y NO se pierde:**
+- Portafolio comercial **«Chatbot ISA»** creado, correo `doc.fiag93@gmail.com`
+  confirmado, Fernando con acceso total.
+
+**Falta un solo paso, y es suyo:** al final del asistente de creación de la
+app, Meta pide **volver a escribir la contraseña de Facebook**. Yo no tecleo
+contraseñas, ni con autorización.
+
+⚠️ La vez pasada se dio clic en **«¿Olvidaste tu contraseña?»** y eso canceló
+todo el asistente (manda a facebook.com/login/identify). Hay que escribir la
+contraseña en el campo y darle **Enviar**. El campo no muestra nada mientras
+se escribe: es normal.
+
+**Para retomar** (yo puedo llevarlo otra vez hasta ahí en ~2 minutos):
+1. `developers.facebook.com/apps/creation/`
+2. Nombre: `Chatbot Multimarca ISA`
+3. Casos de uso → Mensajes comerciales → **Conectarte con los clientes a
+   través de WhatsApp**
+4. Negocio → **Chatbot ISA**
+5. Requisitos → dice «No hay requisitos» ✅ (o sea: número de prueba sin
+   verificación de negocio)
+6. Crear app → **contraseña** ← él
+
+**Después de eso, sigo yo:** `phone_number_id` del número de prueba,
+registrar su celular como destinatario, webhook a `/api/whatsapp`,
+suscribir `messages`, y vincular el número al negocio desde la consola.
+Los tokens los pega él en Cloudflare.
+
+**UNA app sirve para TODOS sus clientes.** No se crea una por cliente: cada
+negocio conecta su número a la misma app, y `empresas.whatsapp_id` (único)
+es lo que distingue a quién le escribieron. Esa app ES el producto que va a
+vender.
+
 ## 🎛 Canales
 
 | Canal | Estado |
