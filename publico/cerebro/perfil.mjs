@@ -176,6 +176,37 @@ export function normalizarPerfil(crudo = {}) {
     estado: ['borrador', 'publicado', 'suspendido'].includes(c.estado) ? c.estado : 'borrador',
     proveedores: lista(c.proveedores).map(p => texto(p, 20)),
     ejemplo: c.ejemplo === true,     // marca de semilla borrable
+
+    /* ── Los cinco que se caían por el hueco ──────────────────────────────
+       Esta función es una LISTA BLANCA: lo que no se nombra aquí se pierde,
+       en silencio y sin error. Estos cinco los mandaba la base y ninguno
+       llegaba, y el más caro fue `modo`:
+
+         · modo       — el interruptor de apagado. NUNCA funcionó. Marcar el
+                        bot como apagado en el panel no lo apagaba: llegaba
+                        siempre como 'activo' y contestaba con IA igual.
+         · destinos   — a dónde va el aviso de urgencia. Habría seguido sin
+                        llegar aunque se pusiera la llave del correo, y el
+                        problema se habría buscado en el correo.
+         · enlace     — el aviso al sistema del negocio. Nunca salía.
+         · topeDiario — el tope propio del negocio.
+
+       (`identidad` NO estaba en esta lista: ya se devolvía arriba en forma
+       abreviada, `identidad,` sin dos puntos. El detector que los encontró
+       solo buscaba `clave:` y la marcó como perdida. Le creí sin calibrarlo,
+       agregué un duplicado aquí, y ese duplicado pisó al bueno y se llevó los
+       colores por omisión. Lo cachó una prueba que ya existía.)
+
+       Las pruebas no lo vieron porque probaban la DECISIÓN pasándole el modo
+       a mano, y nunca que el modo LLEGARA. Ahora hay una que compara esta
+       lista contra lo que la base manda. */
+    modo: ['activo', 'recados', 'apagado'].includes(c.modo) ? c.modo : 'activo',
+    topeDiario: Number(c.topeDiario) > 0 ? Math.floor(Number(c.topeDiario)) : null,
+    // destinos y enlace llevan datos personales y un secreto compartido. Van
+    // tal cual porque ya vienen descifrados y validados de la base, y NO
+    // aparecen en `perfilPublico`: el navegador no tiene por qué verlos.
+    destinos: c.destinos ?? null,
+    enlace: c.enlace ?? null,
   };
 }
 

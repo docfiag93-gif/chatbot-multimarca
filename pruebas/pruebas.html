@@ -1174,7 +1174,7 @@ await suite('Identificador de sesión · la llave de la conversación', async ()
   // texto y se ejecuta el generador aquí. Es la única forma de PROBAR lo
   // que hace en vez de creerle al comentario que tiene arriba.
   let fuente = '';
-  try { fuente = await (await fetchReal.call(window, '../publico/widget.js')).text(); }
+  try { fuente = await (await fetchReal.call(window, '../publico/widget.js', { cache: 'no-store' })).text(); }
   catch (e) { fuente = ''; }
 
   ok('se pudo leer widget.js', fuente.length > 1000, 'largo: ' + fuente.length);
@@ -1242,7 +1242,7 @@ await suite('La llave de servicio · toda consulta acota por empresa', async () 
   // No prueba comportamiento, prueba una REGLA — y por eso vale: la ronda que
   // agregue la función diecisiete se entera aquí, no en producción.
   let fuente = '';
-  try { fuente = await (await fetchReal.call(window, '../servidor/nucleo/datos.mjs')).text(); }
+  try { fuente = await (await fetchReal.call(window, '../servidor/nucleo/datos.mjs', { cache: 'no-store' })).text(); }
   catch (e) { fuente = ''; }
   ok('se pudo leer datos.mjs', fuente.length > 1000, 'largo: ' + fuente.length);
   if (!fuente) return;
@@ -1420,6 +1420,90 @@ suite('El orden de los cortes · la urgencia por encima del dinero', () => {
   ok('sin tope pasado, se le pregunta a la IA como siempre',
      decidirSinIA({ marca: clinica, modo: 'activo',
                     ultimo: '¿cuánto cuesta la consulta?', sobreTope: false }) === null);
+});
+
+await suite('La lista blanca · que no se caiga nada por el hueco', async () => {
+  /* `normalizarPerfil` deja pasar solo lo que nombra. Lo que no, se pierde
+     SIN ERROR — y ese silencio ya costó caro: `modo` nunca llegó, así que el
+     interruptor de apagado no apagaba nada, y `destinos` tampoco, así que el
+     aviso de urgencia no habría llegado aunque el correo estuviera puesto.
+
+     Las pruebas de antes no lo veían porque le pasaban el modo a mano a
+     `decidirSinIA`. Probaban la decisión; nunca que el dato LLEGARA a la
+     decisión. Esta prueba cubre justo ese tramo. */
+
+  // 1 · Comparar código contra código: lo que la base manda vs. lo que pasa.
+  // `no-store` no es adorno: leer del caché haría que esta prueba juzgara
+  // una version vieja del archivo y diera un aprobado falso justo cuando
+  // alguien acaba de romper algo. Un candado que lee ayer no cierra hoy.
+  const traer = async ruta =>
+    (await fetchReal.call(window, ruta, { cache: 'no-store' })).text();
+
+  let datos = '', perfil = '';
+  try {
+    datos  = await traer('../servidor/nucleo/datos.mjs');
+    perfil = await traer('../publico/cerebro/perfil.mjs');
+  } catch (e) { /* abajo se marca */ }
+
+  ok('se pudieron leer los dos archivos', datos.length > 1000 && perfil.length > 1000);
+
+  if (datos && perfil) {
+    /* Cuenta las dos formas de devolver una clave: `clave: valor` y la
+       abreviada `clave,`. Un detector que solo viera la primera marcaría
+       como perdida una clave que sí pasa — y eso ya pasó: dio a `identidad`
+       por caída, se le creyó, y el «arreglo» duplicó la clave y pisó al
+       bueno. La prueba de abajo lo comprueba en vez de suponerlo. */
+    const claves = txt => new Set([
+      ...[...txt.matchAll(/^\s{4}([A-Za-z_]\w*)\s*:/gm)].map(m => m[1]),
+      ...[...txt.matchAll(/^\s{4}([A-Za-z_]\w*)\s*,\s*$/gm)].map(m => m[1]),
+    ]);
+
+    ok('el detector entiende la forma abreviada',
+       claves('    uno: 1,\n    dos,\n').has('dos'),
+       'no vio `dos,` — daría falsos positivos');
+
+    const iM = datos.indexOf('return normalizarPerfil({');
+    const manda = claves(datos.slice(iM, datos.indexOf('\n}', iM)));
+
+    const iP = perfil.indexOf('export function normalizarPerfil');
+    const deja = claves(perfil.slice(iP, perfil.indexOf('\n}', perfil.indexOf('ejemplo:', iP))));
+
+    const caidos = [...manda].filter(k => !deja.has(k));
+    ok('nada de lo que manda la base se cae en la normalización',
+       caidos.length === 0, 'se pierden: ' + caidos.join(', '));
+
+    ok('el comparador encontró algo que comparar',
+       manda.size >= 15 && deja.size >= 20, manda.size + ' vs ' + deja.size);
+  }
+
+  // 2 · Y comportamiento, no solo forma: los campos de los que depende una
+  //     operación tienen que sobrevivir de verdad.
+  const crudo = {
+    id: 'abc', slug: 'x', nombre: 'X',
+    modo: 'apagado',
+    topeDiario: 750,
+    identidad: { color: '#123456' },
+    destinos: { correo: 'a@b.c' },
+    enlace: { url: 'https://x.test', secreto: 's' },
+  };
+  const n = normalizarPerfil(crudo);
+
+  ok('el INTERRUPTOR sobrevive', n.modo === 'apagado', String(n.modo));
+  ok('el tope propio sobrevive', n.topeDiario === 750, String(n.topeDiario));
+  ok('a dónde avisar sobrevive', n.destinos?.correo === 'a@b.c', JSON.stringify(n.destinos));
+  ok('el enlace saliente sobrevive', n.enlace?.url === 'https://x.test', JSON.stringify(n.enlace));
+  ok('los colores de la marca sobreviven', n.identidad?.color === '#123456', JSON.stringify(n.identidad));
+
+  // 3 · Un modo inventado no debe abrir el bot: se cae al lado seguro.
+  ok('un modo inventado cae en activo, no en nada',
+     normalizarPerfil({ ...crudo, modo: 'chistoso' }).modo === 'activo');
+
+  // 4 · Y lo que el navegador recibe NO puede traer los secretos.
+  const publico = perfilPublico(crudo);
+  ok('el navegador NO recibe a dónde se avisa', publico.destinos === undefined);
+  ok('el navegador NO recibe el secreto del enlace', publico.enlace === undefined);
+  ok('el navegador NO recibe el interruptor', publico.modo === undefined);
+  ok('pero SÍ recibe los colores', publico.marca?.color === '#123456');
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */
