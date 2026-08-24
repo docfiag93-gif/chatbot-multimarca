@@ -23,7 +23,7 @@ import { revisarAnclaje, pulir, respuestaSinDato }
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar, recogerHumanos,
-         huecosOcupados, apartarCita }
+         huecosOcupados, apartarCita, esSuPropioBot }
   from './nucleo/datos.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from './nucleo/agenda.mjs';
 
@@ -150,10 +150,27 @@ export async function manejar(req, context) {
   const { marca: marcaId, mensajes, tipo, lead, sesion } = cuerpo || {};
 
   // La marca sale de la base si está ahí; si no, del archivo.
-  const marca = await resolverMarca(marcaId);
+  let marca = await resolverMarca(marcaId);
+
+  /* Un negocio suspendido contesta «fuera de servicio» a todo el mundo —
+     incluido su dueño. Eso lo deja sin poder ver lo que acaba de configurar
+     justo antes de soltarlo a sus clientes, que es cuando más falta hace
+     mirarlo.
+
+     Si viene una sesión de dueño, se le deja pasar y se le dice claramente
+     que está viendo una vista previa. La comprobación solo corre cuando hay
+     cabecera: un visitante anónimo no paga ni una consulta de más. */
   if (marca.suspendida) {
-    return json({ texto: 'Este chat está fuera de servicio por el momento.',
-                  sugerencias: [], accion: 'ninguna', via: 'suspendida' });
+    const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    const dueno = token && await esSuPropioBot({ token, empresaId: marca.id });
+
+    if (!dueno) {
+      return json({ texto: 'Este chat está fuera de servicio por el momento.',
+                    sugerencias: [], accion: 'ninguna', via: 'suspendida' });
+    }
+    // Se vuelve a resolver sin el corte de suspensión, para trabajar con el
+    // perfil completo y no con el esqueleto que trae `suspendida`.
+    marca = { ...(await resolverMarca(marcaId, { incluirSuspendidas: true })), vistaPrevia: true };
   }
 
   const hayContacto = !!(marca.contactos && Object.keys(marca.contactos).length);
@@ -388,6 +405,8 @@ export async function manejar(req, context) {
     // Cuando hubo un fallo antes de acertar, se deja constancia: es la señal
     // temprana de que un proveedor se está degradando.
     if (intentos.length) salida.reintentos = intentos.length;
+
+    if (marca.vistaPrevia) salida.vistaPrevia = true;
 
     enSegundoPlano(context, guardarConversacion({
       empresa: marca, sesion,

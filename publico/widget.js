@@ -36,6 +36,11 @@
   // está alojado,
   // que es justo lo que permite mudarlo sin tocar los sitios de los clientes.
   var ENDPOINT = (script && script.dataset.endpoint) || '/api/bot';
+  /* Si quien incrusta el widget le pasa una sesión, se manda. Sirve para una
+     sola cosa: que el DUEÑO pueda hablar con su bot antes de publicarlo. Un
+     widget en el sitio de un cliente nunca lleva esto — no hay sesión que
+     pasarle. */
+  var SESION_DUENO = (script && script.dataset.sesion) || '';
   var WHATSAPP = (script && script.dataset.whatsapp) || '';   // solo dígitos, con lada
 
   // Si el servidor no contesta (abriste el archivo con doble clic, o la
@@ -596,7 +601,9 @@
   function pedirRespuesta() {
     fetch(ENDPOINT, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: SESION_DUENO
+        ? { 'content-type': 'application/json', Authorization: 'Bearer ' + SESION_DUENO }
+        : { 'content-type': 'application/json' },
       // Se devuelven los horarios que el servidor ofreció en el turno
       // anterior. Sin esto, «sí, el jueves» no tendría contra qué compararse
       // y habría que preguntarle a la IA qué quiso decir — justo donde no

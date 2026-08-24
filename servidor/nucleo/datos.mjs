@@ -16,7 +16,7 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { env } from './entorno.mjs';
-import { clienteSupabase } from './supabase.mjs';
+import { clienteSupabase, usuarioDelToken } from './supabase.mjs';
 import { descifrar, cifrar } from '../../publico/cerebro/cifrado.mjs';
 import { marcaPublica, obtenerMarca } from './marcas.mjs';
 import { normalizarPerfil, perfilPublico } from '../../publico/cerebro/perfil.mjs';
@@ -35,7 +35,7 @@ const MAESTRA = () => env('CHATBOT_CLAVE');
  * Trae la empresa por su slug, ya descifrada, lista para armar el prompt.
  * Devuelve null si no existe en la base (para que el llamador use el archivo).
  */
-export async function empresaPorSlug(slug) {
+export async function empresaPorSlug(slug, { incluirSuspendidas = false } = {}) {
   const sb = servicio();
   if (!sb) return null;
 
@@ -48,7 +48,11 @@ export async function empresaPorSlug(slug) {
 
   // Una empresa suspendida no contesta. Se distingue de "no existe" para
   // poder darle al visitante un mensaje honesto en vez de un error.
-  if (!fila.activa) return { suspendida: true, nombre: fila.nombre };
+  //
+  // `incluirSuspendidas` lo usa SOLO la vista previa del dueño, que ya
+  // demostró con su sesión que el negocio es suyo. Para todos los demás la
+  // suspensión sigue siendo un muro.
+  if (!fila.activa && !incluirSuspendidas) return { suspendida: true, nombre: fila.nombre };
 
   const clave = MAESTRA();
   const abrir = async (campo) => {
@@ -156,8 +160,8 @@ export async function empresaPorWhatsapp(phoneId) {
  * La marca que va a usar el bot: base primero, archivo después.
  * `origen` sirve para depurar sin adivinar de dónde salió la configuración.
  */
-export async function resolverMarca(slug) {
-  const dela = await empresaPorSlug(slug);
+export async function resolverMarca(slug, { incluirSuspendidas = false } = {}) {
+  const dela = await empresaPorSlug(slug, { incluirSuspendidas });
   if (dela?.suspendida) return { suspendida: true, nombre: dela.nombre, origen: 'base' };
   if (dela) return { ...dela, origen: 'base' };
   return { ...obtenerMarca(slug), id: null, origen: 'archivo' };
@@ -428,4 +432,39 @@ export async function moverCita({ empresaId, id, estado }) {
     const g = await sb.actualizar('citas', filtro, { estado });
     return { ok: !!g?.[0], cita: g?.[0] };
   } catch (e) { return { ok: false }; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   ¿ESTE ES SU PROPIO BOT?
+
+   Un negocio suspendido o sin publicar contesta «fuera de servicio» a todo
+   el mundo — incluido su dueño. Eso deja al dueño sin poder ver lo que
+   acaba de configurar antes de soltarlo a sus clientes, que es exactamente
+   cuando más falta hace mirarlo.
+
+   Con sesión de dueño, la suspensión no aplica: puede hablar con su bot,
+   probar la agenda y corregir antes de publicar. Para cualquier otro sigue
+   fuera de servicio.
+
+   El token se verifica contra el servidor de autenticación, nunca
+   decodificándolo aquí: decodificar un JWT sin comprobar la firma es
+   justamente como se cuela alguien con un token inventado.
+   ══════════════════════════════════════════════════════════════════════ */
+export async function esSuPropioBot({ token, empresaId }) {
+  const url = env('SUPABASE_URL'), anon = env('SUPABASE_ANON_KEY');
+  if (!token || !empresaId || !url || !anon) return false;
+
+  const cuenta = await usuarioDelToken(url, anon, token);
+  if (!cuenta) return false;
+
+  const sb = servicio();
+  if (!sb) return false;
+  try {
+    const filas = await sb.seleccionar('usuarios', 'rol,empresa_id,activo',
+      `id=eq.${cuenta.id}&limit=1`);
+    const yo = filas?.[0];
+    if (!yo || !yo.activo) return false;
+    return yo.rol === 'superadmin' || (yo.rol === 'dueno' && yo.empresa_id === empresaId);
+  } catch (e) { return false; }
 }

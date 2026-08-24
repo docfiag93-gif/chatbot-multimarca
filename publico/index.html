@@ -2133,6 +2133,10 @@ sc.src = 'widget.js'; // Sin marca en la URL se toma el primer ejemplo disponibl
 // escrito a mano. Que la consola tenga un giro favorito es justo el defecto
 // que esta pasada vino a quitar.
 sc.dataset.marca = marcaActiva || Object.keys(SEMILLAS)[0] || 'default';
+// Se le pasa la sesión SOLO aquí, en la consola: es lo que deja al dueño
+// hablar con su bot antes de publicarlo. El widget que se pega en el sitio
+// de un cliente no lleva esto ni tiene de dónde sacarlo.
+if (token) sc.dataset.sesion = token;
 sc.defer = true;
 document.body.appendChild(sc);
 
