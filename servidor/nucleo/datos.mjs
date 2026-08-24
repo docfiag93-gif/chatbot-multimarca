@@ -3,11 +3,20 @@
 //
 //  Aquí vive la ÚNICA parte del sistema que usa la llave de servicio de
 //  Supabase (la que se salta RLS). Es inevitable: quien escribe en el chat
-//  no tiene cuenta. Por eso este archivo hace solo cuatro operaciones fijas
-//  y ninguna consulta libre — no hay forma de pedirle desde afuera que traiga
-//  otra cosa.
+//  no tiene cuenta.
 //
-//  El panel NO pasa por aquí: usa el token de la persona y RLS decide.
+//  El panel NO pasa por aquí: usa el token de la persona y RLS decide. Por
+//  eso el aislamiento del panel lo garantiza la base. Aquí NO: aquí lo
+//  garantiza este archivo, y nada más.
+//
+//  De ahí la regla que rige todo lo de abajo: cada función arma su propia
+//  consulta, con filtro fijo, y SIEMPRE acota por `empresa_id`. Ninguna
+//  recibe una consulta desde afuera. Cuando algo entra desde el navegador
+//  —un slug, una `sesion`— sirve para acotar todavía más, nunca para elegir
+//  de qué negocio leer: eso se resuelve aquí dentro.
+//
+//  Antes decía «solo cuatro operaciones fijas». Son dieciséis. Si vas a
+//  agregar la diecisiete, el filtro por empresa_id no es opcional.
 //
 //  ── SOBRE LA MIGRACIÓN DESDE marcas.mjs ──
 //  Si la empresa existe en la base, manda la base. Si no, se cae a
@@ -299,9 +308,16 @@ export async function responderComoHumano({ empresaId, conversacionId, texto, au
   const sb = servicio(); const clave = MAESTRA();
   if (!sb || !clave || !conversacionId) return { ok: false, razon: 'sin_base' };
 
+  // La consulta ya trae acotado el negocio, no solo el id. Así una
+  // conversación ajena no se distingue de una que no existe: pedirla por id
+  // no confirma que exista. (Sin empresaId es el superadmin, que sí ve todo.)
+  const filtro = empresaId
+    ? `id=eq.${conversacionId}&empresa_id=eq.${empresaId}&limit=1`
+    : `id=eq.${conversacionId}&limit=1`;
   const fila = (await sb.seleccionar('conversaciones',
-    'id,empresa_id,humanos_cifrados', `id=eq.${conversacionId}&limit=1`))?.[0];
+    'id,empresa_id,humanos_cifrados', filtro))?.[0];
   if (!fila) return { ok: false, razon: 'no_existe' };
+  // Redundante a propósito, por si el filtro de arriba cambia algún día.
   if (empresaId && fila.empresa_id !== empresaId) return { ok: false, razon: 'ajena' };
 
   let previos = [];
@@ -315,7 +331,12 @@ export async function responderComoHumano({ empresaId, conversacionId, texto, au
     entregado: false,
   });
 
-  await sb.actualizar('conversaciones', `id=eq.${conversacionId}`, {
+  // El filtro repite `empresa_id` aunque la comprobación de arriba ya lo
+  // haya resuelto. No es de más: lee y escribe son dos viajes distintos, y
+  // el día que alguien mueva o simplifique esa comprobación, esta escritura
+  // se quedaría sin dueño y sin que nada avisara. Cuesta nada.
+  await sb.actualizar('conversaciones',
+    `id=eq.${conversacionId}&empresa_id=eq.${fila.empresa_id}`, {
     humanos_cifrados: await cifrar(clave, fila.empresa_id, previos),
     humano_pendiente: true,
   });

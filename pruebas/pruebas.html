@@ -1168,6 +1168,152 @@ await suite('Proponer el tema', async () => {
      temaSugerido('servicio post-venta'));
 });
 
+await suite('Identificador de sesión · la llave de la conversación', async () => {
+  // widget.js es un script clásico: no se puede importar. Se trae como
+  // texto y se ejecuta el generador aquí. Es la única forma de PROBAR lo
+  // que hace en vez de creerle al comentario que tiene arriba.
+  let fuente = '';
+  try { fuente = await (await fetchReal.call(window, '../publico/widget.js')).text(); }
+  catch (e) { fuente = ''; }
+
+  ok('se pudo leer widget.js', fuente.length > 1000, 'largo: ' + fuente.length);
+
+  const trozo = (fuente.match(/function nuevaSesion\(\)\s*\{[\s\S]*?\n  \}/) || [])[0];
+  ok('existe nuevaSesion()', !!trozo, 'no la encontré en el archivo');
+
+  let generar = null;
+  if (trozo) generar = new Function(trozo + '; return nuevaSesion;')();
+
+  if (!generar) { ok('se pudo ejecutar el generador', false, 'no se armó'); return; }
+
+  const muestras = [];
+  for (let i = 0; i < 2000; i++) muestras.push(generar());
+
+  ok('nunca repite en 2000 intentos',
+     new Set(muestras).size === 2000,
+     'distintos: ' + new Set(muestras).size);
+
+  ok('siempre mide lo mismo (32 hex)',
+     muestras.every(m => /^[0-9a-f]{32}$/.test(m)),
+     muestras.find(m => !/^[0-9a-f]{32}$/.test(m)));
+
+  // Lo que hacía frágil al anterior: la hora iba pegada al final, y la hora
+  // no es un secreto. Si el reloj aparece en el id, se adivina medio id.
+  const ahora = Date.now();
+  const relojes = [ahora.toString(36), ahora.toString(16), String(ahora),
+                   Math.floor(ahora / 1000).toString(16)];
+  ok('no lleva el reloj pegado',
+     !muestras.some(m => relojes.some(r => m.includes(r.slice(0, 6)))),
+     'una muestra contenía la hora');
+
+  // Un generador roto que devolviera siempre lo mismo pasaría las pruebas
+  // de formato. Esto mide que los 128 bits se muevan de verdad: cada
+  // posición del texto debe tomar varios valores distintos.
+  const posiciones = [];
+  for (let i = 0; i < 32; i++) posiciones.push(new Set(muestras.map(m => m[i])).size);
+  ok('los 32 lugares varían (≥12 valores cada uno)',
+     Math.min(...posiciones) >= 12,
+     'el lugar más pobre tuvo ' + Math.min(...posiciones));
+
+  // Guardia contra regresión: que nadie vuelva a meter Math.random donde
+  // se decide quién puede leer una conversación.
+  // Se miran las INSTRUCCIONES, no la prosa: el comentario de nuevaSesion
+  // nombra a Math.random justamente para explicar por qué no se usa, y una
+  // guardia que no sepa distinguir prosa de código grita en falso.
+  const sinComentarios = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  const zonaSesion = sinComentarios(fuente.slice(0, fuente.indexOf('/* ── utilidades')));
+  ok('Math.random ya no decide quién lee una conversación',
+     !/Math\.random/.test(zonaSesion),
+     'volvió a aparecer en la zona de sesión');
+
+  // Y que la guardia sirva de algo: si no detectara el código viejo, sería
+  // un adorno verde que no protege nada.
+  ok('la guardia sí atrapa el código viejo',
+     /Math\.random/.test(sinComentarios('var v = Math.random().toString(36); // nota')),
+     'la guardia no detecta ni el caso que vino a evitar');
+});
+
+await suite('La llave de servicio · toda consulta acota por empresa', async () => {
+  // datos.mjs es el único archivo que se salta RLS. Ahí el aislamiento no lo
+  // cuida la base: lo cuida el archivo. Esta prueba lee su código y comprueba
+  // que ninguna consulta a una tabla de inquilino se quedó sin `empresa_id`.
+  //
+  // No prueba comportamiento, prueba una REGLA — y por eso vale: la ronda que
+  // agregue la función diecisiete se entera aquí, no en producción.
+  let fuente = '';
+  try { fuente = await (await fetchReal.call(window, '../servidor/nucleo/datos.mjs')).text(); }
+  catch (e) { fuente = ''; }
+  ok('se pudo leer datos.mjs', fuente.length > 1000, 'largo: ' + fuente.length);
+  if (!fuente) return;
+
+  const codigo = fuente.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  const DE_INQUILINO = ['conversaciones', 'leads', 'citas', 'avisos'];
+
+  // Cada llamada, desde el nombre de la tabla hasta su paréntesis de cierre.
+  function llamadas(texto) {
+    const salida = [];
+    const re = /sb\.(seleccionar|actualizar|insertar)\(\s*'([a-z_]+)'/g;
+    let m;
+    while ((m = re.exec(texto))) {
+      let i = re.lastIndex, hondo = 1;
+      while (i < texto.length && hondo > 0) {
+        if (texto[i] === '(') hondo++;
+        else if (texto[i] === ')') hondo--;
+        i++;
+      }
+      salida.push({ que: m[1], tabla: m[2], cuerpo: texto.slice(m.index, i) });
+    }
+    return salida;
+  }
+
+  const todas = llamadas(codigo);
+  ok('encontró las consultas del archivo', todas.length >= 10, 'halló ' + todas.length);
+
+  // Se juzga por FUNCIÓN, no por paréntesis. `citasDe` y `moverCita` arman
+  // su filtro en una variable la línea de arriba: acotan de verdad, y un
+  // detector que las marcara estaría gritando en falso. Un candado que grita
+  // en falso se acaba ignorando, y entonces ya no es un candado.
+  const funciones = [];
+  const reFn = /export (?:async )?function (\w+)/g;
+  let m;
+  while ((m = reFn.exec(codigo))) {
+    const sigue = reFn.lastIndex;
+    reFn.lastIndex = sigue;
+    const otra = /export (?:async )?function \w+/g;
+    otra.lastIndex = sigue;
+    const fin = otra.exec(codigo)?.index ?? codigo.length;
+    funciones.push({ nombre: m[1], cuerpo: codigo.slice(m.index, fin) });
+  }
+  ok('reconoció las funciones del archivo', funciones.length >= 12, 'halló ' + funciones.length);
+
+  const sueltas = [];
+  for (const f of funciones) {
+    for (const c of llamadas(f.cuerpo)) {
+      if (!DE_INQUILINO.includes(c.tabla)) continue;
+      // Leer o escribir se acota con un filtro; insertar, con la columna.
+      const acota = c.que === 'insertar'
+        ? /empresa_id\s*:/.test(c.cuerpo)
+        : /empresa_id=eq\./.test(f.cuerpo);
+      if (!acota) sueltas.push(f.nombre + ' → ' + c.que + " '" + c.tabla + "'");
+    }
+  }
+
+  ok('ninguna función se salta el filtro por empresa',
+     sueltas.length === 0, sueltas.join(' · '));
+
+  // Que el candado sirva de algo: se le pone enfrente una función que
+  // consulta sin acotar y tiene que marcarla.
+  const trampa = `export async function fuga({ id }) {
+    const g = await sb.actualizar('citas', \`id=eq.\${id}\`, { estado: 'x' });
+    return g;
+  }`;
+  const codigoTrampa = trampa.replace(/\/\/[^\n]*/g, ' ');
+  const marcada = llamadas(codigoTrampa)
+    .some(c => DE_INQUILINO.includes(c.tabla) && !/empresa_id=eq\./.test(codigoTrampa));
+  ok('el candado sí marca una función sin acotar', marcada,
+     'dejó pasar una consulta a citas sin empresa_id');
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);

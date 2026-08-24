@@ -100,13 +100,31 @@
     var v = null;
     try { v = localStorage.getItem(k); } catch (e) {}
     if (!v) {
-      v = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      v = nuevaSesion();
       try { localStorage.setItem(k, v); } catch (e) {
         // Modo privado o almacenamiento bloqueado: se sigue sin recordar.
         try { sessionStorage.setItem(k, v); } catch (e2) {}
       }
     }
     return v;
+  }
+
+  /*
+   * Este identificador es lo ÚNICO que separa la respuesta que una persona
+   * del negocio le escribió a este visitante, de cualquier otro visitante
+   * del mismo negocio. Es, literalmente, la llave de esa conversación.
+   *
+   * Por eso no se genera con Math.random(): su estado interno se puede
+   * reconstruir observando unas cuantas salidas, y de ahí se predicen las
+   * demás. Tampoco se le pega la hora, que es la mitad adivinable del id.
+   * crypto.getRandomValues existe en todos los navegadores que corren esto
+   * —también sin https— y no cuesta nada.
+   */
+  function nuevaSesion() {
+    var b = new Uint8Array(16), s = '', i;
+    (self.crypto || self.msCrypto).getRandomValues(b);
+    for (i = 0; i < b.length; i++) s += (b[i] + 256).toString(16).slice(1);
+    return s;
   }
 
   /* ── utilidades ─────────────────────────────────────────────────────── */
