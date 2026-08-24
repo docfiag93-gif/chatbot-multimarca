@@ -200,6 +200,18 @@
     max-width: 100%; font-weight: 500;
   }
 
+  /* Quién está hablando. Un mensaje de una persona no puede verse igual
+     que uno de la máquina: la diferencia es justo lo que la persona del
+     otro lado necesita saber. */
+  .entra-humano { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; }
+  .entra-humano::before, .entra-humano::after {
+    content: ''; flex: 1; height: 1px; background: rgba(100,116,139,.22);
+  }
+  .entra-humano span {
+    font-size: 11px; letter-spacing: .04em; color: #64748b; white-space: nowrap;
+  }
+  .burbuja.humano { border-left: 3px solid currentColor; }
+
   .escribiendo { display: flex; gap: 4px; padding: 12px 14px; align-self: flex-start; align-items: center; }
   .escribiendo span { font-size: 12px; color: #64748b; margin-left: 6px; }
   .escribiendo i {
@@ -410,7 +422,7 @@
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
           (d && d.mensajes ? d.mensajes : []).forEach(function (m) {
-            pintarBot(m.texto);
+            pintarBot(m.texto, false, true);
             mensajes.push({ rol: 'bot', texto: m.texto });
           });
           if (d && d.mensajes && d.mensajes.length) guardar();
@@ -460,8 +472,27 @@
     var b = el('div', 'burbuja usuario', texto);
     lista.appendChild(b); abajo();
   }
-  function pintarBot(texto, urgencia) {
-    var b = el('div', 'burbuja bot' + (urgencia ? ' urgencia' : ''));
+  /**
+   * Pinta un mensaje del otro lado.
+   *
+   * `humano` marca los que escribió una persona del negocio. Importa que se
+   * note: hasta ahora aparecían idénticos a los del bot, y quien escribía
+   * seguía creyendo que hablaba con una máquina justo cuando ya no.
+   *
+   * Se dice una sola vez por tanda, no en cada burbuja: repetir la etiqueta
+   * en cinco mensajes seguidos convierte el aviso en ruido.
+   */
+  var ultimoFueHumano = false;
+
+  function pintarBot(texto, urgencia, humano) {
+    if (humano && !ultimoFueHumano) {
+      var aviso = el('div', 'entra-humano');
+      aviso.appendChild(el('span', null, 'Ahora te contesta una persona'));
+      lista.appendChild(aviso);
+    }
+    ultimoFueHumano = !!humano;
+
+    var b = el('div', 'burbuja bot' + (urgencia ? ' urgencia' : '') + (humano ? ' humano' : ''));
     b.appendChild(conNegritas(texto));
     lista.appendChild(b); abajo();
   }
@@ -594,6 +625,14 @@
         // vive en el servidor: agregar una acción nueva no obliga a tocar
         // este archivo ni a que los clientes actualicen su widget.
         horariosOfrecidos = Array.isArray(d.horarios) ? d.horarios : [];
+        // Si venía contestando una persona y ahora contesta el bot, hay que
+        // decirlo: callarlo sería dejar creer que sigue habiendo alguien.
+        if (ultimoFueHumano) {
+          var vuelve = el('div', 'entra-humano');
+          vuelve.appendChild(el('span', null, 'Sigue el asistente automático'));
+          lista.appendChild(vuelve);
+          ultimoFueHumano = false;
+        }
         if (ACCIONES_CON_FORMULARIO.indexOf(d.accion) > -1 && cfg.captura.activa) formulario();
         else if (d.accion === 'derivar_humano') enlaceWhatsapp('general');
         else pintarChips(d.sugerencias);
