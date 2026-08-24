@@ -253,6 +253,22 @@ export async function manejar(req, context) {
       });
 
       if (r.ok) {
+        /* Avisar VA DETRÁS de la respuesta. Quien acaba de apartar su lugar
+           no tiene que esperar a que salga un correo para saber que quedó.
+
+           Y el aviso no lleva ni nombre ni teléfono: cuando se apartó todavía
+           no los hay, y aunque los hubiera, un asunto de correo con el dato
+           de una persona se queda visible en la pantalla de cualquiera que
+           pase junto al celular. */
+        enSegundoPlano(context, avisar({
+          empresa: marca, tipo: 'cita',
+          titulo: 'Alguien apartó ' + elegida.comoSeDice,
+          lineas: [
+            'Está <b>apartada</b>, no confirmada.',
+            'Confírmala o cancélala desde la pestaña Agenda.',
+          ],
+        }));
+
         return json({
           texto: 'Listo, te aparté el ' + elegida.comoSeDice + '. ' +
                  'Todavía no es una cita confirmada: te contactan para confirmarla. ' +

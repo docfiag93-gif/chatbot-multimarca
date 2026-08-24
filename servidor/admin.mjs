@@ -26,7 +26,7 @@ import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
 import { catalogoDePoliticas } from './nucleo/politicas.mjs';
 import { catalogoDeAcciones } from './nucleo/acciones.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
-import { responderComoHumano, citasDe, moverCita } from './nucleo/datos.mjs';
+import { responderComoHumano, citasDe, moverCita, fallosDeAviso } from './nucleo/datos.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -422,13 +422,17 @@ export async function manejar(req, context) {
       // ── números para el tablero ───────────────────────────────────────
       case 'metricas': {
         const filtro = datos.empresa_id ? `&empresa_id=eq.${datos.empresa_id}` : '';
-        const [conv, urg, lead, sinDato] = await Promise.all([
+        const [conv, urg, lead, sinDato, porConfirmar] = await Promise.all([
           sb.seleccionar('conversaciones', 'id', `limit=1000${filtro}`),
           sb.seleccionar('conversaciones', 'id,motivo_urgencia,created_at', `urgencia=is.true&limit=200${filtro}`),
           sb.seleccionar('leads', 'id,atendido', `limit=1000${filtro}`),
           // Las veces que el bot tuvo que decir «no tengo ese dato». Es la
           // única métrica del tablero que se traduce en una tarea concreta.
           sb.seleccionar('conversaciones', 'id', `sin_dato=is.true&limit=500${filtro}`),
+          // Citas que el bot apartó y nadie ha confirmado. Cada una es una
+          // persona que cree que tiene lugar y todavía no lo tiene.
+          sb.seleccionar('citas', 'id',
+            `estado=eq.apartada&dia=gte.${new Date().toISOString().slice(0,10)}&limit=200${filtro}`),
         ]);
         return json({
           conversaciones: conv.length,
@@ -437,6 +441,7 @@ export async function manejar(req, context) {
           leads: lead.length,
           leadsSinAtender: lead.filter(l => !l.atendido).length,
           sinDato: sinDato.length,
+          citasPorConfirmar: porConfirmar.length,
         });
       }
 
@@ -445,7 +450,10 @@ export async function manejar(req, context) {
         const filas = await sb.seleccionar('avisos',
           'id,empresa_id,tipo,canal,destino,estado,detalle,visto_at,created_at',
           filtro + 'order=created_at.desc&limit=60');
-        return json({ avisos: filas });
+        // Si se están enviando avisos y no se están pudiendo registrar, la
+        // tabla se ve vacía y eso parece «todavía no ha pasado nada». Se
+        // dice, para que nadie lea una pantalla en blanco como buena noticia.
+        return json({ avisos: filas, fallosAlRegistrar: fallosDeAviso() });
       }
 
       case 'avisos.visto': {

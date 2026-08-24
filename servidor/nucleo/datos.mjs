@@ -239,10 +239,31 @@ export async function avisar({ empresa, tipo, titulo, lineas, conversacionId }) 
         detalle: { nota: String(r.detalle || '').slice(0, 200) },
         conversacion_id: conversacionId || null,
       }]);
-    } catch (e) { /* el registro es deseable, no indispensable */ }
+    } catch (e) {
+      /* NO se silencia. El registro sigue siendo deseable y no indispensable
+         —no vale tumbar un aviso por no poder anotarlo— pero un catch mudo
+         es exactamente lo que dejó la bitácora vacía durante meses sin que
+         nadie se enterara.
+
+         El panel de plataforma lee esta tabla para mostrar «avisos enviados».
+         Si los insert se rechazan en silencio, esa pantalla dice «todavía no
+         se ha enviado ningún aviso» mientras se están enviando. */
+      registrarFalloDeAviso(String(e.message || e).slice(0, 140));
+    }
   }
   return r;
 }
+
+/* Los últimos fallos al ANOTAR un aviso. Vive en memoria del worker: no
+   sirve para auditar —para eso está la tabla— sino para que el diagnóstico
+   pueda decir «se están enviando avisos y no se están registrando» en vez de
+   dejar una pantalla vacía que parece normal. */
+const _fallosDeAviso = [];
+function registrarFalloDeAviso(razon) {
+  _fallosDeAviso.unshift({ razon, en: new Date().toISOString() });
+  while (_fallosDeAviso.length > 5) _fallosDeAviso.pop();
+}
+export function fallosDeAviso() { return [..._fallosDeAviso]; }
 
 /* ══════════════════════════════════════════════════════════════════════
    CUANDO CONTESTA UNA PERSONA

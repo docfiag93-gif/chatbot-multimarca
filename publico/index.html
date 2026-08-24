@@ -2495,6 +2495,18 @@ async function cargarTablero() {
        números sueltos siguen abajo, más chicos, que para eso sirven. */
     const pendientes = [];
 
+    /* Va primero, antes que las solicitudes: alguien ya movió su día
+       creyendo que tiene lugar apartado, y todavía no lo tiene. */
+    if (m.citasPorConfirmar) {
+      pendientes.push({
+        clase: 'urge', icono: '📅',
+        titulo: m.citasPorConfirmar === 1
+          ? 'Una cita sin confirmar' : m.citasPorConfirmar + ' citas sin confirmar',
+        detalle: 'El bot apartó el lugar. Falta que tú lo confirmes o lo canceles.',
+        boton: 'Ver la agenda', vista: 'agenda',
+      });
+    }
+
     if (m.leadsSinAtender) {
       pendientes.push({
         clase: 'urge', icono: '👤',
@@ -3216,7 +3228,13 @@ async function cargarSuper() {
 
   // ── envíos a sistemas externos ──
   try {
-    const { avisos } = await api('avisos.listar');
+    const { avisos, fallosAlRegistrar } = await api('avisos.listar');
+    if (fallosAlRegistrar?.length) {
+      $('#tabla-envios').insertAdjacentHTML('beforebegin',
+        `<div class="aviso mal" style="margin-bottom:10px"><b>Se están enviando avisos
+         que no se pueden registrar aquí.</b> La lista de abajo está incompleta.
+         Último motivo: <code>${esc(fallosAlRegistrar[0].razon)}</code></div>`);
+    }
     $('#tabla-envios').innerHTML = avisos?.length ? `
       <tr><th>Cuándo</th><th>Qué</th><th>Resultado</th><th>A dónde</th></tr>
       ${avisos.slice(0,20).map(a => `
