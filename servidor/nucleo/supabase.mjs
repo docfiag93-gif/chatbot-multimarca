@@ -64,6 +64,21 @@ export function clienteSupabase({ url, llave, token }) {
         body: JSON.stringify(cambios),
       }),
 
+    /**
+     * Llama una función de la base.
+     *
+     * Existe para las operaciones que NO se pueden partir en leer y luego
+     * escribir sin dejar una rendija: sumar un contador, apartar un hueco.
+     * Hacerlas en dos viajes deja pasar lo que ocurre entre los dos viajes,
+     * y eso es justo lo que se cuela cuando hay tráfico — que es cuando
+     * importa.
+     */
+    rpc: (funcion, argumentos = {}) =>
+      pedir(`/rpc/${funcion}`, {
+        method: 'POST',
+        body: JSON.stringify(argumentos),
+      }),
+
     // Registrar en bitácora nunca debe tumbar la operación principal: si el
     // registro falla, se pierde una línea de historial, no la acción.
     /**

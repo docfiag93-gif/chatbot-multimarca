@@ -44,6 +44,7 @@ import {
 import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agenda.mjs';
+import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { temaSugerido } from '../publico/cerebro/temas.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
@@ -1312,6 +1313,113 @@ await suite('La llave de servicio · toda consulta acota por empresa', async () 
     .some(c => DE_INQUILINO.includes(c.tabla) && !/empresa_id=eq\./.test(codigoTrampa));
   ok('el candado sí marca una función sin acotar', marcada,
      'dejó pasar una consulta a citas sin empresa_id');
+});
+
+suite('El tope del día · que el plan signifique algo', () => {
+
+  ok('cada plan trae lo suyo',
+     topeDe({ plan: 'prueba' }) === TOPES.prueba &&
+     topeDe({ plan: 'basico' }) === TOPES.basico &&
+     topeDe({ plan: 'pro' })    === TOPES.pro);
+
+  ok('un plan desconocido cae en el más chico, no en el más grande',
+     topeDe({ plan: 'inventado' }) === TOPES.prueba,
+     String(topeDe({ plan: 'inventado' })));
+
+  ok('sin plan tampoco regala el tope grande',
+     topeDe({}) === TOPES.prueba && topeDe() === TOPES.prueba);
+
+  ok('el tope propio le gana al del plan',
+     topeDe({ plan: 'prueba', topeDiario: 5000 }) === 5000);
+
+  // Un cero o una basura en esa columna NO deben dejar mudo a un negocio.
+  ok('un tope propio inválido se ignora en vez de callar al bot',
+     topeDe({ plan: 'basico', topeDiario: 0 })     === TOPES.basico &&
+     topeDe({ plan: 'basico', topeDiario: -3 })    === TOPES.basico &&
+     topeDe({ plan: 'basico', topeDiario: 'ocho' }) === TOPES.basico);
+
+  // ── dónde va el día ──
+  const e = (u, t = 100) => estadoDeCuota({ usados: u, tope: t });
+
+  ok('en el tope exacto TODAVÍA contesta',
+     e(100).excedido === false, 'usados=tope debería pasar');
+
+  ok('uno más y ya no',
+     e(101).excedido === true);
+
+  ok('cuenta lo que queda', e(30).restantes === 70 && e(140).restantes === 0);
+
+  // Lo importante del aviso no es que se mande: es que se mande UNA vez.
+  // Un aviso por mensaje a partir del 80% acaba en la basura, y entonces el
+  // dueño no se entera del que sí importaba.
+  const veces = (desde, hasta, cual) => {
+    let n = 0;
+    for (let i = desde; i <= hasta; i++) if (e(i)[cual]) n++;
+    return n;
+  };
+  ok('el aviso del 80% suena exactamente una vez',
+     veces(0, 200, 'avisarCerca') === 1, 'sonó ' + veces(0, 200, 'avisarCerca') + ' veces');
+  ok('el aviso del tope suena exactamente una vez',
+     veces(0, 200, 'avisarTope') === 1, 'sonó ' + veces(0, 200, 'avisarTope') + ' veces');
+  ok('el del 80% suena en el 80', e(80).avisarCerca === true);
+  ok('el del tope suena al pasarse, no al llegar',
+     e(100).avisarTope === false && e(101).avisarTope === true);
+
+  // ── qué se le dice a quien escribió ──
+  const conCaptura = respuestaPorTope({ marca: { captura: { activa: true } } });
+  const sinCaptura = respuestaPorTope({ marca: {} });
+
+  ok('si puede tomar datos, los pide', conCaptura.accion === 'capturar_contacto');
+  ok('si no puede, no inventa una acción', sinCaptura.accion === 'ninguna');
+
+  // NO se reusa el texto de «recados». Ese promete que una persona va a
+  // contestar ahorita, y aquí puede que no haya nadie mirando: sería una
+  // promesa que el negocio nunca pidió hacer.
+  const prometeHumano = t => /te contesta una persona|ahorita te contesta/i.test(t);
+  ok('no le promete a nadie que un humano va a contestar',
+     !prometeHumano(conCaptura.texto) && !prometeHumano(sinCaptura.texto),
+     conCaptura.texto);
+
+  ok('dice la verdad: que es por hoy',
+     /hoy/i.test(conCaptura.texto) && /hoy/i.test(sinCaptura.texto));
+});
+
+suite('El orden de los cortes · la urgencia por encima del dinero', () => {
+  const clinica = {
+    nombre: 'Consultorio', politicas: ['urgencias-clinicas'],
+    captura: { activa: true }, contactos: {},
+  };
+
+  // Lo único no negociable de todo esto: quedarse sin cuota es un asunto de
+  // dinero, y un asunto de dinero no puede dejar a alguien sin que le digan
+  // que llame al 911.
+  const conDolor = decidirSinIA({ marca: clinica, modo: 'activo',
+                                  ultimo: 'me duele mucho el pecho y no puedo respirar',
+                                  sobreTope: true });
+  ok('con el tope pasado, una urgencia SIGUE saliendo',
+     conDolor?.corte === 'urgencia', conDolor?.corte);
+
+  ok('y sale la instrucción de verdad, no un texto de tope',
+     /911|urgencias|inmediat/i.test(conDolor?.texto || ''), conDolor?.texto);
+
+  // El interruptor del dueño es una decisión suya; el tope es una
+  // consecuencia. Manda la decisión.
+  const apagado = decidirSinIA({ marca: clinica, modo: 'apagado',
+                                 ultimo: 'hola', sobreTope: true });
+  ok('el apagado del dueño le gana al tope', apagado?.corte === 'apagado', apagado?.corte);
+
+  const recados = decidirSinIA({ marca: clinica, modo: 'recados',
+                                 ultimo: 'hola', sobreTope: true });
+  ok('el modo recados también le gana al tope', recados?.corte === 'recados', recados?.corte);
+
+  // Y con todo en orden, el tope sí corta.
+  const tope = decidirSinIA({ marca: clinica, modo: 'activo',
+                              ultimo: '¿cuánto cuesta la consulta?', sobreTope: true });
+  ok('con el bot activo y sin urgencia, el tope corta', tope?.corte === 'tope', tope?.corte);
+
+  ok('sin tope pasado, se le pregunta a la IA como siempre',
+     decidirSinIA({ marca: clinica, modo: 'activo',
+                    ultimo: '¿cuánto cuesta la consulta?', sobreTope: false }) === null);
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

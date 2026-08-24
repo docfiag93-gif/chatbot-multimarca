@@ -30,6 +30,7 @@ import { descifrar, cifrar } from '../../publico/cerebro/cifrado.mjs';
 import { marcaPublica, obtenerMarca } from './marcas.mjs';
 import { normalizarPerfil, perfilPublico } from '../../publico/cerebro/perfil.mjs';
 import { enviarAviso, recortar } from './avisos.mjs';
+import { estadoDeCuota, topeDe } from './cuota.mjs';
 
 export function servicio() {
   const url = env('SUPABASE_URL');
@@ -104,6 +105,8 @@ export async function empresaPorSlug(slug, { incluirSuspendidas = false } = {}) 
              : (fila.dominio === 'clinico' ? ['urgencias-clinicas'] : []),
     acciones: Array.isArray(fila.acciones) ? fila.acciones : perfilGuardado.acciones,
     plan: fila.plan,
+    // Va junto al plan porque juntos deciden el tope. Nulo = el del plan.
+    topeDiario: fila.tope_diario ?? null,
     estado: fila.activa === false ? 'suspendido' : 'publicado',
     tono:         await abrir('persona_cifrada')      || perfilGuardado.tono,
     conocimiento: await abrir('conocimiento_cifrado') || perfilGuardado.conocimiento || [],
@@ -461,6 +464,57 @@ export async function moverCita({ empresaId, id, estado }) {
     const g = await sb.actualizar('citas', filtro, { estado });
     return { ok: !!g?.[0], cita: g?.[0] };
   } catch (e) { return { ok: false }; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   EL TOPE DEL DÍA
+
+   Contar aquí y no en la memoria de la función no es un detalle: Cloudflare
+   levanta muchas copias en distintos lugares, cada una con su propia
+   memoria, y un contador por copia no es un contador. La base es lo único
+   que todas comparten.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Suma un mensaje y dice cómo va el día.
+ *
+ * Si la base no contesta se devuelve `null`, y quien llama debe DEJAR PASAR
+ * el mensaje. Es a propósito y en esa dirección: quedarse sin contador es un
+ * problema nuestro, y castigar por eso a quien está escribiendo —o peor, a
+ * quien tiene una urgencia— sería cobrarle a la persona equivocada un fallo
+ * de infraestructura.
+ */
+export async function apuntarMensaje({ empresa }) {
+  const sb = servicio();
+  if (!sb || !empresa?.id) return null;
+  try {
+    const usados = await sb.rpc('apuntar_mensaje', { p_empresa: empresa.id });
+    const n = Number(Array.isArray(usados) ? usados[0] : usados);
+    if (!Number.isFinite(n)) return null;
+    return estadoDeCuota({ usados: n, tope: topeDe({ plan: empresa.plan, topeDiario: empresa.topeDiario }) });
+  } catch (e) { return null; }
+}
+
+/** Lo consumido hoy, para pintarlo en el panel. No suma nada. */
+export async function consumoDe({ empresaId, plan, topeDiario }) {
+  const sb = servicio();
+  if (!sb || !empresaId) return null;
+  try {
+    // La fecha se calcula igual que en la funcion que suma. Si aquí se usara
+    // la del servidor, el panel diría un número y el tope usaría otro entre
+    // las 18:00 y la medianoche.
+    const filas = await sb.seleccionar('consumo', 'dia,mensajes',
+      `empresa_id=eq.${empresaId}&order=dia.desc&limit=30`);
+    const hoyMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
+      .toISOString().slice(0, 10);
+    const hoy = (filas || []).find(f => f.dia === hoyMX);
+    return {
+      ...estadoDeCuota({ usados: hoy?.mensajes || 0,
+                         tope: topeDe({ plan, topeDiario }) }),
+      historial: (filas || []).map(f => ({ dia: f.dia, mensajes: f.mensajes })),
+    };
+  } catch (e) { return null; }
 }
 
 

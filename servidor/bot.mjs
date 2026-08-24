@@ -23,7 +23,7 @@ import { revisarAnclaje, pulir, respuestaSinDato }
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar, recogerHumanos,
-         huecosOcupados, apartarCita, esSuPropioBot }
+         huecosOcupados, apartarCita, esSuPropioBot, apuntarMensaje }
   from './nucleo/datos.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from './nucleo/agenda.mjs';
 
@@ -310,8 +310,52 @@ export async function manejar(req, context) {
     }
   }
 
-  const corte = decidirSinIA({ marca, modo, ultimo, hayContacto });
+  let corte = decidirSinIA({ marca, modo, ultimo, hayContacto });
   const inmediata = corte?.corte === 'urgencia' ? corte : null;
+
+  /* ── El tope del día ───────────────────────────────────────────────────
+     Se cuenta AQUÍ, y no arriba, por dos razones que se ven al revés:
+
+     · Solo se cobra lo que de verdad iba a llegar a la IA. Si ya hubo corte
+       —urgencia, apagado, recados— no se gastó cuota y sería injusto sumarla:
+       el dueño que apaga su bot para no decir tonterías acabaría pagando por
+       apagarlo.
+
+     · Y sobre todo: contar exige un viaje a la base. Ponerlo antes obligaría
+       a que un «me duele el pecho» esperara ese viaje para recibir su
+       respuesta. La urgencia sale primero, sin preguntarle a nadie.
+
+     Si la base no contesta, `apuntarMensaje` devuelve null y el mensaje PASA.
+     Quedarse sin contador es un problema nuestro; cobrárselo a quien está
+     escribiendo sería cobrarle el fallo a la persona equivocada. */
+  let cuota = null;
+  if (!corte) {
+    cuota = await apuntarMensaje({ empresa: marca });
+    if (cuota?.excedido) {
+      // Se vuelve a preguntar entero en vez de armar la respuesta a mano:
+      // así el orden —urgencia primero, siempre— sigue viviendo en un solo
+      // lugar, aunque alguien mueva este bloque algún día.
+      corte = decidirSinIA({ marca, modo, ultimo, hayContacto, sobreTope: true });
+    }
+
+    // Avisarle al dueño, una sola vez por umbral. Que se quede sin cuota sin
+    // enterarse es lo peor de los dos mundos: pierde clientes y cree que el
+    // bot funciona.
+    if (cuota?.avisarCerca || cuota?.avisarTope) {
+      enSegundoPlano(context, avisar({
+        empresa: marca, tipo: 'tope',
+        titulo: cuota.avisarTope
+          ? 'Tu bot llegó al tope de hoy'
+          : 'Tu bot va en el 80% de los mensajes de hoy',
+        lineas: cuota.avisarTope
+          ? ['Llevas <b>' + cuota.usados + '</b> de <b>' + cuota.tope + '</b> mensajes.',
+             'A partir de ahora toma datos de contacto en vez de contestar, y vuelve solo mañana.',
+             'Si esto pasa seguido, el plan se te quedó chico.']
+          : ['Llevas <b>' + cuota.usados + '</b> de <b>' + cuota.tope + '</b> mensajes.',
+             'Te avisamos antes de llegar para que no te agarre desprevenido.'],
+      }));
+    }
+  }
 
   if (inmediata) {
     // ORDEN DELIBERADO: la instrucción de llamar al 911 sale YA. Guardar la

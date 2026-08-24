@@ -26,7 +26,7 @@ import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
 import { catalogoDePoliticas } from './nucleo/politicas.mjs';
 import { catalogoDeAcciones } from './nucleo/acciones.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
-import { responderComoHumano, citasDe, moverCita, fallosDeAviso } from './nucleo/datos.mjs';
+import { responderComoHumano, citasDe, moverCita, fallosDeAviso, consumoDe } from './nucleo/datos.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -434,6 +434,22 @@ export async function manejar(req, context) {
           sb.seleccionar('citas', 'id',
             `estado=eq.apartada&dia=gte.${new Date().toISOString().slice(0,10)}&limit=200${filtro}`),
         ]);
+        /* El consumo del día. Va aquí y no en su propia pantalla porque un
+           tope que no se ve es una trampa: el dueño se enteraría el día que
+           su bot deja de contestar, y lo leería como una falla nuestra.
+
+           Se pide solo cuando hay UNA empresa de por medio. El superadmin
+           mirando la plataforma entera no tiene un consumo propio que
+           enseñar, y sumar los de todos no querría decir nada. */
+        const idEmpresa = datos.empresa_id || yo.empresa_id || null;
+        let cuota = null;
+        if (idEmpresa) {
+          const e = (await sb.seleccionar('empresas', 'plan,tope_diario',
+                                          `id=eq.${idEmpresa}&limit=1`))?.[0];
+          if (e) cuota = await consumoDe({ empresaId: idEmpresa,
+                                           plan: e.plan, topeDiario: e.tope_diario });
+        }
+
         return json({
           conversaciones: conv.length,
           urgencias: urg.length,
@@ -442,6 +458,7 @@ export async function manejar(req, context) {
           leadsSinAtender: lead.filter(l => !l.atendido).length,
           sinDato: sinDato.length,
           citasPorConfirmar: porConfirmar.length,
+          cuota,
         });
       }
 

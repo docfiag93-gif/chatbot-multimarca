@@ -367,6 +367,13 @@ tr:last-child td{border-bottom:0}
 /* El renglón de quien está esperando entrar. La franja marca la fila entera,
    no solo la placa: la tabla se lee de corrido y una etiqueta suelta a media
    línea se pierde. El fondo va tenue a propósito — señala, no grita. */
+/* La barrita del consumo del día. Va dentro de la tarjeta del número
+   porque «47» no dice nada y «47 de 200» apenas: lo que se lee de un
+   vistazo es cuánto falta para que se acabe. */
+.barra-cuota{margin-top:9px;height:4px;border-radius:99px;background:var(--linea);overflow:hidden}
+.barra-cuota i{display:block;height:100%;background:var(--acento);border-radius:99px;
+  transition:width .4s ease}
+.metrica.urge .barra-cuota i{background:var(--mal)}
 tr.espera td{background:var(--mal-suave)}
 tr.espera td:first-child{box-shadow:inset 3px 0 0 var(--mal)}
 
@@ -2613,6 +2620,23 @@ async function cargarTablero() {
        números sueltos siguen abajo, más chicos, que para eso sirven. */
     const pendientes = [];
 
+    /* ANTES QUE TODO LO DEMÁS: si el bot se quedó sin cuota, ahora mismo hay
+       gente escribiéndole y recibiendo «hoy ya no puedo contestar». Nada de
+       lo que sigue en esta lista está costando clientes en este segundo.
+
+       Un tope que no se ve es una trampa: el dueño se enteraría el día que
+       su bot deja de contestar, y lo leería como una falla nuestra. */
+    if (m.cuota?.excedido) {
+      pendientes.push({
+        clase: 'mal', icono: '⏳',
+        titulo: 'Tu bot llegó al tope de hoy',
+        detalle: 'Llevas ' + m.cuota.usados + ' de ' + m.cuota.tope + ' mensajes. ' +
+                 'Mientras tanto toma datos de contacto en vez de contestar, y vuelve solo mañana. ' +
+                 'Si te pasa seguido, el plan se te quedó chico.',
+        boton: 'Ver quién quedó esperando', vista: 'solicitudes',
+      });
+    }
+
     /* Va primero, antes que las solicitudes: alguien ya movió su día
        creyendo que tiene lugar apartado, y todavía no lo tiene. */
     if (m.citasPorConfirmar) {
@@ -2656,6 +2680,19 @@ async function cargarTablero() {
       });
     }
 
+    /* Cerca del tope pero sin pasarlo: todavía no cuesta nada, así que no va
+       hasta arriba. Pero avisar antes es la diferencia entre decidir y
+       enterarse. */
+    if (m.cuota && m.cuota.cerca && !m.cuota.excedido) {
+      pendientes.push({
+        clase: 'ojo', icono: '⏳',
+        titulo: 'Vas en el ' + m.cuota.porciento + '% de los mensajes de hoy',
+        detalle: 'Llevas ' + m.cuota.usados + ' de ' + m.cuota.tope + '. Te quedan ' +
+                 m.cuota.restantes + '. Al llegar, el bot toma datos en vez de contestar.',
+        boton: 'Ver las charlas', vista: 'charlas',
+      });
+    }
+
     const sinPublicar = negociosVisibles().filter(n => n.id && !n.ejemplo && n.estado !== 'publicado');
     if (sinPublicar.length) {
       pendientes.push({
@@ -2691,7 +2728,13 @@ async function cargarTablero() {
     tab.innerHTML = `
       <div class="metrica"><div class="n">${m.conversaciones ?? 0}</div><div class="r">conversaciones</div></div>
       <div class="metrica"><div class="n">${m.leads ?? 0}</div><div class="r">datos recibidos</div></div>
-      <div class="metrica"><div class="n">${negociosVisibles().length}</div><div class="r">${contexto ? 'negocio' : 'negocios'}</div></div>`;
+      <div class="metrica"><div class="n">${negociosVisibles().length}</div><div class="r">${contexto ? 'negocio' : 'negocios'}</div></div>
+      ${m.cuota ? `
+      <div class="metrica ${m.cuota.excedido ? 'urge' : ''}">
+        <div class="n">${m.cuota.usados}<span style="font-size:15px;font-weight:600;color:var(--tenue)"> / ${m.cuota.tope}</span></div>
+        <div class="r">mensajes de hoy</div>
+        <div class="barra-cuota" aria-hidden="true"><i style="width:${m.cuota.porciento}%"></i></div>
+      </div>` : ''}`;
     // Un pendiente que no lleva a ningún lado es un letrero, no un pendiente.
     $$('#cola-escalamiento [data-ir]').forEach(b => b.addEventListener('click', () => {
       if (b.dataset.filtro) {

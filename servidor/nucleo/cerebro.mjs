@@ -17,6 +17,7 @@
 import { normalizarPerfil } from '../../publico/cerebro/perfil.mjs';
 import { interceptar, aportesDePoliticas } from './politicas.mjs';
 import { fragmentoDeAcciones, accionPermitida } from './acciones.mjs';
+import { respuestaPorTope } from './cuota.mjs';
 
 // Cuánta conversación se le manda al modelo. Más turnos = más contexto pero
 // más tokens y más lento. Seis pares alcanzan de sobra para una consulta
@@ -193,7 +194,8 @@ export function accionValida(perfil, accion) {
 
    Devuelve la respuesta ya lista, o null si toca preguntarle a la IA.
    ══════════════════════════════════════════════════════════════════════ */
-export function decidirSinIA({ marca = {}, modo = 'activo', ultimo = '', hayContacto = false }) {
+export function decidirSinIA({ marca = {}, modo = 'activo', ultimo = '',
+                              hayContacto = false, sobreTope = false }) {
   // 1 · Siempre primero. En los tres modos.
   const urgente = respuestaInmediata(marca, ultimo);
   if (urgente) return { ...urgente, corte: 'urgencia' };
@@ -219,6 +221,19 @@ export function decidirSinIA({ marca = {}, modo = 'activo', ultimo = '', hayCont
       via: 'recados', corte: 'recados',
     };
   }
+
+  // 4 · El tope del día, AL FINAL de los cortes y no antes.
+  //
+  // Va después de los interruptores del dueño porque son cosas distintas:
+  // apagar es una decisión suya y gastarse el día es una consecuencia. Si el
+  // dueño ya apagó el bot, lo que manda es su decisión — y de todos modos con
+  // el bot apagado no se gasta cuota, así que llegar aquí en ese estado sería
+  // señal de que algo se contó mal.
+  //
+  // Va después de la urgencia por lo mismo de siempre, y esto es lo único de
+  // esta función que no es negociable: quedarse sin cuota no puede dejar a
+  // nadie sin que le digan que llame al 911. Un tope es un asunto de dinero.
+  if (sobreTope) return respuestaPorTope({ marca });
 
   return null;
 }
