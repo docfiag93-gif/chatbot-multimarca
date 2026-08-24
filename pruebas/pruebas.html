@@ -1007,6 +1007,57 @@ await suite('Pulir la respuesta', async () => {
   ok('unaSolaPregunta sin preguntas no rompe', unaSolaPregunta('Hola. Todo bien.') === 'Hola. Todo bien.');
 });
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   ·  LA FIRMA DEL WEBHOOK DE META
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('Firma del webhook', async () => {
+  // Se reimplementa aquí lo mismo que hace el servidor, para comprobar que
+  // el cálculo es el correcto contra un caso conocido.
+  const hmac = async (secreto, texto) => {
+    const enc = new TextEncoder();
+    const k = await crypto.subtle.importKey('raw', enc.encode(secreto),
+      { name:'HMAC', hash:'SHA-256' }, false, ['sign']);
+    const f = await crypto.subtle.sign('HMAC', k, enc.encode(texto));
+    return [...new Uint8Array(f)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  };
+
+  const cuerpo = '{"object":"whatsapp_business_account","entry":[{"id":"1"}]}';
+  const firma = await hmac('secreto-de-la-app', cuerpo);
+
+  ok('la firma es SHA-256 en hexadecimal', /^[0-9a-f]{64}$/.test(firma), firma);
+
+  // El mismo cuerpo con el mismo secreto da siempre lo mismo.
+  ok('es estable', await hmac('secreto-de-la-app', cuerpo) === firma);
+
+  // Cambiar UN carácter del cuerpo cambia la firma entera.
+  const alterado = cuerpo.replace('"1"', '"2"');
+  ok('un cuerpo alterado NO coincide', await hmac('secreto-de-la-app', alterado) !== firma);
+
+  // Otro secreto, otra firma. Es lo que impide que un tercero la fabrique.
+  ok('otro secreto NO produce la misma firma', await hmac('otro-secreto', cuerpo) !== firma);
+
+  /* EL DETALLE QUE ARRUINA ESTO EN PRODUCCIÓN: firmar el objeto vuelto a
+     serializar en vez del texto que llegó. `JSON.stringify(JSON.parse(x))`
+     casi nunca devuelve `x`, y entonces la firma no coincide NUNCA. */
+  const conEspacios = '{"object": "whatsapp_business_account", "entry": [{"id": "1"}]}';
+  ok('el mismo JSON con otro formato da otra firma — hay que usar el cuerpo crudo',
+     await hmac('secreto-de-la-app', conEspacios) !== firma);
+  ok('y reserializar lo cambia',
+     JSON.stringify(JSON.parse(conEspacios)) !== conEspacios);
+
+  // Comparación en tiempo constante: mismo resultado que ===, sin filtrar
+  // por dónde dejó de coincidir.
+  const igualConstante = (a, b) => {
+    if (a.length !== b.length) return false;
+    let d = 0; for (let i=0;i<a.length;i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return d === 0;
+  };
+  ok('comparación constante: acepta la buena', igualConstante(firma, firma));
+  ok('comparación constante: rechaza la mala', !igualConstante(firma, 'f'+firma.slice(1)));
+  ok('comparación constante: rechaza distinto largo', !igualConstante(firma, firma.slice(0,-1)));
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);

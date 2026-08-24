@@ -121,6 +121,51 @@ function leerEntrante(cuerpo) {
   };
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   LA FIRMA  ·  comprobar que el mensaje viene de Meta y no de cualquiera
+
+   La URL del webhook es pública. Sin esta comprobación, cualquiera que la
+   descubra puede mandarle mensajes inventados: el bot contestaría, se
+   guardarían conversaciones falsas en el expediente del negocio, y se
+   quemaría la cuota de IA de un cliente que no hizo nada.
+
+   Meta firma cada envío con HMAC-SHA256 sobre el CUERPO CRUDO, usando el
+   secreto de la app. Aquí se recalcula y se compara.
+
+   DOS DETALLES QUE ARRUINAN ESTO SI SE HACEN MAL:
+
+   1. Hay que firmar el texto EXACTO que llegó. Si se hace `req.json()` y
+      luego `JSON.stringify()`, el resultado casi nunca es idéntico —cambia
+      el orden de las llaves, los espacios, cómo se escapan los acentos— y
+      la firma no coincide nunca. Por eso el cuerpo se lee UNA vez como
+      texto y de ahí se parsea.
+
+   2. La comparación es en tiempo constante. Un `===` normal se rinde en el
+      primer byte distinto, y ese tiempo, medido muchas veces, deja
+      adivinar la firma correcta byte por byte. Cuesta lo mismo hacerlo
+      bien.
+   ══════════════════════════════════════════════════════════════════════ */
+async function firmaValida(secreto, cuerpoCrudo, cabecera) {
+  if (!cabecera || !cabecera.startsWith('sha256=')) return false;
+
+  const enc = new TextEncoder();
+  const llave = await crypto.subtle.importKey(
+    'raw', enc.encode(secreto), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const firma = await crypto.subtle.sign('HMAC', llave, enc.encode(cuerpoCrudo));
+
+  const esperado = [...new Uint8Array(firma)]
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  const recibido = cabecera.slice('sha256='.length).toLowerCase();
+
+  if (recibido.length !== esperado.length) return false;
+  let diferencia = 0;
+  for (let i = 0; i < esperado.length; i++) {
+    diferencia |= esperado.charCodeAt(i) ^ recibido.charCodeAt(i);
+  }
+  return diferencia === 0;
+}
+
 export async function manejar(req, context = {}) {
   const url = new URL(req.url);
 
@@ -144,8 +189,24 @@ export async function manejar(req, context = {}) {
 
   if (req.method !== 'POST') return json({ error: 'Usa POST' }, 405);
 
+  // UNA sola lectura, como texto: la firma se calcula sobre el cuerpo tal
+  // cual llegó. Volver a serializarlo desde el objeto rompe la firma.
+  const crudo = await req.text();
+
+  const secreto = env('WHATSAPP_APP_SECRET');
+  if (secreto) {
+    const ok = await firmaValida(secreto, crudo, req.headers.get('x-hub-signature-256'));
+    // 403 y sin explicar: a quien no es Meta no se le dice qué le faltó.
+    if (!ok) return new Response('no', { status: 403 });
+  } else if (env('WHATSAPP_TOKEN')) {
+    // Configurado a medias. No se bloquea —cortar los mensajes de un
+    // consultorio por una variable que falta sería peor— pero queda dicho.
+    console.warn('[whatsapp] Falta WHATSAPP_APP_SECRET: se están aceptando ' +
+                 'webhooks SIN comprobar la firma. Cualquiera con la URL puede escribir.');
+  }
+
   let cuerpo;
-  try { cuerpo = await req.json(); } catch { return json({ ok: true }); }
+  try { cuerpo = JSON.parse(crudo); } catch { return json({ ok: true }); }
 
   const entrante = leerEntrante(cuerpo);
   // SIEMPRE 200, aunque no haya nada que hacer. Un error aquí hace que Meta
