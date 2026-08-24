@@ -297,7 +297,8 @@ export async function manejar(req, context) {
       // vuelve a ofrecer: dejarlo en «no se pudo» sería perder a la persona.
       if (r.razon === 'ya_tomado') {
         const otras = tresOpciones(huecosLibres({
-          horarios: marca.horarios || {}, ocupados: await huecosOcupados(marca.id) }));
+          horarios: marca.horarios || {}, ocupados: await huecosOcupados(marca.id),
+          duracion: marca.duracionCita || 30 }));
         return json({
           texto: 'Se me acaba de ocupar ese horario, alguien lo tomó hace un momento. ' +
                  (otras.length ? '¿Te sirve alguno de estos?' : 'Déjame tus datos y te buscamos.'),
@@ -392,8 +393,12 @@ export async function manejar(req, context) {
          Esa es toda la diferencia entre «sí hacemos citas» y «¿te sirve el
          jueves a las 5?». */
       if (salida.accion === 'agendar' && marca.id && Object.keys(marca.horarios || {}).length) {
+        /* La duración la pone el negocio: una consulta de 40 minutos con
+           huecos de 30 ofrece horas que se empalman, y eso lo descubre el
+           dueño cuando ya tiene dos personas a la misma hora. */
         const opciones = tresOpciones(huecosLibres({
-          horarios: marca.horarios, ocupados: await huecosOcupados(marca.id) }));
+          horarios: marca.horarios, ocupados: await huecosOcupados(marca.id),
+          duracion: marca.duracionCita || 30 }));
         if (opciones.length) {
           salida.sugerencias = opciones.map(o => o.comoSeDice);
           salida.horarios = opciones;      // el widget las devuelve al elegir

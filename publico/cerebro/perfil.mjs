@@ -125,6 +125,9 @@ export function normalizarPerfil(crudo = {}) {
     // ── dónde y cuándo ──
     canales: lista(c.canales).map(x => texto(x, 30)),
     horarios: normalizarHorario(objeto(c.horarios)),
+    // Cuánto dura una cita, en minutos. Manda el tamaño de los huecos que
+    // ofrece la agenda: 40 minutos con huecos de 30 empalma citas.
+    duracionCita: Number(c.duracionCita) > 0 ? Number(c.duracionCita) : 30,
     ubicaciones: lista(c.ubicaciones).slice(0, 12).map(u => ({
       nombre: texto(u.nombre, 120),
       direccion: texto(u.direccion, 300),

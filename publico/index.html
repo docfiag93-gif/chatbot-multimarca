@@ -652,6 +652,19 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
 .cita .quien b{display:block;font-size:15px;letter-spacing:-.01em}
 .cita .quien span{display:block;font-size:12.5px;color:var(--suave);margin-top:2px}
 .cita .mano{display:flex;gap:7px;flex-wrap:wrap}
+
+/* Horarios: siete renglones, uno por día. Se ve completo de un vistazo —
+   una lista que hay que desplegar día por día invita a dejarla a medias. */
+.dia-horario{display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--linea-sutil);flex-wrap:wrap}
+.dia-horario:last-child{border-bottom:0}
+.dia-horario .nombre{width:96px;flex:none;font-size:14px;font-weight:500}
+.dia-horario input[type=time]{width:110px;padding:6px 9px;font-size:13.5px}
+.dia-horario .a{color:var(--tenue);font-size:13px}
+.dia-horario.cerrado .horas{opacity:.35;pointer-events:none}
+.dia-horario .cerrado-txt{font-size:12.5px;color:var(--tenue)}
+.interruptor-dia{display:flex;align-items:center;gap:7px;cursor:pointer;
+  font-size:13px;color:var(--suave);flex:none}
 </style>
 </head>
 <body>
@@ -979,7 +992,24 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
           el botón abre el WhatsApp de quien te escribe, con su pregunta ya redactada.</p>
         </div>
 
-        <h3 style="margin-top:24px">Qué puede hacer</h3>
+        <h3 style="margin-top:26px">Horarios de atención</h3>
+        <p class="pista" style="margin-bottom:12px">De aquí salen dos cosas: lo que
+        el bot contesta cuando le preguntan a qué hora abren, y <b>los huecos que
+        ofrece al agendar</b>. Sin esto, el bot no puede apartar citas.</p>
+        <div id="horarios"></div>
+
+        <div class="campo" style="margin-top:14px;max-width:280px">
+          <label for="f-duracion">Cuánto dura una cita</label>
+          <select id="f-duracion">
+            <option value="20">20 minutos</option>
+            <option value="30" selected>30 minutos</option>
+            <option value="40">40 minutos</option>
+            <option value="60">1 hora</option>
+          </select>
+          <p class="pista">Es el tamaño de cada hueco que ofrece.</p>
+        </div>
+
+        <h3 style="margin-top:26px">Qué puede hacer</h3>
         <div id="acciones"></div>
         <h3 style="margin-top:24px">Reglas especiales</h3>
         <p class="pista" style="margin-bottom:12px">Ninguna viene encendida.
@@ -1500,6 +1530,67 @@ $('#btn-mas-atrib').addEventListener('click', () => $('#atributos').appendChild(
 $('#catalogo').appendChild(renglonOferta());
 $('#conocimiento').appendChild(renglonPar('k','Tema (ej. envíos)','Qué debe saber'));
 
+/* ── horarios ─────────────────────────────────────────────────────────
+   Siete renglones, uno por día, todos a la vista. De aquí sale lo que el
+   bot contesta sobre horarios Y los huecos que ofrece al agendar: sin
+   horarios cargados no puede apartar nada, así que el paso lo dice.
+
+   Las claves van SIN ACENTO (`miercoles`, `sabado`) porque así están en los
+   perfiles y en la lógica de agenda. Poner el acento aquí y no allá es como
+   se pierde un día entero sin que nadie entienda por qué. */
+const DIAS_SEMANA = [
+  ['lunes','Lunes'], ['martes','Martes'], ['miercoles','Miércoles'],
+  ['jueves','Jueves'], ['viernes','Viernes'], ['sabado','Sábado'], ['domingo','Domingo'],
+];
+
+$('#horarios').innerHTML = DIAS_SEMANA.map(([id, rot]) => `
+  <div class="dia-horario cerrado" data-dia="${id}">
+    <span class="nombre">${esc(rot)}</span>
+    <label class="interruptor-dia">
+      <input type="checkbox" class="h-abre" data-dia="${id}"> Abre
+    </label>
+    <span class="horas">
+      <input type="time" class="h-desde" data-dia="${id}" value="09:00" aria-label="Abre a las">
+      <span class="a">a</span>
+      <input type="time" class="h-hasta" data-dia="${id}" value="18:00" aria-label="Cierra a las">
+    </span>
+  </div>`).join('');
+
+$$('.h-abre').forEach(c => c.addEventListener('change', () => {
+  c.closest('.dia-horario').classList.toggle('cerrado', !c.checked);
+  refrescarPrevio();
+}));
+$$('.h-desde,.h-hasta').forEach(i => i.addEventListener('input', refrescarPrevio));
+
+/** Lo que se guarda: solo los días abiertos. Un día cerrado no lleva llave. */
+function horariosDelFormulario() {
+  const out = {};
+  DIAS_SEMANA.forEach(([id]) => {
+    const abre = $(`.h-abre[data-dia="${id}"]`);
+    if (!abre?.checked) return;
+    const desde = $(`.h-desde[data-dia="${id}"]`).value;
+    const hasta = $(`.h-hasta[data-dia="${id}"]`).value;
+    // Un horario al revés no se guarda: la agenda lo descartaría en
+    // silencio y nadie entendería por qué no ofrece ese día.
+    if (desde && hasta && hasta > desde) out[id] = { abre: desde, cierra: hasta };
+  });
+  return out;
+}
+
+function llenarHorarios(horarios = {}) {
+  DIAS_SEMANA.forEach(([id]) => {
+    const franja = horarios[id];
+    const abierto = !!(franja && !franja.cerrado && franja.abre && franja.cierra);
+    const chk = $(`.h-abre[data-dia="${id}"]`);
+    chk.checked = abierto;
+    chk.closest('.dia-horario').classList.toggle('cerrado', !abierto);
+    if (abierto) {
+      $(`.h-desde[data-dia="${id}"]`).value = franja.abre;
+      $(`.h-hasta[data-dia="${id}"]`).value = franja.cierra;
+    }
+  });
+}
+
 /* ── acciones y políticas ─────────────────────────────────────────── */
 $('#acciones').innerHTML = ACCIONES_UI.map(a => `
   <label class="opcion"><input type="checkbox" class="ac" value="${esc(a.id)}"
@@ -1548,6 +1639,8 @@ function perfilDelFormulario() {
     politicas: $$('.po').filter(i=>i.checked).map(i=>i.value),
     contactos: $('#f-contacto').value
       ? { principal: { whatsapp: $('#f-contacto').value, etiqueta: 'Escribir por WhatsApp' } } : {},
+    horarios: horariosDelFormulario(),
+    duracionCita: +$('#f-duracion').value || 30,
     proveedores: $('#f-orden')?.value ? $('#f-orden').value.split(',') : [],
     captura: { activa: true, titulo: 'Dejar mis datos',
       campos: [{id:'nombre',etiqueta:'Tu nombre',tipo:'text',requerido:true},
@@ -1651,7 +1744,11 @@ function secretosDe(p) {
       descripcion: p.descripcion, idioma: p.idioma,
       // Estos tres no se preguntan en el asistente: se conservan tal cual
       // venían. Ver `extrasDelNegocio`.
-      horarios:    p.horarios    && Object.keys(p.horarios).length    ? p.horarios    : (e.horarios || {}),
+      // Los horarios YA se preguntan en el asistente, así que mandan los del
+      // formulario aunque vengan vacíos: si alguien cierra todos los días,
+      // eso es una decisión, no un olvido que haya que rellenar con lo viejo.
+      horarios:    p.horarios || {},
+      duracionCita: p.duracionCita || 30,
       ubicaciones: p.ubicaciones && p.ubicaciones.length              ? p.ubicaciones : (e.ubicaciones || []),
       objetivos:   p.objetivos   && p.objetivos.length                ? p.objetivos   : (e.objetivos || []),
     },
@@ -1791,6 +1888,8 @@ function llenarFormulario(p) {
           || Object.values(p.contactos || {})[0]?.whatsapp || '';
   $('#f-contacto').value = wa;
 
+  llenarHorarios(p.horarios || {});
+  $('#f-duracion').value = String(p.duracionCita || 30);
   if ($('#f-orden')) $('#f-orden').value = (p.proveedores || []).join(',');
   refrescarPrevio();
 }
