@@ -110,7 +110,7 @@ export async function manejar(req, context) {
         // Sin filtro: RLS ya decide. El superadmin ve todas, un dueño ve la
         // suya. No se filtra aquí a propósito — que mande la base.
         const filas = await sb.seleccionar('empresas',
-          'id,slug,nombre,categoria,plan,activa,estado,modo,whatsapp_id,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
+          'id,slug,nombre,categoria,plan,tope_diario,activa,estado,modo,whatsapp_id,ejemplo,suspendida_at,marca,saludo,sugerencias,descargo,captura,contactos,politicas,acciones,created_at',
           'order=created_at.desc');
         return json({ empresas: filas });
       }
@@ -276,6 +276,17 @@ export async function manejar(req, context) {
         // políticas sí las controla el dueño de la marca — son suyas y de su
         // rubro, no una decisión de la plataforma.
         if (esSuper && datos.plan) cambios.plan = datos.plan;
+
+        /* El tope propio, también solo del superadmin y por lo mismo: es
+           dinero. Se acepta el vacío para volver al tope del plan, y por eso
+           se compara contra undefined y no con un `if (datos.tope_diario)` —
+           que trataría el 0 y el vacío como «no lo mandaron» y haría
+           imposible quitarlo una vez puesto. */
+        if (esSuper && datos.tope_diario !== undefined) {
+          const t = Number(datos.tope_diario);
+          cambios.tope_diario = Number.isFinite(t) && t > 0 ? Math.floor(t) : null;
+        }
+
         for (const [nombre, col] of Object.entries(SECRETOS)) {
           if (datos.secretos && nombre in datos.secretos) {
             cambios[col] = await cifrar(MAESTRA, id, datos.secretos[nombre]);
@@ -444,10 +455,25 @@ export async function manejar(req, context) {
         const idEmpresa = datos.empresa_id || yo.empresa_id || null;
         let cuota = null;
         if (idEmpresa) {
-          const e = (await sb.seleccionar('empresas', 'plan,tope_diario',
+          const e = (await sb.seleccionar('empresas', 'plan,tope_diario,perfil_cifrado',
                                           `id=eq.${idEmpresa}&limit=1`))?.[0];
-          if (e) cuota = await consumoDe({ empresaId: idEmpresa,
-                                           plan: e.plan, topeDiario: e.tope_diario });
+          if (e) {
+            /* La zona vive dentro del bulto cifrado, así que hay que abrirlo
+               para saber cuándo empieza el día de ESTE negocio. Vale el
+               trabajo: si el panel usara una zona y el bot otra, el número
+               de la pantalla y el que dispara el tope serían distintos
+               durante las horas en que los dos husos no coinciden — y nadie
+               entendería por qué el bot se calló «antes de tiempo». */
+            let zona = 'America/Mexico_City';
+            try {
+              const perfil = e.perfil_cifrado
+                ? await descifrar(MAESTRA, idEmpresa, e.perfil_cifrado) : null;
+              if (perfil?.zonaHoraria) zona = perfil.zonaHoraria;
+            } catch (err) { /* sin poder abrirlo, la de siempre */ }
+
+            cuota = await consumoDe({ empresaId: idEmpresa, zona,
+                                      plan: e.plan, topeDiario: e.tope_diario });
+          }
         }
 
         return json({

@@ -123,7 +123,6 @@ export function normalizarPerfil(crudo = {}) {
     descargo: texto(c.descargo, 300),
 
     // ── dónde y cuándo ──
-    canales: lista(c.canales).map(x => texto(x, 30)),
     horarios: normalizarHorario(objeto(c.horarios)),
     // Cuánto dura una cita, en minutos. Manda el tamaño de los huecos que
     // ofrece la agenda: 40 minutos con huecos de 30 empalma citas.
@@ -152,6 +151,17 @@ export function normalizarPerfil(crudo = {}) {
     limites: lista(c.limites).map(l => texto(l, 300)).slice(0, 20),
     // Módulos que se activan A PROPÓSITO. Vacío por omisión, siempre.
     politicas: lista(c.politicas).map(p => texto(p, 40)),
+    /* ⚠ ESPECIFICADO, NO CONSTRUIDO.
+       Describe una función que no existe: pasar a una persona tras N
+       respuestas fallidas. Nadie lee estos valores y nadie los guarda, así
+       que hoy son una promesa escrita en el modelo de datos.
+
+       Se conserva —a diferencia de `canales`, que se borró por ser puro
+       peso muerto— porque la idea es buena y concreta: un bot que dice «no
+       tengo ese dato» dos veces seguidas debería ofrecer un humano en vez
+       de seguir frustrando a alguien. La prueba del camino de escritura lo
+       lista aparte, como deuda a la vista, para que no se confunda con algo
+       que ya funciona. */
     escalamiento: {
       activo: objeto(c.escalamiento).activo !== false,
       tras: Number(objeto(c.escalamiento).tras) || 2,

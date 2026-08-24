@@ -489,7 +489,12 @@ export async function apuntarMensaje({ empresa }) {
   const sb = servicio();
   if (!sb || !empresa?.id) return null;
   try {
-    const usados = await sb.rpc('apuntar_mensaje', { p_empresa: empresa.id });
+    // La zona del negocio decide cuándo empieza su día. Sin esto, un cliente
+    // fuera de México vería su contador reiniciarse a media jornada.
+    const usados = await sb.rpc('apuntar_mensaje', {
+      p_empresa: empresa.id,
+      p_zona: empresa.zonaHoraria || 'America/Mexico_City',
+    });
     const n = Number(Array.isArray(usados) ? usados[0] : usados);
     if (!Number.isFinite(n)) return null;
     return estadoDeCuota({ usados: n, tope: topeDe({ plan: empresa.plan, topeDiario: empresa.topeDiario }) });
@@ -497,18 +502,34 @@ export async function apuntarMensaje({ empresa }) {
 }
 
 /** Lo consumido hoy, para pintarlo en el panel. No suma nada. */
-export async function consumoDe({ empresaId, plan, topeDiario }) {
+/**
+ * Qué día es en un huso dado, en formato YYYY-MM-DD.
+ *
+ * `sv-SE` no es capricho: es el único idioma que Intl formatea justo así.
+ * Armarlo a mano con toISOString() daría el día en UTC —otro día durante
+ * seis horas cada tarde— y construirlo con getFullYear() daría el del
+ * navegador, que en un servidor no es el del negocio.
+ */
+function diaEn(zona) {
+  try {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: zona || 'America/Mexico_City' })
+      .format(new Date());
+  } catch (e) {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Mexico_City' }).format(new Date());
+  }
+}
+
+export async function consumoDe({ empresaId, plan, topeDiario, zona }) {
   const sb = servicio();
   if (!sb || !empresaId) return null;
   try {
-    // La fecha se calcula igual que en la funcion que suma. Si aquí se usara
-    // la del servidor, el panel diría un número y el tope usaría otro entre
-    // las 18:00 y la medianoche.
+    // La fecha se calcula con la MISMA zona que usa la función que suma. Si
+    // aquí se usara la del servidor, el panel diría un número y el tope
+    // usaría otro durante las horas en que los dos husos no coinciden.
     const filas = await sb.seleccionar('consumo', 'dia,mensajes',
       `empresa_id=eq.${empresaId}&order=dia.desc&limit=30`);
-    const hoyMX = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
-      .toISOString().slice(0, 10);
-    const hoy = (filas || []).find(f => f.dia === hoyMX);
+    const hoyAllá = diaEn(zona);
+    const hoy = (filas || []).find(f => f.dia === hoyAllá);
     return {
       ...estadoDeCuota({ usados: hoy?.mensajes || 0,
                          tope: topeDe({ plan, topeDiario }) }),

@@ -1506,6 +1506,99 @@ await suite('La lista blanca · que no se caiga nada por el hueco', async () => 
   ok('pero SÍ recibe los colores', publico.marca?.color === '#123456');
 });
 
+await suite('El camino de ESCRITURA · que lo escrito llegue a la base', async () => {
+  /* Ayer se auditó el camino de LECTURA —de la base al bot— y se encontraron
+     cuatro campos que se caían, incluido el interruptor de apagado. Esta
+     prueba hace lo mismo en la otra dirección: del formulario a la base.
+
+     Ahí también había cuatro que no llegaban. Dos eran fantasmas (nadie los
+     leía), pero `proveedores` SÍ se lee en proveedores.mjs desde siempre: la
+     función existía y era inalcanzable, porque su valor nunca se guardaba.
+
+     Se compara código contra código. Es feo y es lo que funciona: el hueco
+     no da error, solo silencio, y el silencio no se prueba con un assert
+     sobre un valor. */
+  const traer = async r => (await fetchReal.call(window, r, { cache: 'no-store' })).text();
+  let perfil = '', idx = '', adm = '';
+  try {
+    perfil = await traer('../publico/cerebro/perfil.mjs');
+    idx    = await traer('../publico/index.html');
+    adm    = await traer('../servidor/admin.mjs');
+  } catch (e) { /* se marca abajo */ }
+
+  ok('se pudieron leer los tres archivos',
+     perfil.length > 1000 && idx.length > 1000 && adm.length > 1000);
+
+  if (perfil && idx && adm) {
+    const claves = (t, ind) => new Set([
+      ...[...t.matchAll(new RegExp('^\\s{' + ind + '}([A-Za-z_]\\w*)\\s*:', 'gm'))].map(m => m[1]),
+      ...[...t.matchAll(new RegExp('^\\s{' + ind + '}([A-Za-z_]\\w*)\\s*,\\s*$', 'gm'))].map(m => m[1]),
+    ]);
+
+    // Lo que el formulario produce.
+    const iP = perfil.indexOf('export function normalizarPerfil');
+    const produce = claves(perfil.slice(iP, perfil.indexOf('\n}', perfil.indexOf('ejemplo:', iP))), 4);
+
+    // Lo que el servidor guarda en columnas sueltas, y de qué campo lo saca.
+    const iG = adm.indexOf("case 'empresas.guardar'");
+    const guardar = adm.slice(iG, adm.indexOf("case 'empresas.modo'"));
+    const deColumna = new Set([...guardar.matchAll(/datos\.(\w+)/g)].map(m => m[1]));
+
+    // Lo que viaja cifrado en el bulto.
+    const iS = idx.indexOf('function secretosDe(p)');
+    const enBulto = new Set([...idx.slice(iS, idx.indexOf('\n}', iS)).matchAll(/p\.(\w+)/g)].map(m => m[1]));
+
+    /* Los que se ponen a propósito por otra vía, no por `empresas.guardar`:
+       el identificador y el slug los pone el alta; estado, modo y ejemplo
+       tienen su propio endpoint porque son decisiones, no datos; identidad
+       viaja como `marca`. Esta lista es corta a propósito — si crece, es que
+       algo se está escondiendo detrás de la palabra «aparte». */
+    const porOtraVia = new Set(['id', 'slug', 'estado', 'ejemplo', 'modo', 'identidad', 'destinos', 'enlace']);
+
+    /* La base escribe en minúsculas con guión bajo (`tope_diario`) y el
+       formulario en jorobas (`topeDiario`). Comparar los nombres tal cual
+       daba por perdido un campo que sí se guarda — el mismo tipo de falso
+       positivo que ayer costó romper los colores por creerle a un detector
+       sin calibrar. Se comparan aplanados. */
+    const plano = t => t.toLowerCase().replace(/_/g, '');
+    const llegan = new Set([...deColumna, ...enBulto, ...porOtraVia].map(plano));
+
+    /* Deuda A LA VISTA, no barrida bajo la alfombra. `escalamiento` describe
+       una función que no existe —pasar a un humano tras N fallos— y por eso
+       no llega a la base: no hay nada que guardar todavía. Va en su propia
+       lista y no en la de «por otra vía» a propósito: esa diría que está
+       resuelto, y esta dice lo que es. Cuando se construya, sale de aquí. */
+    const especificadoSinConstruir = new Set(['escalamiento']);
+
+    const huerfanos = [...produce].filter(k =>
+      !llegan.has(plano(k)) && !especificadoSinConstruir.has(k));
+
+    ok('la deuda declarada sigue siendo UNA sola cosa',
+       especificadoSinConstruir.size === 1,
+       'ya son ' + especificadoSinConstruir.size + ': se está usando de alfombra');
+
+    ok('nada de lo que el formulario recoge se pierde al guardar',
+       huerfanos.length === 0, 'no llegan a la base: ' + huerfanos.join(', '));
+
+    ok('el comparador vio los tres conjuntos',
+       produce.size >= 25 && deColumna.size >= 8 && enBulto.size >= 8,
+       [produce.size, deColumna.size, enBulto.size].join(' / '));
+
+    // `proveedores` es el que dolía: se leía y nunca se podía escribir.
+    ok('proveedores ya tiene por dónde guardarse', enBulto.has('proveedores'));
+    ok('la zona horaria ya tiene por dónde guardarse', enBulto.has('zonaHoraria'));
+
+    // Y que la lista de excepciones no se use para tapar agujeros nuevos.
+    ok('la lista de «va por otra vía» sigue siendo corta',
+       porOtraVia.size <= 8, 'ya son ' + porOtraVia.size);
+
+    // Que el comparador aplanado no se pase de listo y dé todo por bueno.
+    ok('el comparador aplanado sigue detectando lo que de verdad falta',
+       !llegan.has(plano('unCampoQueNadieGuarda')),
+       'aprueba cualquier cosa: no sirve de candado');
+  }
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);

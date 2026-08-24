@@ -1773,6 +1773,21 @@ function secretosDe(p) {
       duracionCita: p.duracionCita || 30,
       ubicaciones: p.ubicaciones && p.ubicaciones.length              ? p.ubicaciones : (e.ubicaciones || []),
       objetivos:   p.objetivos   && p.objetivos.length                ? p.objetivos   : (e.objetivos || []),
+
+      /* Estos dos se normalizaban y NO se guardaban en ninguna parte, así
+         que nunca podían valer nada:
+
+           · proveedores — en qué orden intenta las IA este negocio.
+             `proveedores.mjs` lo lee desde siempre (`marca.proveedores`).
+             La función existía y era inalcanzable.
+           · zonaHoraria — el huso del negocio. Hoy el tope del día usa
+             Ciudad de México a la fuerza; con esto guardado, un cliente
+             fuera de ese huso deja de ser un cambio de código.
+
+         Van en el bulto y no en columna propia porque el bulto existe justo
+         para lo que no la tiene, y así no hace falta una migración. */
+      proveedores: p.proveedores && p.proveedores.length ? p.proveedores : (e.proveedores || []),
+      zonaHoraria: p.zonaHoraria || e.zonaHoraria || 'America/Mexico_City',
     },
   };
 }
@@ -2070,6 +2085,9 @@ function accionesDe(n, estado) {
         ? `<button class="btn sec chico" data-hacer="reactivar" data-id="${esc(n.id)}">Reactivar</button>`
         : `<button class="btn fantasma chico" data-hacer="suspender" data-id="${esc(n.id)}">Suspender</button>`);
       b.push(`<button class="btn fantasma chico" data-hacer="duplicar" data-id="${esc(n.id)}">Duplicar</button>`);
+      // Plan y tope son LO QUE SE COBRA. Hasta hoy el tope solo se podía
+      // poner escribiendo SQL a mano, o sea que en la práctica no existía.
+      b.push(`<button class="btn fantasma chico" data-hacer="plan" data-id="${esc(n.id)}">Plan y tope</button>`);
     }
   }
   return b.join('');
@@ -2133,6 +2151,7 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
   if (hacer === 'qr') { await mostrarQR(slug); return; }
 
   if (hacer === 'whatsapp') { mostrarWhatsapp(id); return; }
+  if (hacer === 'plan')     { mostrarPlan(id); return; }
 
 
   if (hacer === 'copiar') {
@@ -2759,6 +2778,85 @@ async function cargarTablero() {
  * Confundirlos es el error más común de este trámite, así que la pantalla lo
  * dice antes de que se escriba nada.
  */
+/**
+ * Plan y tope de un negocio. Solo para el superadmin: es lo que se cobra.
+ *
+ * El tope acepta quedarse VACÍO, y eso significa «el que le toque por su
+ * plan». Es la opción normal — poner un número aquí es la excepción, para
+ * decirle que sí a un cliente grande sin inventarle un plan nuevo.
+ */
+function mostrarPlan(id) {
+  const n = negocios.find(x => x.id === id) || {};
+  const TOPES = { prueba: 200, basico: 2000, pro: 10000 };
+
+  const caja = document.createElement('div');
+  caja.className = 'velo';
+  caja.innerHTML = `<div class="cuadro" role="dialog" aria-modal="true" aria-label="Plan y tope">
+      <div class="fila" style="justify-content:space-between;align-items:flex-start">
+        <div><h2 class="sec" style="margin:0">Plan de ${esc(n.nombre || '')}</h2>
+        <p class="pista" style="margin:2px 0 0">Cuántos mensajes al día puede contestar su bot.</p></div>
+        <button class="btn sec chico" data-cerrar>Cerrar</button>
+      </div>
+
+      <div id="plan-msg" style="margin-top:14px"></div>
+
+      <div class="campo" style="margin-top:14px">
+        <label for="plan-cual">Plan</label>
+        <select id="plan-cual">
+          ${Object.entries(TOPES).map(([k, v]) => `
+            <option value="${k}" ${k === (n.plan || 'prueba') ? 'selected' : ''}>
+              ${k} — ${v.toLocaleString('es-MX')} mensajes al día</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="plan-tope">Tope propio (opcional)</label>
+        <input id="plan-tope" inputmode="numeric" placeholder="déjalo vacío para usar el del plan"
+               value="${n.tope_diario ?? ''}">
+        <p class="pista">Solo si este cliente necesita otra cosa. <b>Vacío es lo normal:</b>
+        usa el número del plan de arriba. Borrarlo lo devuelve a eso.</p>
+      </div>
+
+      <div class="fila"><button class="btn" id="plan-guardar">Guardar</button></div>
+
+      <p class="pista" style="margin-top:16px">Al llegar al tope el bot no se apaga:
+      deja de llamar a la IA y toma datos de contacto, y vuelve solo al día siguiente.
+      El dueño recibe aviso al 80% y al llegar. Una urgencia sale siempre, tope o no.</p>
+    </div>`;
+
+  document.body.appendChild(caja);
+  const cerrar = () => caja.remove();
+  caja.addEventListener('click', e => { if (e.target === caja || e.target.dataset.cerrar !== undefined) cerrar(); });
+
+  caja.querySelector('#plan-guardar').addEventListener('click', async () => {
+    const b = caja.querySelector('#plan-guardar');
+    const crudo = caja.querySelector('#plan-tope').value.trim();
+    const msg = caja.querySelector('#plan-msg');
+
+    // Un texto en el tope no debe guardarse como «sin tope» sin avisar: quien
+    // escribió «dos mil» quiso decir 2000, no «el del plan».
+    if (crudo && !/^\d+$/.test(crudo)) {
+      msg.innerHTML = `<div class="aviso mal">El tope tiene que ser un número, o quedarse vacío.</div>`;
+      return;
+    }
+
+    b.disabled = true; b.textContent = '…';
+    try {
+      await api('empresas.guardar', {
+        id,
+        plan: caja.querySelector('#plan-cual').value,
+        tope_diario: crudo === '' ? null : Number(crudo),
+      });
+      await cargarNegocios();
+      await cargarTablero();
+      cerrar();
+    } catch (e) {
+      msg.innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
+      b.disabled = false; b.textContent = 'Guardar';
+    }
+  });
+}
+
 function mostrarWhatsapp(id) {
   const n = negocios.find(x => x.id === id) || {};
   const yaEsta = !!n.whatsapp_id;
