@@ -1275,6 +1275,21 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       <div class="fila" style="margin-top:12px"><button class="btn" id="btn-llave">Generar llave</button></div>
       <div id="salida-llave"></div>
     </div>
+
+    <div class="tarjeta">
+      <h2 class="sec">Palabra secreta para WhatsApp</h2>
+      <p class="pista">La que va <b>igual en dos lados</b>: en Cloudflare como
+      <code>WHATSAPP_VERIFY_TOKEN</code> y en Meta como «token de verificación».
+      Sirve para que Meta y tu servidor se reconozcan.</p>
+      <p class="pista"><b>No uses la de arriba.</b> Aquella lleva los caracteres
+      <code>+</code> y <code>/</code>, y en una dirección web un <code>+</code> se
+      convierte en espacio: la palabra nunca coincidiría y buscarías el error
+      donde no está. Esta solo trae letras y números.</p>
+      <div class="fila" style="margin-top:12px">
+        <button class="btn" id="btn-palabra">Generar palabra secreta</button>
+      </div>
+      <div id="salida-palabra"></div>
+    </div>
     <div class="tarjeta">
       <h2 class="sec">Probar la IA</h2>
       <p class="pista">Le manda una pregunta de verdad a cada proveedor y dice
@@ -2317,7 +2332,26 @@ fetchReal('/api/bot?ping=1').then(r=>r.json()).then(d => {
   const probs = (d.problemas||[]).map(p =>
     `<div class="aviso ${p.gravedad==='critico'?'mal':'ojo'}"><b>${esc(p.titulo)}</b><br>
      ${esc(p.detalle)}<br><small>${esc(p.arreglo)}</small></div>`).join('');
-  $('#estado').innerHTML = filas + (probs || '<div class="aviso ok">Todo configurado.</div>');
+  /* Las tres de WhatsApp, cada una con su nombre. Solo se pintan si hay al
+     menos una puesta: a quien no usa WhatsApp no se le llena la pantalla con
+     tres focos apagados de algo que no piensa usar.
+
+     Y se nombran las variables tal cual se escriben en Cloudflare. Un
+     «falta la clave» obliga a ir a buscar cómo se llama; un
+     `WHATSAPP_APP_SECRET` se copia y se pega. */
+  const w = d.whatsapp || {};
+  const algoDeWa = w.verifica || w.responde || w.firma;
+  const wa = !algoDeWa ? '' :
+    '<div style="margin-top:10px">' +
+    [['WHATSAPP_VERIFY_TOKEN', w.verifica, 'el apretón de manos con Meta'],
+     ['WHATSAPP_TOKEN',        w.responde, 'con qué contesta'],
+     ['WHATSAPP_APP_SECRET',   w.firma,    'comprobar que quien llama es Meta']]
+      .map(([n, hay, para]) =>
+        `<span class="placa ${hay ? 'ok' : 'mal'}" title="${esc(para)}"
+               style="margin:2px 3px 2px 0">${hay ? '●' : '○'} ${n}</span>`).join(' ') +
+    '</div>';
+
+  $('#estado').innerHTML = filas + wa + (probs || '<div class="aviso ok">Todo configurado.</div>');
 }).catch(() => {
   /* No hay servidor detrás de esta página.
      El mensaje que había aquí decía «la consola se ve, pero el asistente no
@@ -3740,6 +3774,29 @@ $('#btn-llave').addEventListener('click', async () => {
     `<pre style="white-space:pre-wrap;word-break:break-all">${esc(llave)}</pre>
      <div class="aviso ojo">Cópiala ahora. No se guarda en ningún lado.</div>`;
 });
+/* Hexadecimal a propósito: solo 0-9 y a-f. Esta palabra viaja como parte de
+   una dirección web cuando Meta llama, y ahí un `+` se decodifica como
+   espacio. La llave maestra de arriba es base64 y sí lleva `+`: reusarla aquí
+   habría fallado de un modo que no se entiende mirando ninguna de las dos
+   pantallas. 32 bytes al azar, del generador criptográfico del navegador —
+   no de Math.random, que no sirve para secretos. */
+$('#btn-palabra').addEventListener('click', () => {
+  const b = crypto.getRandomValues(new Uint8Array(32));
+  let hex = '';
+  for (const n of b) hex += (n + 256).toString(16).slice(1);
+  $('#salida-palabra').innerHTML =
+    `<pre style="white-space:pre-wrap;word-break:break-all">${esc(hex)}</pre>
+     <div class="fila"><button class="btn sec chico" id="copiar-palabra">Copiar</button></div>
+     <div class="aviso ojo">Cópiala ahora y pégala en los dos lados.
+     No se guarda en ningún lado: si cierras esto, genera otra y cámbiala en
+     los dos — nunca en uno solo.</div>`;
+  $('#copiar-palabra').addEventListener('click', async e => {
+    const ok = await copiarTexto(hex);
+    e.target.textContent = ok ? '✓ Copiada' : 'No se pudo';
+    setTimeout(() => { e.target.textContent = 'Copiar'; }, 1600);
+  });
+});
+
 $('#btn-probar-cifrado').addEventListener('click', async () => {
   const s = $('#salida-cifrado');
   s.innerHTML = '<p class="pista">Corriendo…</p>';

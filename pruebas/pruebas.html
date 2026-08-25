@@ -1780,6 +1780,61 @@ suite('Las dos formas de no saber', () => {
   ok('vacío no dispara nada', !admiteNoSaber('') && !admiteNoSaber(null));
 });
 
+await suite('Lo que se calcula tiene que llegar a una pantalla', async () => {
+  /* El pecado recurrente de este proyecto, cometido seis veces ya: algo se
+     calcula bien, se guarda bien, y ninguna pantalla lo pide. `leads.listar`,
+     `empresas.detalle`, las conversaciones, `revisarRedaccion`, `proveedores`
+     — y hace dos horas, el detalle de las tres variables de WhatsApp: lo
+     calculaba `revisarEntorno` y la respuesta del ping lo tiraba.
+
+     Esta prueba compara lo que `revisarEntorno` DEVUELVE contra lo que el
+     ping ENTREGA. No prueba comportamiento; prueba que nada se quede a medio
+     camino. Vale justamente por eso: ese hueco nunca da error, solo silencio. */
+  const traer = async r => (await fetchReal.call(window, r, { cache: 'no-store' })).text();
+  let bot = '', diag = '';
+  try {
+    bot  = await traer('../servidor/bot.mjs');
+    diag = await traer('../servidor/nucleo/diagnostico.mjs');
+  } catch (e) { /* se marca abajo */ }
+
+  ok('se pudieron leer los dos archivos', bot.length > 1000 && diag.length > 1000);
+  if (!bot || !diag) return;
+
+  // Lo que revisarEntorno devuelve, en su `return { ... }` final.
+  const iR = diag.indexOf('export function revisarEntorno');
+  const cuerpo = diag.slice(iR, diag.indexOf('\n}', diag.indexOf('problemas,\n  };', iR)));
+  const devuelve = new Set([
+    ...[...cuerpo.matchAll(/^\s{4}([A-Za-z_]\w*)\s*:/gm)].map(m => m[1]),
+    ...[...cuerpo.matchAll(/^\s{4}([A-Za-z_]\w*)\s*,\s*$/gm)].map(m => m[1]),
+  ]);
+
+  // Lo que el ping entrega.
+  const iP = bot.indexOf("url.searchParams.get('ping')");
+  const respuesta = bot.slice(iP, bot.indexOf('\n  }', bot.indexOf('problemas,\n    });', iP)));
+
+  ok('el comparador encontró las dos partes',
+     devuelve.size >= 5 && respuesta.length > 200,
+     devuelve.size + ' / ' + respuesta.length);
+
+  /* `listo` se recalcula en la respuesta (se le suma si la base contesta), y
+     `capacidades` se entrega expandida con dos campos más. Los dos SÍ llegan,
+     solo que con otra forma. */
+  const perdidos = [...devuelve].filter(k => !new RegExp('\\b' + k + '\\b').test(respuesta));
+
+  ok('nada de lo que se calcula se queda sin entregar',
+     perdidos.length === 0, 'se calcula y no llega: ' + perdidos.join(', '));
+
+  // El que dolió: las tres por separado.
+  ok('el detalle de las tres de WhatsApp llega al panel',
+     /whatsapp:\s*d\.whatsapp/.test(respuesta),
+     'se calcula el detalle y el ping lo tira');
+
+  // Y que el candado sirva: si se le quita, tiene que gritar.
+  ok('el candado detecta un campo que no se entrega',
+     !new RegExp('\\binventadoQueNadieEntrega\\b').test(respuesta),
+     'aprueba cualquier cosa: no sirve de candado');
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);

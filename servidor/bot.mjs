@@ -118,6 +118,16 @@ export async function manejar(req, context) {
         baseResponde: prueba ? prueba.lee : false,
         negociosVisibles: prueba ? prueba.filas : 0,
       },
+      /* Las tres de WhatsApp POR SEPARADO. `capacidades.whatsapp` solo dice
+         sí o no, y «WhatsApp no está listo» no le sirve a nadie: las tres se
+         ponen en lugares distintos del panel de Meta.
+
+         Esto ya lo calculaba `revisarEntorno` y esta respuesta lo tiraba: el
+         dato existía y no llegaba a ninguna pantalla. Es el mismo patrón que
+         este proyecto lleva encontrando toda la semana, cometido esta vez a
+         dos horas de haberlo escrito. Por eso abajo hay una prueba que
+         compara lo que se calcula contra lo que se entrega. */
+      whatsapp: d.whatsapp,
       problemas,
     });
   }
