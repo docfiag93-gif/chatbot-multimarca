@@ -341,6 +341,23 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
 .pasos button[data-listo] .n{background:var(--ok);color:#fff}
 
+/* El momento en que nace un bot. Es la única pantalla de todo el producto
+   que da una buena noticia sin condiciones, y se ve distinta a propósito.
+   Lo demás del panel informa; esta felicita y dice qué sigue. */
+.nacio{border:1px solid var(--ok);border-radius:14px;background:var(--ok-suave);
+  padding:20px;display:flex;flex-direction:column;gap:16px}
+.nacio .fiesta{display:flex;gap:14px;align-items:flex-start}
+.nacio .fiesta .ico{width:34px;height:34px;border-radius:50%;background:var(--ok);
+  color:#fff;display:grid;place-items:center;font-size:18px;font-weight:700;flex:none}
+.nacio .fiesta b{display:block;font-size:17px;margin-bottom:3px}
+.nacio .fiesta span{font-size:13.5px;color:var(--tenue);line-height:1.5}
+.nacio > .btn{align-self:flex-start;text-decoration:none}
+.nacio .sigue{border-top:1px solid var(--linea);padding-top:14px}
+.nacio .sigue b{font-size:13px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--tenue);display:block;margin-bottom:8px}
+.nacio .sigue ol{margin:0 0 12px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.nacio .sigue li{font-size:13.5px;line-height:1.55}
+
 /* El selector de giro y la hora de la conversación. La hora es la mitad del
    argumento: un mensaje a las 11:47 p.m. dice solo, sin texto de apoyo, por
    qué hace falta algo que conteste cuando no hay nadie. */
@@ -2091,8 +2108,38 @@ async function publicar() {
     // orden de spread.
     await api('empresas.guardar', { ...p, id, secretos: secretosDe(p) });
     await api('empresas.publicar', { id });
-    $('#alta-msg').innerHTML = `<div class="aviso ok">Publicado. Ya puedes pegarlo con
-      <code>data-marca="${esc(p.slug)}"</code>.</div>`;
+    /* Este es el momento más importante del producto: acaba de nacer el bot
+       de alguien. Antes decía «Publicado. Ya puedes pegarlo con
+       data-marca="..."» — el instante de triunfo, escrito en programador, y
+       terminando en un dato que a un médico no le dice absolutamente nada.
+
+       Ahora se celebra, se le enseña que está VIVO —con la liga que puede
+       abrir ahora mismo— y se le dan los dos pasos que siguen. Nadie sabe
+       qué hacer después de un «listo» que no dice qué sigue. */
+    const liga = location.origin + '/chat.html?marca=' + encodeURIComponent(p.slug);
+    $('#alta-msg').innerHTML = `
+      <div class="nacio">
+        <div class="fiesta">
+          <span class="ico" aria-hidden="true">✓</span>
+          <div>
+            <b>Tu asistente ya está contestando.</b>
+            <span>Desde ahora responde solo, a cualquier hora, con lo que le cargaste.</span>
+          </div>
+        </div>
+        <a class="btn" href="${esc(liga)}" target="_blank" rel="noopener">Pruébalo tú mismo →</a>
+        <div class="sigue">
+          <b>Lo que sigue</b>
+          <ol>
+            <li>Copia tu liga y ponla donde te escriben: perfil de Instagram,
+                firma de correo, o mándala por WhatsApp.</li>
+            <li>Imprime tu código QR para la sala de espera.</li>
+          </ol>
+          <button class="btn sec chico" id="btn-ir-compartir">Ver mi liga y mi QR</button>
+        </div>
+      </div>`;
+    $('#btn-ir-compartir')?.addEventListener('click', () => {
+      location.search = '?marca=' + encodeURIComponent(p.slug) + '#probar';
+    });
     await cargarNegocios();
   } catch (e) {
     $('#alta-msg').innerHTML = `<div class="aviso mal">${esc(e.message)}</div>`;
