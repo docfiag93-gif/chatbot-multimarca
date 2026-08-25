@@ -291,7 +291,43 @@ export async function manejar(req, context = {}) {
                             texto: salida.texto, opciones: salida.sugerencias })
     : responderPorWhatsapp({ phoneId: entrante.phoneId, para: entrante.de, texto: salida.texto });
 
-  await enviar;
+  /* Se mira CÓMO salió. Antes esto era `await enviar;` a secas: la función
+     sabía perfectamente por qué había fallado —devuelve `meta_401`,
+     `sin_token`, lo que sea— y quien la llamaba tiraba la respuesta.
+
+     El resultado: el mensaje entra, la IA contesta, la conversación se
+     guarda... y a la persona no le llega nada. Desde afuera se ve idéntico a
+     que el bot esté muerto, y desde adentro no queda una sola pista. Es el
+     último eslabón de la cadena y era el único sin registrar.
+
+     Nunca se guarda el token ni el cuerpo del error de Meta: solo el código.
+     El cuerpo puede traer el token de vuelta. */
+  const salioAsi = await enviar;
+
+  if (salioAsi && salioAsi.ok === false) {
+    const QUE_SIGNIFICA = {
+      sin_token: 'WHATSAPP_TOKEN no está puesta en el servidor.',
+      meta_401:  'Meta rechazó el token: está vencido o se regeneró y no se actualizó en Cloudflare. Los temporales duran 24 horas.',
+      meta_403:  'El token no tiene permiso sobre ese número.',
+      meta_400:  'Meta rechazó la petición. Lo más común: el número de quien escribió NO está en la lista de destinatarios de prueba.',
+      meta_404:  'Ese phone_number_id no existe o no es de esta app.',
+      meta_429:  'Demasiados mensajes seguidos: Meta está frenando.',
+    };
+    const sb = servicio();
+    if (sb) {
+      const anotar = sb.bitacora({
+        actor: null, empresa_id: marca?.id || null,
+        accion: 'whatsapp.no_se_pudo_responder',
+        detalle: {
+          razon: salioAsi.razon,
+          nota: QUE_SIGNIFICA[salioAsi.razon]
+                || 'Meta rechazó el envío con ' + salioAsi.razon + '.',
+          cuando: new Date().toISOString(),
+        },
+      });
+      if (context.waitUntil) context.waitUntil(anotar); else await anotar;
+    }
+  }
 
   // Guardar y avisar van DETRÁS de la respuesta, nunca delante: en una
   // urgencia, cada segundo de retraso es un segundo sin el 911.
