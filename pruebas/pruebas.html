@@ -46,6 +46,7 @@ import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs
 import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agenda.mjs';
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
+import { aQuienSeLeContesta } from '../servidor/whatsapp.mjs';
 import { temaSugerido } from '../publico/cerebro/temas.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
@@ -1833,6 +1834,36 @@ await suite('Lo que se calcula tiene que llegar a una pantalla', async () => {
   ok('el candado detecta un campo que no se entrega',
      !new RegExp('\\binventadoQueNadieEntrega\\b').test(respuesta),
      'aprueba cualquier cosa: no sirve de candado');
+});
+
+suite('El dígito que México arrastra', () => {
+  /* Costó dos diagnósticos equivocados. El mensaje entra, la IA contesta, y
+     Meta devuelve 131030 «el destinatario no está en la lista» señalando un
+     número que SÍ está en la lista — escrito de la otra forma.
+
+     WhatsApp manda `5219616552222` en el mensaje entrante. La lista de
+     permitidos dice `529616552222`. Para Meta son dos números distintos. */
+  ok('quita el 1 de México', aQuienSeLeContesta('5219616552222') === '529616552222');
+  ok('quita el 9 de Argentina', aQuienSeLeContesta('5491123456789') === '541123456789');
+
+  ok('un número mexicano YA correcto no se toca',
+     aQuienSeLeContesta('529616552222') === '529616552222',
+     'quitarle otro dígito lo rompería');
+
+  /* Lo importante es lo que NO toca. Inventarle dígitos al teléfono de
+     alguien es peor que no contestarle: el mensaje se iría a un desconocido. */
+  ok('no toca a Estados Unidos', aQuienSeLeContesta('15551234567') === '15551234567');
+  ok('no toca a España',         aQuienSeLeContesta('34612345678') === '34612345678');
+  ok('no toca a Colombia',       aQuienSeLeContesta('573001234567') === '573001234567');
+
+  // Un 521 que NO tenga el largo exacto no es el caso mexicano: puede ser
+  // otro país que empiece igual, o un número mal formado.
+  ok('un 521 con largo distinto se deja en paz',
+     aQuienSeLeContesta('521961655') === '521961655' &&
+     aQuienSeLeContesta('52196165522223') === '52196165522223');
+
+  ok('limpia espacios y signos', aQuienSeLeContesta('+52 1 961 655 2222') === '529616552222');
+  ok('vacío no truena', aQuienSeLeContesta('') === '' && aQuienSeLeContesta(null) === '');
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

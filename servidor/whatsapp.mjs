@@ -51,6 +51,34 @@ function recordar(clave, mensaje) {
 }
 
 /** Manda un mensaje de texto por WhatsApp. */
+/**
+ * El número al que de verdad se puede contestar.
+ *
+ * México y Argentina arrastran un dígito extra en WhatsApp por razones
+ * históricas de su numeración: un `1` después del 52, un `9` después del 54.
+ * WhatsApp lo manda así en el mensaje ENTRANTE —tanto en `from` como en
+ * `wa_id`— y la API lo RECHAZA al enviar: para ella `5219616552222` y
+ * `529616552222` son dos números distintos, y solo el segundo está en la
+ * lista de destinatarios permitidos.
+ *
+ * El síntoma es de los que enloquecen: el mensaje entra, la IA contesta, la
+ * conversación se guarda, y Meta responde 131030 «el destinatario no está en
+ * la lista» señalando un número que SÍ está en la lista. Está, pero escrito
+ * de la otra forma.
+ *
+ * Solo se toca cuando el patrón calza EXACTO —país, dígito y largo—. Ante
+ * cualquier otra cosa se devuelve tal cual: inventarle dígitos al teléfono de
+ * alguien es peor que no contestarle.
+ */
+export function aQuienSeLeContesta(numero) {
+  const n = String(numero || '').replace(/\D/g, '');
+  // México: 52 + 1 + diez dígitos → se quita el 1.
+  if (/^521\d{10}$/.test(n)) return '52' + n.slice(3);
+  // Argentina: 54 + 9 + diez dígitos → se quita el 9.
+  if (/^549\d{10}$/.test(n)) return '54' + n.slice(3);
+  return n || String(numero || '');
+}
+
 async function responderPorWhatsapp({ phoneId, para, texto }) {
   const token = env('WHATSAPP_TOKEN');
   if (!token || !phoneId) return { ok: false, razon: 'sin_token' };
@@ -60,7 +88,7 @@ async function responderPorWhatsapp({ phoneId, para, texto }) {
     headers: { Authorization: 'Bearer ' + token, 'content-type': 'application/json' },
     body: JSON.stringify({
       messaging_product: 'whatsapp',
-      to: para,
+      to: aQuienSeLeContesta(para),
       type: 'text',
       text: { preview_url: false, body: String(texto).slice(0, 4000) },
     }),
