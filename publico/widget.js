@@ -279,6 +279,7 @@
   .form textarea { resize: vertical; min-height: 58px; }
   .form .aviso { font-size: 11px; line-height: 1.45; display: flex; gap: 7px; align-items: flex-start; }
   .form .aviso input { width: auto; margin-top: 2px; flex: none; }
+  .form .aviso a { color: inherit; text-decoration: underline; white-space: nowrap; }
   .form .acciones { display: flex; gap: 8px; }
   .form .acciones button {
     flex: 1; border: 0; border-radius: 10px; padding: 10px; font-size: 14px;
@@ -790,10 +791,29 @@
     var aviso = el('label', 'aviso');
     var check = el('input'); check.type = 'checkbox';
     aviso.appendChild(check);
+
+    /* OJO: esto decía `cfg.dominio === 'clinico'`, y `dominio` es el campo
+       que quedó OBSOLETO cuando el producto dejó de tener dos sectores
+       fijos. O sea que la aclaración clínica —la que dice que esto no es
+       una cita confirmada, justo la que protege al médico— llevaba
+       semanas sin mostrarse nunca. Un condicional sobre un campo muerto no
+       da error: simplemente deja de ser verdad. */
+    var esClinico = (cfg.politicas || []).indexOf('urgencias-clinicas') !== -1;
     aviso.appendChild(document.createTextNode(
       'Acepto que usen mis datos para contactarme. ' +
-      (cfg.dominio === 'clinico' ? 'Entiendo que esto no es una cita confirmada.' : '')
+      (esClinico ? 'Entiendo que esto no es una cita confirmada. ' : '')
     ));
+
+    /* El aviso de privacidad tiene que estar DONDE se pide el
+       consentimiento, no escondido en la portada: la ley pide que esté
+       disponible en el momento de la recolección, y quien va a marcar esta
+       casilla está aquí, no allá. */
+    var liga = el('a');
+    liga.href = '/aviso-privacidad.html';
+    liga.target = '_blank';
+    liga.rel = 'noopener';
+    liga.textContent = 'Aviso de privacidad';
+    aviso.appendChild(liga);
     f.appendChild(aviso);
 
     var err = el('div', 'error'); f.appendChild(err);

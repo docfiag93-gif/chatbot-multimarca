@@ -2527,6 +2527,88 @@ suite('El 911 primero, el médico después · nunca al revés', () => {
      /961 000 1111/.test(interna.texto) && /911/.test(interna.texto));
 });
 
+await suite('El aviso de privacidad y el consentimiento', async () => {
+  /* La casilla de consentimiento existe desde hace tiempo. Lo que faltaba es
+     que el aviso estuviera DONDE se pide: la ley pide que esté disponible en
+     el momento de la recolección, y quien va a marcar la casilla está en el
+     widget, no en la portada. */
+  const traer = async r => (await fetchReal.call(window, r, { cache: 'no-store' })).text();
+
+  const aviso = await traer('../publico/aviso-privacidad.html');
+  ok('existe el aviso de privacidad', aviso.length > 2000);
+
+  /* Lo que la ley exige que diga. No es una lista de buenas intenciones:
+     son los elementos del artículo 16 y del reglamento. */
+  for (const [que, patron] of [
+    ['identifica al responsable',        /Responsable:/i],
+    ['dice qué datos recoge',            /Qué datos se recogen/i],
+    ['distingue los datos SENSIBLES',    /datos personales sensibles/i],
+    ['separa finalidades primarias y secundarias', /finalidades secundarias/i],
+    ['nombra los derechos ARCO',         /Acceso.*Rectificaci[oó]n.*Cancelaci[oó]n.*Oposici[oó]n/s],
+    ['da un medio y un plazo para ejercerlos', /20 d[ií]as h[aá]biles/i],
+    ['dice cómo revocar el consentimiento', /revocar tu consentimiento/i],
+    ['declara las transferencias',       /Con qui[eé]n se comparten/i],
+    ['dice cuánto se conservan',          /Cu[aá]nto tiempo se conservan/i],
+    ['avisa si hay una filtración',       /vulneraci[oó]n/i],
+  ]) ok(que, patron.test(aviso), que);
+
+  /* La transferencia que casi todos omiten: el texto de la conversación se
+     manda a un tercero para que redacte la respuesta. Es la más importante
+     de declarar, porque es la que nadie se imagina. */
+  ok('declara que el texto va a un proveedor de IA',
+     /Gemini/.test(aviso) && /Generar las respuestas/i.test(aviso),
+     'es la transferencia que nadie se imagina y por eso hay que decirla');
+
+  /* Y la distinción que ordena todo lo demás: la plataforma es RESPONSABLE
+     de sus titulares de cuenta y solo ENCARGADO de los pacientes, que son
+     de cada consultorio. */
+  ok('distingue responsable de encargado',
+     /Dos responsables distintos/i.test(aviso) &&
+     /\bencargados?\b/i.test(aviso));
+
+  ok('y le dice al paciente a quién dirigirse',
+     /dir[ií]gete a ese negocio/i.test(aviso));
+
+  // ── El widget ──
+  const w = await traer('../publico/widget.js');
+  ok('el formulario enlaza el aviso',
+     /aviso-privacidad\.html/.test(w),
+     'tiene que estar donde se pide el consentimiento, no en la portada');
+
+  /* El condicional estaba escrito sobre `dominio`, el campo que quedó
+     obsoleto cuando el producto dejó de tener dos sectores fijos. La
+     aclaración clínica —la que protege al médico— llevaba semanas sin
+     mostrarse nunca. Un condicional sobre un campo muerto no da error:
+     simplemente deja de ser verdad. */
+  /* Se miran las INSTRUCCIONES, no la prosa: el comentario que explica este
+     arreglo nombra `cfg.dominio` justamente para decir por qué ya no se usa.
+     Es la tercera vez en este archivo que una guardia grita por una palabra
+     escrita dentro de una explicación — por eso el limpiador va aparte. */
+  const soloCodigo = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+  ok('la aclaración clínica NO depende del campo obsoleto',
+     !/cfg\.dominio/.test(soloCodigo(w)),
+     'condicional muerto: nunca se mostraba');
+  ok('y la guardia sí atraparía el código viejo',
+     /cfg\.dominio/.test(soloCodigo("if (cfg.dominio === 'clinico') {} // nota")));
+  ok('y sí depende de la política encendida',
+     /urgencias-clinicas/.test(w));
+
+  ok('las políticas llegan al navegador para poder decidirlo',
+     perfilPublico({ politicas: ['urgencias-clinicas'] }).politicas
+       .includes('urgencias-clinicas'));
+
+  /* Y lo que el navegador sigue SIN recibir: el prompt, el conocimiento y
+     los límites. Agregar `politicas` no podía abrir esa puerta. */
+  const pub = perfilPublico({
+    politicas: ['urgencias-clinicas'], tono: 'secreto',
+    conocimiento: [{ tema: 'x', texto: 'precios internos' }],
+    limites: ['no digas esto'], llaves: { gemini: 'AI...' },
+  });
+  ok('agregar las políticas no destapó nada más',
+     pub.tono === undefined && pub.conocimiento === undefined &&
+     pub.limites === undefined && pub.llaves === undefined);
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);

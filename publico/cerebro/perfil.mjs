@@ -241,6 +241,11 @@ export function perfilPublico(perfil) {
     captura: p.captura,
     contactos: p.contactos,
     acciones: p.acciones,
+    /* Qué módulos trae encendidos. NO es información sensible —es qué
+       reglas sigue el bot, no el contenido de nadie— y el widget la
+       necesita: sin ella no puede saber si tiene que agregar la aclaración
+       clínica al pie del formulario de contacto. */
+    politicas: p.politicas,
   };
 }
 
