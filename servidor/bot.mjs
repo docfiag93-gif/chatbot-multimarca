@@ -18,7 +18,7 @@ import { MARCAS } from './nucleo/marcas.mjs';
 import { construirPrompt, respuestaInmediata, accionValida, decidirSinIA } from './nucleo/cerebro.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
 import { revisarEntorno, explicarFallo, probarBase } from './nucleo/diagnostico.mjs';
-import { revisarAnclaje, pulir, respuestaSinDato }
+import { revisarAnclaje, pulir, respuestaSinDato, admiteNoSaber }
   from './nucleo/anclaje.mjs';
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
@@ -433,6 +433,29 @@ export async function manejar(req, context) {
         const { corte: _c, tras, ...r } = paso;
         salida = { ...r, via, anclaje: 'degradado', escalado: tras };
       }
+    } else if (admiteNoSaber(texto)) {
+      /* La IA contestó bien —no inventó nada, así que el anclaje la dejó
+         pasar— pero lo que dijo fue «no tengo esa información».
+
+         Para quien escribe eso es idéntico a que el anclaje la degradara:
+         preguntó y no le contestaron. Antes solo se contaba el caso de la
+         invención, y por eso la lista de «lo que le falta al negocio» venía
+         corta y el escalamiento tardaba de más en ofrecer una persona. */
+      salida = {
+        texto,
+        sugerencias: Array.isArray(datos.sugerencias) ? datos.sugerencias.slice(0, 3).map(String) : [],
+        accion: accionValida(marca, datos.accion),
+        via,
+        anclaje: 'sin_dato',
+      };
+      if (pulido.arreglos.length) salida.pulido = pulido.arreglos;
+
+      const fallos = await vecesQueNoSupo({ empresaId: marca.id, sesion });
+      const paso = decidirEscalar({ marca, fallosPrevios: fallos });
+      if (paso) {
+        const { corte: _c, tras, ...r } = paso;
+        salida = { ...r, via, anclaje: 'sin_dato', escalado: tras };
+      }
     } else {
       salida = {
         texto,
@@ -481,7 +504,9 @@ export async function manejar(req, context) {
       // El anclaje calculaba esto y lo tiraba. Cada vez que el bot tiene que
       // admitir que no sabe algo, alguien preguntó algo que el negocio no ha
       // cargado: es la lista de tareas más útil que existe.
-      sinDato: salida.anclaje === 'degradado',
+      // Las DOS formas de no saber: la que hubo que degradar por inventar,
+      // y la que el modelo admitió solo. Desde fuera son la misma cosa.
+      sinDato: salida.anclaje === 'degradado' || salida.anclaje === 'sin_dato',
     }));
 
     return json(salida);

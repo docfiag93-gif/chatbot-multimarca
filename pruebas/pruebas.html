@@ -57,6 +57,7 @@ import { construirPrompt, accionValida } from '../servidor/nucleo/cerebro.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 import { POLITICAS_UI, ACCIONES_UI } from '../publico/cerebro/catalogos-ui.mjs';
 import { obtenerMarca } from '../servidor/nucleo/marcas.mjs';
+import { admiteNoSaber } from '../servidor/nucleo/anclaje.mjs';
 import { revisarAnclaje, afirmacionesDe, corpusDe, revisarRedaccion, pulir,
          recortarAFrases, unaSolaPregunta,
          limpiarMuletillas, respuestaSinDato } from '../servidor/nucleo/anclaje.mjs';
@@ -1737,6 +1738,46 @@ suite('¿Está abierto? · lo que NO se sabe no se afirma', () => {
   ok('SIN SABER: usa el normal, no el de la noche',
      decidirEscalar({ marca: conNocturno, fallosPrevios: 0, ahora: lunes23 }).texto === 'de día',
      'decir «no hay nadie» sin saberlo es inventar sobre el negocio de otro');
+});
+
+suite('Las dos formas de no saber', () => {
+  /* El anclaje solo se entera cuando la IA INVENTA. Cuando admite sola que no
+     sabe, nadie lo contaba — y para quien escribe las dos son idénticas:
+     preguntó y no le contestaron.
+
+     Los tres primeros casos son respuestas REALES que dio el bot en
+     producción hoy. Es la razón por la que existe esta función: las tres
+     dicen lo mismo a la persona, y el sistema solo marcaba una. */
+  const reales = [
+    'No tengo el horario exacto a la mano y prefiero no darte uno equivocado. Déjame tus datos.',
+    'No tengo esa información exacta aquí. ¿Quieres que te contacte alguien del equipo para confirmarlo?',
+    'Depende de lo que necesites en este momento. ¿Quieres que te llamemos para platicarlo bien?',
+  ];
+  ok('cacha la que degradó el anclaje',      admiteNoSaber(reales[0]));
+  ok('y la que la IA admitió sola',          admiteNoSaber(reales[1]));
+  ok('pero NO una respuesta que sí contesta', !admiteNoSaber(reales[2]),
+     'esa dice «depende», que es una respuesta, no un hueco');
+
+  ok('«no cuento con ese dato»',    admiteNoSaber('Lo siento, no cuento con ese dato.'));
+  ok('«no puedo confirmarte»',      admiteNoSaber('No puedo confirmarte el precio en este momento.'));
+  ok('«no lo sé con certeza»',      admiteNoSaber('No lo sé con certeza, mejor pregúntale a la doctora.'));
+
+  /* Lo que suena a ignorancia y NO lo es. Confundirlas tiene costo real:
+     «no tengo lugar el jueves» es una respuesta completa y útil, y contarla
+     como hueco ensuciaría la única lista que le dice al dueño qué le falta
+     cargar. Una lista sucia se deja de mirar. */
+  ok('«no tengo lugar el jueves» SÍ es una respuesta',
+     !admiteNoSaber('No tengo lugar el jueves, pero el viernes a las 5 sí.'));
+  ok('«no tenemos ese servicio» SÍ es una respuesta',
+     !admiteNoSaber('No tenemos ese servicio, solo consulta general.'));
+  ok('«no manejamos» SÍ es una respuesta',
+     !admiteNoSaber('No manejamos pagos con transferencia, solo efectivo y tarjeta.'));
+  ok('«no atendemos» SÍ es una respuesta',
+     !admiteNoSaber('No atendemos domingos.'));
+
+  ok('una respuesta normal no dispara nada',
+     !admiteNoSaber('La consulta cuesta $800 y atendemos de lunes a viernes.'));
+  ok('vacío no dispara nada', !admiteNoSaber('') && !admiteNoSaber(null));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

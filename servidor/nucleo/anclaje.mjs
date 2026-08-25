@@ -234,6 +234,55 @@ export function limpiarMuletillas(texto) {
  * mismo error. Se admite el hueco y se ofrece a una persona, que es
  * exactamente lo que haría un empleado honesto que no se sabe el precio.
  */
+/**
+ * ¿El bot acaba de admitir que no sabe algo?
+ *
+ * Hace falta porque el anclaje solo se entera cuando la IA INVENTA un dato y
+ * hay que degradarla. Cuando la IA admite por su cuenta «no tengo esa
+ * información», nadie lo registraba — y para quien escribe las dos cosas son
+ * exactamente lo mismo: preguntó y no le contestaron.
+ *
+ * El efecto era doble y silencioso: la lista de «veces que el bot no supo»
+ * —que es la lista de lo que le falta al negocio— venía corta desde siempre,
+ * y el escalamiento tardaba de más en ofrecer una persona.
+ *
+ * ── SOBRE MIRAR EL TEXTO ──
+ * Sí, esto es buscar frases en la salida de un modelo, y eso es frágil por
+ * naturaleza. Se hace igual por dos razones: el patrón vive AQUÍ, donde se
+ * puede probar contra casos reales, y equivocarse sale barato en las dos
+ * direcciones —de más, ofrece un humano que no hacía falta; de menos, deja
+ * las cosas como estaban—. Ninguna de las dos le da un dato falso a nadie,
+ * que es lo único que este archivo existe para impedir.
+ */
+const NO_SABE = [
+  /\bno tengo (?:ese|esa|el|la|los|las|un|una)?\s*(?:dato|informaci[óo]n|precio|horario|detalle)/i,
+  /\bno (?:cuento|dispongo) con (?:ese|esa|esa informaci[óo]n|el dato)/i,
+  /\bno (?:lo|la|los|las)? ?s[ée] con (?:certeza|exactitud)/i,
+  /\bno (?:tengo|hay) (?:esa|la) informaci[óo]n\b/i,
+  /\bprefiero no (?:darte|decirte|inventar)/i,
+  /\bno (?:puedo|podr[íi]a) confirmarte?\b/i,
+  /\bno (?:me )?aparece (?:ese|esa|el|la)\b/i,
+  /\bno (?:viene|est[áa]) (?:cargad[oa]|en mi informaci[óo]n)\b/i,
+];
+
+/* Frases que SUENAN a ignorancia y no lo son. Van primero porque el costo de
+   confundirlas es real: «no tengo lugar el jueves» es una respuesta completa
+   y útil, y contarla como un hueco del negocio ensuciaría la única lista que
+   de verdad le dice al dueño qué le falta cargar. */
+const SÍ_SABE = [
+  /\bno tengo (?:lugar|cupo|espacio|disponibilidad|citas? disponibles?)/i,
+  /\bno (?:tenemos|hay) (?:ese|esa|ese servicio|disponibilidad)\b/i,
+  /\bno atendemos\b/i,
+  /\bno manejamos\b/i,
+];
+
+export function admiteNoSaber(texto) {
+  const t = String(texto || '');
+  if (!t.trim()) return false;
+  if (SÍ_SABE.some(r => r.test(t))) return false;
+  return NO_SABE.some(r => r.test(t));
+}
+
 export function respuestaSinDato(perfil, inventadas) {
   const tipos = new Set(inventadas.map(i => i.tipo));
   let que = 'ese dato';
