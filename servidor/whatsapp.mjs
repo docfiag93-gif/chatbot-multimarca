@@ -66,8 +66,22 @@ async function responderPorWhatsapp({ phoneId, para, texto }) {
     }),
   });
   if (!r.ok) {
-    // El cuerpo del error de Meta puede traer el token: no se propaga.
-    return { ok: false, razon: 'meta_' + r.status };
+    /* Se rescata el CÓDIGO numérico de Meta, que es lo que de verdad dice qué
+       pasó: 131030 es «el destinatario no está en la lista permitida», 131026
+       es «no se pudo entregar», 190 es «token vencido». Sin él, un 400 pelado
+       obliga a adivinar entre cinco causas distintas.
+
+       Solo el número y el subcódigo. NUNCA el cuerpo completo ni el mensaje
+       de Meta: ahí puede venir de vuelta el número de la persona, y este
+       registro lo lee el superadmin de la plataforma, que no es el dueño del
+       consultorio. */
+    let codigo = null, sub = null;
+    try {
+      const e = (await r.json())?.error;
+      codigo = Number(e?.code) || null;
+      sub = Number(e?.error_subcode) || null;
+    } catch (err) { /* sin cuerpo legible: queda el status */ }
+    return { ok: false, razon: 'meta_' + r.status, codigo, sub };
   }
   return { ok: true };
 }
@@ -114,7 +128,14 @@ function leerEntrante(cuerpo) {
 
   return {
     phoneId: v?.metadata?.phone_number_id,
-    de: m.from,
+    /* Se contesta al `wa_id` de contactos, NO al `from` del mensaje.
+       Casi siempre son idénticos, pero en México no: WhatsApp arrastra un
+       «1» extra después del 52 —`5219616552222` en vez de `529616552222`—
+       por razones históricas del numeración mexicana. Meta acepta el mensaje
+       entrante con ese formato y RECHAZA el envío de vuelta.
+       `wa_id` es el identificador canónico y es el que Meta documenta para
+       responder. El `from` se queda de respaldo por si algún día falta. */
+    de: v?.contacts?.[0]?.wa_id || m.from,
     texto: texto || '',
     tipo: m.type,
     nombre: v?.contacts?.[0]?.profile?.name || '',
@@ -305,6 +326,19 @@ export async function manejar(req, context = {}) {
   const salioAsi = await enviar;
 
   if (salioAsi && salioAsi.ok === false) {
+    /* Los códigos de Meta dicen la verdad; el status HTTP solo dice «400».
+       Traducidos a lo que hay que HACER, no a lo que pasó. */
+    const POR_CODIGO = {
+      131030: 'El número de quien escribió NO está en la lista de destinatarios de prueba, en WhatsApp → Configuración de la API → «Para».',
+      131026: 'Meta no pudo entregar el mensaje. Suele ser un número mal formado o una cuenta sin WhatsApp.',
+      131047: 'Pasaron más de 24 horas desde el último mensaje de esa persona: fuera de esa ventana solo se puede escribir con una plantilla aprobada.',
+      131051: 'Ese tipo de mensaje no está permitido para este número.',
+      190:    'El token de acceso venció o se regeneró. Genera uno nuevo en Meta y actualízalo en Cloudflare.',
+      100:    'Meta dice que un dato de la petición es inválido. Lo más común: el formato del número de destino.',
+      368:    'La cuenta está restringida temporalmente por políticas de Meta.',
+      80007:  'Demasiados mensajes seguidos: Meta está frenando el envío.',
+    };
+
     const QUE_SIGNIFICA = {
       sin_token: 'WHATSAPP_TOKEN no está puesta en el servidor.',
       meta_401:  'Meta rechazó el token: está vencido o se regeneró y no se actualizó en Cloudflare. Los temporales duran 24 horas.',
@@ -320,7 +354,10 @@ export async function manejar(req, context = {}) {
         accion: 'whatsapp.no_se_pudo_responder',
         detalle: {
           razon: salioAsi.razon,
-          nota: QUE_SIGNIFICA[salioAsi.razon]
+          codigo_meta: salioAsi.codigo || null,
+          subcodigo: salioAsi.sub || null,
+          nota: POR_CODIGO[salioAsi.codigo]
+                || QUE_SIGNIFICA[salioAsi.razon]
                 || 'Meta rechazó el envío con ' + salioAsi.razon + '.',
           cuando: new Date().toISOString(),
         },
