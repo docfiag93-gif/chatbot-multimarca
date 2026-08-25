@@ -341,6 +341,15 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
 .pasos button[data-listo] .n{background:var(--ok);color:#fff}
 
+/* El selector de giro y la hora de la conversación. La hora es la mitad del
+   argumento: un mensaje a las 11:47 p.m. dice solo, sin texto de apoyo, por
+   qué hace falta algo que conteste cuando no hay nadie. */
+.cambiagiro{display:flex;gap:5px;padding:10px 12px 0}
+.cambiagiro button{background:none;border:0;padding:5px 10px;border-radius:99px;
+  font-size:12px;font-weight:600;color:var(--tenue);cursor:pointer;font-family:inherit}
+.cambiagiro button[data-on]{background:var(--acento-suave);color:var(--acento)}
+.muestra .barra .hora{font-size:12px;font-weight:600;color:var(--tenue);flex:none}
+
 /* El recibo del turno cubierto. Verde y con la cifra grande a la izquierda:
    es la única tarjeta del tablero que trae buenas noticias, y en una pantalla
    hecha de pendientes eso merece verse distinto. */
@@ -582,8 +591,12 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
   box-shadow:var(--sombra);overflow:hidden}
 .muestra .barra{display:flex;align-items:center;gap:10px;padding:13px 16px;
   border-bottom:1px solid var(--linea-sutil);background:var(--hundido)}
-.muestra .cara{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
-  font-size:15px;background:#7c2d12;color:#fff;flex:none}
+/* El color del avatar venía FIJO en el marrón del café, así que el
+   consultorio y el taller salían con el color de una cafetería. Ahora lo
+   pone cada ejemplo, y el emoji se ve: a 15px sobre un fondo oscuro parecía
+   una mancha. */
+.muestra .cara{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+  font-size:18px;line-height:1;background:var(--tenue);color:#fff;flex:none}
 .muestra .quien{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
 .muestra .estado{font-size:11.5px;color:var(--ok);display:flex;align-items:center;gap:5px}
 .muestra .estado::before{content:'';width:6px;height:6px;border-radius:50%;
@@ -899,27 +912,25 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
       </div>
 
       <!-- Muestra de una conversación real: el producto es la respuesta. -->
+      <!-- El lema habla de las once de la noche y la demostración enseñaba
+           una cafetería preguntando por café: dos historias distintas en la
+           misma pantalla. Ahora la conversación LLEVA LA HORA, y arranca con
+           el consultorio, que es a quien se le está vendiendo.
+
+           Se puede cambiar de giro porque el producto sirve para cualquiera,
+           y decirlo con un botón convence más que decirlo con una frase. -->
       <div class="muestra" aria-label="Ejemplo de conversación">
+        <div class="cambiagiro" id="cambiagiro" role="tablist"></div>
         <div class="barra">
-          <div class="cara" aria-hidden="true">☕</div>
+          <div class="cara" id="mu-cara" aria-hidden="true">🩺</div>
           <div style="flex:1">
-            <div class="quien">Café de ejemplo</div>
+            <div class="quien" id="mu-quien">Consultorio de ejemplo</div>
             <div class="estado">en línea</div>
           </div>
+          <div class="hora" id="mu-hora">11:47 p.m.</div>
         </div>
-        <div class="charla">
-          <div class="globo yo">¿Cuánto cuesta la bolsa de 250 g?</div>
-          <div class="globo el">Cuesta <b>$180</b>. Es de tueste medio, dulce y sin acidez
-            fuerte. ¿La prefieres en grano o molida?</div>
-          <span class="sello">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M20 6L9 17l-5-5"/></svg>
-            precio verificado contra el catálogo
-          </span>
-          <div class="globo yo">¿Y a qué hora abren el domingo?</div>
-          <div class="tecleo" aria-hidden="true"><i></i><i></i><i></i></div>
-        </div>
+        <div class="charla" id="mu-charla"></div>
+      </div>
       </div>
     </div>
 
@@ -4228,10 +4239,76 @@ function pintarTurno(horarios) {
   if (nota) nota.classList.toggle('oculto', !!suyos);
 }
 
+/* ── La conversación de la portada ────────────────────────────────────
+   Tres giros, con la hora a la vista. La primera es la del médico porque
+   es a quien se le está vendiendo; las otras dos están para que «cualquier
+   giro» no sea una frase, sino un botón que se puede apretar.
+
+   Las tres terminan con el bot escribiendo: lo que se está enseñando no es
+   una respuesta, es que HAY alguien del otro lado a esa hora. */
+const MUESTRAS = [
+  { id: 'consultorio', rot: 'Consultorio', cara: '🩺', color: '#0f766e', quien: 'Consultorio de ejemplo',
+    hora: '11:47 p.m.',
+    turnos: [
+      { de: 'yo', txt: 'Buenas noches, ¿cuánto sale la consulta de primera vez?' },
+      { de: 'el', txt: 'Primera vez son <b>$800</b> e incluye la valoración completa. ' +
+                       '¿Te aparto un lugar para esta semana?' },
+      { sello: 'precio verificado contra lo que cargó el consultorio' },
+      { de: 'yo', txt: '¿Tienen algo el jueves por la tarde?' },
+    ] },
+  { id: 'cafe', rot: 'Cafetería', cara: '☕', color: '#7c2d12', quien: 'Café de ejemplo',
+    hora: '10:12 p.m.',
+    turnos: [
+      { de: 'yo', txt: '¿Cuánto cuesta la bolsa de 250 g?' },
+      { de: 'el', txt: 'Cuesta <b>$180</b>. Es de tueste medio, dulce y sin acidez fuerte. ' +
+                       '¿La prefieres en grano o molida?' },
+      { sello: 'precio verificado contra el catálogo' },
+      { de: 'yo', txt: '¿Y a qué hora abren el domingo?' },
+    ] },
+  { id: 'taller', rot: 'Taller', cara: '🔧', color: '#334155', quien: 'Taller de ejemplo',
+    hora: '6:05 a.m.',
+    turnos: [
+      { de: 'yo', txt: 'Se me quedó el carro. ¿A qué hora abren?' },
+      { de: 'el', txt: 'Abrimos a las <b>8:00</b>. Si me dejas tu teléfono, en cuanto ' +
+                       'llegue el jefe de taller te marca.' },
+      { sello: 'horario verificado contra lo que cargó el taller' },
+      { de: 'yo', txt: 'Va, es el 961...' },
+    ] },
+];
+
+let muestraActiva = 0;
+
+function pintarMuestra() {
+  const m = MUESTRAS[muestraActiva];
+  if (!m || !$('#mu-charla')) return;
+
+  $('#cambiagiro').innerHTML = MUESTRAS.map((x, i) =>
+    `<button role="tab" data-i="${i}" ${i === muestraActiva ? 'data-on' : ''}>${esc(x.rot)}</button>`
+  ).join('');
+  $$('#cambiagiro button').forEach(b => b.addEventListener('click', () => {
+    muestraActiva = +b.dataset.i; pintarMuestra();
+  }));
+
+  $('#mu-cara').textContent  = m.cara;
+  $('#mu-cara').style.background = m.color;
+  $('#mu-quien').textContent = m.quien;
+  $('#mu-hora').textContent  = m.hora;
+
+  const paloma = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+      aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>`;
+
+  $('#mu-charla').innerHTML = m.turnos.map(t => t.sello
+    ? `<span class="sello">${paloma}${esc(t.sello)}</span>`
+    : `<div class="globo ${t.de}">${t.txt}</div>`).join('') +
+    '<div class="tecleo" aria-hidden="true"><i></i><i></i><i></i></div>';
+}
+
 function modoPortada() {
   document.body.classList.add('sin-cajon');
   cajon(false);
   pintarTurno(null);
+  pintarMuestra();
   $('#pestanas').classList.add('oculto');
   $('#banda-acceso').classList.add('oculto');
   SECCIONES_CONSOLA.forEach(v => $('#v-'+v)?.classList.add('oculto'));
