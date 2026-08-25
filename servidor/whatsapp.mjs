@@ -24,7 +24,7 @@ import { construirPrompt, decidirSinIA } from './nucleo/cerebro.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
 import { revisarAnclaje, pulir, respuestaSinDato } from './nucleo/anclaje.mjs';
 import { explicarFallo } from './nucleo/diagnostico.mjs';
-import { empresaPorWhatsapp, guardarConversacion, avisar } from './nucleo/datos.mjs';
+import { empresaPorWhatsapp, guardarConversacion, avisar, servicio } from './nucleo/datos.mjs';
 
 const GRAFO = 'https://graph.facebook.com/v21.0';
 
@@ -183,7 +183,41 @@ export async function manejar(req, context = {}) {
     if (modo === 'subscribe' && esperado && testigo === esperado) {
       return new Response(reto || '', { status: 200, headers: { 'content-type': 'text/plain' } });
     }
-    // Sin decir por qué: a quien no es Meta no se le explica qué le faltó.
+
+    /* Al de afuera se le sigue contestando un «no» pelado —a quien no es Meta
+       no se le explica qué le faltó— PERO el dato no se tira.
+
+       Sin esto, el dueño ve en Meta «no se pudo validar la URL» y no tiene
+       forma de saber si escribió mal la palabra secreta o si la variable ni
+       siquiera existe en el servidor. Son dos problemas distintos, en dos
+       lugares distintos, y se ven exactamente igual. Es el mismo silencio que
+       ya escondió la bitácora vacía y los avisos que no salían.
+
+       Queda en la bitácora, que el superadmin ya mira. Nunca se guarda el
+       valor del testigo: solo si coincidió o no. */
+    const anotar = (async () => {
+      const sb = servicio();
+      if (!sb) return;
+      await sb.bitacora({
+        actor: null, empresa_id: null,
+        accion: 'whatsapp.verificacion_rechazada',
+        detalle: {
+          motivo: !esperado ? 'sin_variable' : (modo !== 'subscribe' ? 'modo_raro' : 'no_coincide'),
+          nota: !esperado
+            ? 'WHATSAPP_VERIFY_TOKEN no está puesta en el servidor. Ponla en las variables del proyecto y vuelve a desplegar; después reintenta desde Meta.'
+            : (modo !== 'subscribe'
+               ? 'Llegó una llamada que no era el apretón de manos de Meta.'
+               : 'La palabra secreta que mandó Meta NO coincide con WHATSAPP_VERIFY_TOKEN. Cópiala igual en los dos lados.'),
+          cuando: new Date().toISOString(),
+        },
+      });
+    })().catch(() => {});
+
+    // Se contesta YA. Meta tiene poca paciencia con el apretón de manos, y
+    // esperar a que se escriba la nota solo lograría que además del rechazo
+    // hubiera un tiempo agotado.
+    if (context.waitUntil) context.waitUntil(anotar); else await anotar;
+
     return new Response('no', { status: 403 });
   }
 

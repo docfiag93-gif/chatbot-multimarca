@@ -42,6 +42,21 @@ export function revisarEntorno(leerEntorno) {
   const cifrado = hay('CHATBOT_CLAVE');
   const correo  = hay('RESEND_API_KEY');
 
+  /* WhatsApp necesita TRES variables y cada una hace algo distinto:
+       · WHATSAPP_VERIFY_TOKEN — la palabra secreta del apretón de manos.
+         Sin ella, Meta no puede dar de alta el webhook: le contestamos 403.
+       · WHATSAPP_TOKEN        — con qué se CONTESTA. Sin ella los mensajes
+         entran y nadie puede responder.
+       · WHATSAPP_APP_SECRET   — con qué se comprueba que quien llama es Meta
+         de verdad. Sin ella, cualquiera con la URL puede escribirle al bot.
+     Se miran por separado a propósito: «WhatsApp no sirve» no dice dónde
+     buscar, y estas tres se ponen en lugares distintos del panel de Meta. */
+  const wsVerifica = hay('WHATSAPP_VERIFY_TOKEN');
+  const wsResponde = hay('WHATSAPP_TOKEN');
+  const wsFirma    = hay('WHATSAPP_APP_SECRET');
+  const wsPuestas  = [wsVerifica, wsResponde, wsFirma].filter(Boolean).length;
+  const whatsapp   = wsPuestas === 3;
+
   const problemas = [];
 
   if (!conProveedor) {
@@ -101,11 +116,47 @@ export function revisarEntorno(leerEntorno) {
     });
   }
 
+  /* WhatsApp es OPCIONAL: la mayoría de los negocios solo usa el widget de
+     su sitio, y a esos no hay que darles lata. Por eso NO se avisa cuando
+     está sin configurar del todo.
+
+     Lo que sí se avisa es el estado de EN MEDIO, que es el peligroso: con
+     una o dos variables puestas, Meta cree que hay integración, llama al
+     webhook, y falla de un modo que desde afuera parece que el bot está
+     roto. Nadie configura dos de tres a propósito — es alguien a medio
+     camino que se distrajo. */
+  if (wsPuestas > 0 && wsPuestas < 3) {
+    const faltan = [
+      !wsVerifica && 'WHATSAPP_VERIFY_TOKEN',
+      !wsResponde && 'WHATSAPP_TOKEN',
+      !wsFirma    && 'WHATSAPP_APP_SECRET',
+    ].filter(Boolean);
+
+    const queSePierde = {
+      WHATSAPP_VERIFY_TOKEN: 'Meta no va a poder dar de alta el webhook: le contestamos que no.',
+      WHATSAPP_TOKEN:        'Los mensajes entran pero el bot no puede contestarlos.',
+      WHATSAPP_APP_SECRET:   'No se comprueba que quien llama sea Meta: cualquiera con la URL puede escribirle al bot.',
+    };
+
+    problemas.push({
+      gravedad: faltan.includes('WHATSAPP_APP_SECRET') && faltan.length === 1 ? 'critico' : 'aviso',
+      clave: 'whatsapp_a_medias',
+      titulo: 'WhatsApp está configurado a medias',
+      detalle: faltan.map(v => `Falta ${v}. ${queSePierde[v]}`).join(' '),
+      arreglo: 'Agrega ' + faltan.join(', ') + ' en las variables del proyecto y vuelve a desplegar. ' +
+               'Las tres salen del panel de tu app en Meta.',
+      variables: faltan,
+    });
+  }
+
   return {
     listo: !problemas.some(p => p.gravedad === 'critico'),
     proveedores,
     orden: leerEntorno('BOT_ORDEN') || ORDEN_POR_OMISION,
-    capacidades: { base, panel, cifrado, correo },
+    capacidades: { base, panel, cifrado, correo, whatsapp },
+    // Por separado, para que el panel pueda decir cuál falta en vez de
+    // «WhatsApp no está listo».
+    whatsapp: { verifica: wsVerifica, responde: wsResponde, firma: wsFirma },
     problemas,
   };
 }

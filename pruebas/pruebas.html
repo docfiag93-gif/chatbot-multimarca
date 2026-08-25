@@ -1599,6 +1599,59 @@ await suite('El camino de ESCRITURA · que lo escrito llegue a la base', async (
   }
 });
 
+suite('WhatsApp · el estado de en medio es el peligroso', () => {
+  const base = { SUPABASE_URL: 'x', SUPABASE_SERVICE_KEY: 'x', SUPABASE_ANON_KEY: 'x',
+                 CHATBOT_CLAVE: 'x', RESEND_API_KEY: 'x', GEMINI_API_KEY: 'x' };
+  const con = extra => { const e = { ...base, ...extra }; return revisarEntorno(n => e[n]); };
+  const tieneWa = d => d.problemas.some(p => p.clave === 'whatsapp_a_medias');
+
+  /* WhatsApp es OPCIONAL. La mayoría de los negocios solo usa el widget de su
+     sitio, y llenarles el panel de avisos sobre algo que no piensan usar es
+     la forma más rápida de que dejen de leer los avisos. */
+  ok('sin nada de WhatsApp NO molesta', !tieneWa(con({})));
+
+  ok('con las tres puestas tampoco', !tieneWa(con({
+    WHATSAPP_VERIFY_TOKEN: 'a', WHATSAPP_TOKEN: 'b', WHATSAPP_APP_SECRET: 'c' })));
+
+  ok('y entonces la capacidad queda encendida',
+     con({ WHATSAPP_VERIFY_TOKEN:'a', WHATSAPP_TOKEN:'b', WHATSAPP_APP_SECRET:'c' })
+       .capacidades.whatsapp === true);
+
+  // Lo que sí importa: una o dos de tres. Nadie configura dos a propósito.
+  ok('con UNA sola, avisa', tieneWa(con({ WHATSAPP_TOKEN: 'b' })));
+  ok('con DOS, avisa',      tieneWa(con({ WHATSAPP_TOKEN: 'b', WHATSAPP_VERIFY_TOKEN: 'a' })));
+
+  // Y el aviso tiene que decir CUÁL falta: «WhatsApp no sirve» no dice dónde
+  // buscar, y las tres se ponen en lugares distintos del panel de Meta.
+  const dos = con({ WHATSAPP_TOKEN: 'b', WHATSAPP_VERIFY_TOKEN: 'a' });
+  const aviso = dos.problemas.find(p => p.clave === 'whatsapp_a_medias');
+  ok('nombra la que falta y solo esa',
+     aviso.variables.length === 1 && aviso.variables[0] === 'WHATSAPP_APP_SECRET',
+     aviso.variables.join(','));
+
+  // Faltar SOLO la firma es distinto de faltar las otras: el bot funciona,
+  // pero cualquiera con la URL puede escribirle. Eso no es un aviso.
+  ok('faltar solo la firma es CRÍTICO, no un aviso',
+     aviso.gravedad === 'critico', aviso.gravedad);
+
+  const soloVerify = con({ WHATSAPP_VERIFY_TOKEN: 'a' });
+  ok('faltar las de funcionamiento es aviso, no crítico',
+     soloVerify.problemas.find(p => p.clave === 'whatsapp_a_medias').gravedad === 'aviso');
+
+  // Que el detalle sirva para actuar, no solo para preocuparse.
+  ok('explica qué se pierde con cada una',
+     /cualquiera con la URL/i.test(aviso.detalle), aviso.detalle);
+
+  ok('el arreglo dice de dónde salen',
+     /panel de tu app en Meta/i.test(aviso.arreglo), aviso.arreglo);
+
+  // Las tres por separado, para que el panel pueda señalar la que falta.
+  const p = con({ WHATSAPP_TOKEN: 'b' }).whatsapp;
+  ok('reporta las tres por separado',
+     p.responde === true && p.verifica === false && p.firma === false,
+     JSON.stringify(p));
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);
