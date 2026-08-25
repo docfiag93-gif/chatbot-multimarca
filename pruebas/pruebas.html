@@ -43,7 +43,7 @@ import {
 } from '../servidor/nucleo/proveedores.mjs';
 import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
-import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agenda.mjs';
+import { huecosLibres, tresOpciones, cualEligio, periodosAOcupacion } from '../servidor/nucleo/agenda.mjs';
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
 import { aQuienSeLeContesta } from '../servidor/whatsapp.mjs';
@@ -1947,6 +1947,108 @@ suite('Qué te preguntan más', () => {
                        {texto:'cuanto cuesta un examen'}])[0].pregunta
        === 'cuanto cuesta un examen',
      'nunca se muestra el texto recortado');
+});
+
+suite('Tu calendario manda · el gym, la guardia y la clase', () => {
+  // Jueves 27 de agosto de 2026. Consultorio de 15:00 a 21:00, citas de 30.
+  const jueves = new Date(2026, 7, 27, 9, 0);
+  const base = {
+    horarios: { jueves: { cerrado: false, abre: '15:00', cierra: '21:00' } },
+    duracion: 30, dias: 1, desde: jueves, maximo: 40,
+  };
+  const horas = r => r.map(h => h.hora);
+
+  ok('sin calendario, ofrece toda la tarde',
+     horas(huecosLibres(base)).join(' ') ===
+     '15:00 15:30 16:00 16:30 17:00 17:30 18:00 18:30 19:00 19:30 20:00 20:30',
+     horas(huecosLibres(base)).join(' '));
+
+  /* EL CASO DE FERNANDO, tal como lo pidió: gym a las 16:00.
+     Un gimnasio de 16:00 a 17:30 tiene que tumbar 16:00, 16:30 y 17:00 —
+     no solo la hora en que empieza. */
+  const conGym = huecosLibres({ ...base,
+    bloqueados: [{ dia: '2026-08-27', desde: '16:00', hasta: '17:30' }] });
+  ok('el gym de las cuatro tumba las tres medias horas que ocupa',
+     !horas(conGym).some(h => ['16:00','16:30','17:00'].includes(h)) &&
+     horas(conGym).includes('15:30') && horas(conGym).includes('17:30'),
+     horas(conGym).join(' '));
+
+  /* Lo que un bloqueo por hora de inicio NO atraparía: algo que empieza a
+     media rejilla. Una clase de 18:15 a 19:05 no empieza en ningún hueco y
+     aun así estropea los dos que toca. */
+  const conClase = huecosLibres({ ...base,
+    bloqueados: [{ dia: '2026-08-27', desde: '18:15', hasta: '19:05' }] });
+  ok('una clase a media hora rota tumba los huecos que ENCIMA',
+     !horas(conClase).some(h => ['18:00','18:30','19:00'].includes(h)) &&
+     horas(conClase).includes('17:30') && horas(conClase).includes('19:30'),
+     horas(conClase).join(' '));
+
+  ok('lo que NO se encima sigue ofreciéndose',
+     huecosLibres({ ...base, bloqueados: [{ dia:'2026-08-27', desde:'09:00', hasta:'11:00' }] })
+       .length === 12,
+     'un bloque fuera del horario de consulta no debe quitar nada');
+
+  ok('el calendario se suma a las citas ya apartadas, no las reemplaza',
+     !horas(huecosLibres({ ...base,
+       ocupados:   [{ dia: '2026-08-27', hora: '15:00' }],
+       bloqueados: [{ dia: '2026-08-27', desde: '20:00', hasta: '21:00' }],
+     })).some(h => ['15:00','20:00','20:30'].includes(h)));
+
+  ok('un bloque al revés o incompleto se ignora en vez de tumbar la agenda',
+     huecosLibres({ ...base, bloqueados: [
+        { dia:'2026-08-27', desde:'18:00', hasta:'17:00' },
+        { dia:'2026-08-27', desde:'x', hasta:'y' },
+        { hasta:'19:00' }, null,
+     ] }).length === 12);
+});
+
+suite('De la hora de Google a la hora de tu consultorio', () => {
+  const MX = 'America/Mexico_City';
+
+  /* Google contesta en UTC. Tuxtla va seis horas atrás. Sin traducir, un gym
+     de las cuatro de la tarde bloquearía las diez de la noche — y el bot
+     ofrecería justo la hora del gimnasio. */
+  const gym = periodosAOcupacion(
+    [{ start: '2026-08-27T22:00:00Z', end: '2026-08-27T23:30:00Z' }], MX);
+  ok('las 22:00 UTC son las 16:00 en Tuxtla',
+     gym[0]?.dia === '2026-08-27' && gym[0]?.desde === '16:00' && gym[0]?.hasta === '17:30',
+     JSON.stringify(gym));
+
+  /* Una guardia de 20:00 a 08:00 cruza la medianoche: ocupa el final de un
+     día y el principio del siguiente. Guardarla como un solo bloque dejaría
+     libre toda la madrugada del segundo día. */
+  const guardia = periodosAOcupacion(
+    [{ start: '2026-08-28T02:00:00Z', end: '2026-08-28T14:00:00Z' }], MX);
+  ok('una guardia que cruza la medianoche se parte en dos días',
+     guardia.length === 2 &&
+     guardia[0].dia === '2026-08-27' && guardia[0].desde === '20:00' && guardia[0].hasta === '24:00' &&
+     guardia[1].dia === '2026-08-28' && guardia[1].desde === '00:00' && guardia[1].hasta === '08:00',
+     JSON.stringify(guardia));
+
+  ok('un periodo de tres días se parte en tres',
+     periodosAOcupacion([{ start:'2026-08-27T18:00:00Z', end:'2026-08-30T18:00:00Z' }], MX).length === 4);
+
+  ok('una zona horaria inventada no tumba la agenda',
+     periodosAOcupacion([{ start:'2026-08-27T22:00:00Z', end:'2026-08-27T23:00:00Z' }],
+                        'Marte/Olimpo').length === 0);
+
+  ok('basura no truena',
+     periodosAOcupacion(null).length === 0 &&
+     periodosAOcupacion([null, {}, {start:'x', end:'y'}]).length === 0);
+
+  ok('un periodo de duración cero se ignora',
+     periodosAOcupacion([{ start:'2026-08-27T22:00:00Z', end:'2026-08-27T22:00:00Z' }], MX).length === 0);
+
+  // Y de punta a punta: lo que Google dice → lo que el bot deja de ofrecer.
+  const libres = huecosLibres({
+    horarios: { jueves: { cerrado:false, abre:'15:00', cierra:'21:00' } },
+    duracion: 30, dias: 1, desde: new Date(2026, 7, 27, 9, 0),
+    bloqueados: periodosAOcupacion(
+      [{ start:'2026-08-27T22:00:00Z', end:'2026-08-27T23:30:00Z' }], MX),
+  }).map(h => h.hora);
+  ok('de punta a punta: Google dice ocupado y el bot no lo ofrece',
+     !libres.some(h => ['16:00','16:30','17:00'].includes(h)) && libres.includes('17:30'),
+     libres.join(' '));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */
