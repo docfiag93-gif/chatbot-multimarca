@@ -20,6 +20,35 @@ y no caduca. Mientras no esté, el bot se queda mudo cada tarde sin avisar.
 Precios, horarios y tratamientos siguen siendo ficticios. Negocios → Editar →
 pasos 4 y 5.
 
+### Para el jueves · seguridad
+
+Fernando lo pidió así: «un cifrado extremo, que sea inhackeable, para no tener
+robo empresarial y de datos». La meta es la correcta; la palabra no.
+
+**Nada es inhackeable, y quien te venda eso te está mintiendo.** Lo que sí
+existe es hacer que robar no valga la pena y que, si pasa, se note. Y de eso
+ya hay bastante puesto:
+
+- Cada negocio tiene **su propia llave** derivada. Robar la base sin la llave
+  maestra no da nada legible.
+- El aislamiento entre consultorios está **probado con dos negocios reales**,
+  corriendo como usuario normal y no como dueño de las tablas — que es donde
+  una prueba mal hecha aprueba en falso.
+- Los secretos **nunca** entran a los registros, ni siquiera cuando Meta
+  devuelve un error que los trae dentro.
+
+Lo que falta no es un algoritmo más fuerte. Es lo aburrido:
+
+1. **Rotación de la llave maestra** — hoy si se filtra, no hay forma de
+   cambiarla sin perder lo cifrado.
+2. **Segundo factor** para entrar al panel. Hoy una contraseña robada da
+   acceso completo, y es el camino más barato para un atacante: nadie rompe
+   AES-256, todos prueban contraseñas.
+3. **Qué pasa el día que pase.** No hay plan escrito de cómo cortar accesos,
+   avisar a los afectados y cumplir el plazo que marca la ley.
+
+El punto 2 es el que más te compra por lo que cuesta. Empezamos por ahí.
+
 ### Y una que NO te bloquea, para que no te agobie
 
 El **abogado** que revise el aviso de privacidad hace falta cuando empieces a
