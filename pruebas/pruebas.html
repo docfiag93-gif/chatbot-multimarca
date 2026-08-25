@@ -2107,9 +2107,43 @@ await suite('El token que se muere sin avisar', async () => {
        .estado === 'desconocido');
   ok('sin token no inventa nada',
      (await revisarToken({})).estado === 'desconocido');
-  ok('y «desconocido» no genera aviso',
-     queHacerConElToken({ estado: 'desconocido' }) === null &&
-     queHacerConElToken({ estado: 'vigente' }) === null);
+  ok('«vigente» no genera aviso', queHacerConElToken({ estado: 'vigente' }) === null);
+
+  /* ── EL HUECO QUE SE ENCONTRÓ EN PRODUCCIÓN ──
+     Sin `WHATSAPP_APP_ID`, el token se inspecciona a SÍ MISMO. Y un token
+     muerto no puede inspeccionar nada, ni a sí mismo: Meta contesta 400.
+
+     O sea que el aviso funcionaba mientras el token vivía —avisó con horas
+     de anticipación, hizo su trabajo— y enmudecía en el instante exacto en
+     que se moría. El peor momento posible para callarse. */
+  const rechazado = await revisarToken({ token: 'T', ahora: AHORA,
+    traer: async () => ({ ok: false, status: 400, json: async () => ({}) }) });
+  ok('un rechazo de Meta al auto-inspeccionarse se marca como sospechoso',
+     rechazado.estado === 'desconocido' && rechazado.sospechoso === true);
+
+  const avisoSospecha = queHacerConElToken(rechazado);
+  ok('y SÍ genera aviso, en vez de callarse', !!avisoSospecha);
+  ok('sin afirmar que venció, porque no se sabe',
+     !/ya venció|está vencido/.test(avisoSospecha.titulo) &&
+     /casi siempre/.test(avisoSospecha.detalle),
+     avisoSospecha.titulo);
+  ok('y dice cómo hacer que el aviso sea exacto la próxima vez',
+     /WHATSAPP_APP_ID/.test(avisoSospecha.arreglo));
+
+  /* Con el appId puesto la inspección es de verdad, así que un rechazo YA NO
+     es sospecha de token muerto: puede ser cualquier otra cosa. Ahí sí se
+     calla, porque inventar una causa sería peor que no decir nada. */
+  const conAppId = await revisarToken({ token: 'T', appId: '123', appSecret: 'S',
+    traer: async () => ({ ok: false, status: 400, json: async () => ({}) }) });
+  ok('con appId puesto, un rechazo NO se atribuye al token',
+     conAppId.sospechoso !== true && queHacerConElToken(conAppId) === null);
+
+  /* Y si el silencio es honesto —se cayó la red— se calla. Avisar ahí sería
+     mandar a alguien a rotar una credencial que servía. */
+  const sinRed = await revisarToken({ token: 'T',
+    traer: async () => { throw new Error('sin red'); } });
+  ok('si se cayó la red, se calla',
+     sinRed.sospechoso !== true && queHacerConElToken(sinRed) === null);
 
   // Lo que se le dice al dueño
   const aviso = queHacerConElToken({ estado: 'por_vencer', horas: 3.4 });
