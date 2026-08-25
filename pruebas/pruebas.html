@@ -47,7 +47,7 @@ import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agend
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
 import { aQuienSeLeContesta } from '../servidor/whatsapp.mjs';
-import { temaSugerido } from '../publico/cerebro/temas.mjs';
+import { temaSugerido, palabrasClave, parecido, agruparPreguntas } from '../publico/cerebro/temas.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
 import { CATEGORIAS_SUGERIDAS } from '../publico/cerebro/catalogos-ui.mjs';
@@ -1864,6 +1864,89 @@ suite('El dígito que México arrastra', () => {
 
   ok('limpia espacios y signos', aQuienSeLeContesta('+52 1 961 655 2222') === '529616552222');
   ok('vacío no truena', aQuienSeLeContesta('') === '' && aQuienSeLeContesta(null) === '');
+});
+
+suite('Qué te preguntan más', () => {
+  // Escritas como escribe la gente: con prisa, sin acentos, con faltas.
+  const reales = [
+    { texto: '¿cuánto cuesta la consulta?' },
+    { texto: 'cuanto cuestan las consultas' },
+    { texto: 'Buenas, cuánto cuesta una consulta?' },
+    { texto: '¿tienen estacionamiento?', sinDato: true },
+    { texto: 'hay estacionamiento ahi', sinDato: true },
+    { texto: 'hola' },
+    { texto: 'buenos días' },
+    { texto: '¿a qué hora abren?' },
+  ];
+  const g = agruparPreguntas(reales);
+
+  ok('junta la misma pregunta escrita de tres formas',
+     g.find(x => /consulta/.test(x.pregunta))?.veces === 3,
+     JSON.stringify(g.map(x => [x.pregunta, x.veces])));
+
+  ok('junta también sin acentos y con otro orden',
+     g.find(x => /estacionamiento/.test(x.pregunta))?.veces === 2);
+
+  /* Un «hola» suelto no es una pregunta. Si se contara, la lista de «lo que
+     más te preguntan» empezaría con saludos y nadie volvería a abrirla. */
+  ok('los saludos no ensucian la lista',
+     !g.some(x => /^hola|buenos d/i.test(x.pregunta)),
+     g.map(x => x.pregunta).join(' | '));
+
+  // Lo que ordena la lista no es la frecuencia: es la frecuencia de lo que
+  // NO sabemos contestar. Preguntar mucho algo que el bot ya responde bien
+  // no es una tarea pendiente.
+  ok('arriba va lo que preguntan y NO sabemos',
+     /estacionamiento/.test(g[0].pregunta),
+     'primero salió: ' + g[0].pregunta);
+
+  ok('cuenta cuántas veces se quedó sin respuesta',
+     g[0].sinRespuesta === 2, String(g[0].sinRespuesta));
+
+  ok('lo que pasa una sola vez no llena la lista',
+     !g.some(x => /hora abren/.test(x.pregunta)),
+     'una pregunta única todavía no es un patrón');
+
+  ok('propone la etiqueta del tema', !!g[0].tema && g[0].tema.length > 2, g[0].tema);
+
+  // Y lo que NO debe hacer, que es lo importante.
+  ok('NUNCA propone una respuesta',
+     !('respuesta' in g[0]) && !('sugerencia' in g[0]),
+     'un bot que se contesta solo repite sus errores con más seguridad');
+
+  // Casos que rompen
+  ok('lista vacía no truena', agruparPreguntas([]).length === 0);
+  ok('basura no truena', agruparPreguntas([null, '', {texto:'   '}, 5]).length === 0);
+
+  ok('dos preguntas DISTINTAS no se juntan',
+     agruparPreguntas([
+       {texto:'cuanto cuesta la consulta'}, {texto:'cuanto cuesta la consulta'},
+       {texto:'donde estan ubicados'},      {texto:'donde estan ubicados'},
+     ]).length === 2);
+
+  // El parecido en sí
+  ok('mide parecido', parecido(['precio','consulta'], ['precio','consulta']) === 1 &&
+                      parecido(['precio'], ['ubicacion']) === 0);
+  ok('el plural no separa',
+     palabrasClave('precios').join() === palabrasClave('precio').join());
+
+  ok('el verbo en plural tampoco',
+     palabrasClave('cuestan').join() === palabrasClave('cuesta').join(),
+     'cuesta vs cuestan es la misma pregunta escrita por dos personas');
+
+  /* Estos recortes se equivocan a veces —«examen» queda en «exame»— y no
+     importa: nunca se le muestran a nadie, solo sirven para comparar, y a
+     los dos lados se les aplica el mismo. Lo que hace falta es que sea
+     consistente, no correcto. */
+  ok('un recorte equivocado sigue siendo consistente',
+     palabrasClave('examen').join() === palabrasClave('examenes').join(),
+     'dos formas de la misma palabra tienen que caer juntas aunque el corte sea feo');
+
+  ok('lo que se le ENSEÑA al dueño es la pregunta original, sin recortar',
+     agruparPreguntas([{texto:'¿cuánto cuestan los exámenes?'},
+                       {texto:'cuanto cuesta un examen'}])[0].pregunta
+       === 'cuanto cuesta un examen',
+     'nunca se muestra el texto recortado');
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */
