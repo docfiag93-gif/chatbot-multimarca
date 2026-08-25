@@ -1403,6 +1403,15 @@ function olvidarSesion() {
   try { localStorage.removeItem(LLAVE_CONTEXTO); } catch (e) {}
 }
 
+/* Se enciende cuando HABÍA una sesión guardada y dejó de servir. No es un
+   detalle cosmético: sin esto, quien vuelve al día siguiente se encuentra la
+   pantalla de entrada otra vez y NADIE le dice por qué. Se siente como que
+   la aplicación lo olvidó o está rota —«otra vez me pide el enlace»— cuando
+   en realidad su sesión simplemente venció, que es lo normal y lo correcto.
+
+   Un cierre de sesión silencioso es indistinguible de una falla. */
+let sesionVencida = false;
+
 /** Canjea el pase por un acceso nuevo. Devuelve true si lo logró. */
 async function renovarSesion() {
   let pase = null;
@@ -1415,6 +1424,7 @@ async function renovarSesion() {
   } catch (e) {
     // El pase venció o se revocó: se tira, para no reintentar en cada carga.
     try { localStorage.removeItem(LLAVE_PASE); } catch (e2) {}
+    sesionVencida = true;
     return false;
   }
 }
@@ -2649,7 +2659,21 @@ async function arrancar() {
           listo = true;
         } catch (e2) { /* el pase tampoco sirvió */ }
       }
-      if (!listo) { olvidarSesion(); modoPortada(); }
+      if (!listo) { sesionVencida = true; olvidarSesion(); modoPortada(); }
+    }
+  }
+
+  /* Y se le dice. En la tarjeta de acceso, que es donde está mirando: acaba
+     de aterrizar ahí sin haberlo pedido. */
+  if (sesionVencida && !enLinea) {
+    const caja = $('#acceso-msg');
+    if (caja && !caja.innerHTML.trim()) {
+      caja.innerHTML = `<div class="aviso ojo"><b>Tu sesión venció.</b>
+        Es lo normal después de un rato sin usarla — no le pasó nada a tu cuenta.
+        Vuelve a entrar con tu contraseña.</div>`;
+      // Se abre el bloque de contraseña: es el camino que SÍ funciona sin
+      // depender de que un correo te devuelva.
+      $('#bloque-clave')?.classList.remove('oculto');
     }
   }
   await cargarNegocios();
