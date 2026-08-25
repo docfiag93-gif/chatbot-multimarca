@@ -341,6 +341,34 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
 .pasos button[data-listo] .n{background:var(--ok);color:#fff}
 
+/* La rejilla de 168 horas. Siete columnas —una por día— de veinticuatro
+   celdas. No lleva números ni ejes: lo que tiene que entenderse de un
+   vistazo, sin leer, es la proporción entre el bloque de horas en que estás
+   y el océano en que no. Un gráfico que hay que estudiar no convence a
+   nadie en cinco segundos. */
+.turno{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center;
+  padding:26px;border:1px solid var(--linea);border-radius:16px;
+  background:var(--panel);margin:26px 0}
+.turno-dicho h3{font-size:23px;margin:0 0 8px;letter-spacing:-.01em}
+.turno-dicho h3 b{color:var(--acento)}
+.turno-dicho p{margin:0 0 14px;color:var(--tenue);line-height:1.6;max-width:46ch}
+.turno-clave{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;font-weight:600}
+.turno-clave span{display:flex;align-items:center;gap:7px}
+.turno-clave i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.turno-clave .c-tu{background:var(--acento)}
+.turno-clave .c-bot{background:var(--linea)}
+.turno-rejilla{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:none}
+.turno-rejilla .col{display:flex;flex-direction:column;gap:6px;align-items:center}
+.turno-rejilla .dia{display:grid;grid-template-rows:repeat(24,1fr);gap:2px;width:100%}
+.turno-rejilla i{width:14px;height:5px;border-radius:2px;background:var(--linea);display:block}
+.turno-rejilla i[data-tu]{background:var(--acento)}
+.turno-rejilla .ini{font-size:11px;font-weight:700;color:var(--tenue);line-height:1}
+@media (max-width:760px){
+  .turno{grid-template-columns:1fr;gap:22px}
+  .turno-rejilla{justify-self:stretch;gap:6px}
+  .turno-rejilla i{width:100%;height:6px}
+}
+
 /* Las tres formas de compartir. Cada una con su botón a la derecha y su
    explicación al lado: un botón sin decir para qué sirve obliga a probarlo
    para saberlo, y probar cosas en una pantalla de administración da miedo. */
@@ -846,9 +874,13 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     <div class="heroe">
       <div>
         <span class="marbete"><span class="punto"></span>Responde en segundos, todo el día</span>
-        <h2 class="lema">Contesta por ti cuando<br>tú no puedes<em>.</em></h2>
-        <p class="entrada">Un asistente que responde con <b>tus</b> datos —tus precios, tus
-        horarios, tus reglas— y que cuando no sabe algo lo dice, en vez de inventarlo.</p>
+        <!-- El lema anterior decía «contesta por ti cuando tú no puedes»: el
+             mensaje correcto, dicho en abstracto. Quien compra esto no tiene
+             un problema abstracto — tiene uno con hora. -->
+        <h2 class="lema">A las once de la noche<br>alguien preguntó el precio<em>.</em></h2>
+        <p class="entrada">Y nadie contestó. A las ocho de la mañana ya se fue con otro.<br>
+        Un asistente que responde con <b>tus</b> datos —tus precios, tus horarios, tus
+        reglas— y que cuando no sabe algo lo dice, en vez de inventarlo.</p>
         <div class="acciones">
           <button class="btn" id="btn-ir-acceso">Entrar a mi panel</button>
           <button class="btn sec" id="btn-ver-demo">Ver un ejemplo</button>
@@ -878,6 +910,29 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
           <div class="tecleo" aria-hidden="true"><i></i><i></i><i></i></div>
         </div>
       </div>
+    </div>
+
+    <!-- ══ EL TURNO QUE NADIE CUBRE ══
+         Lo que convence a un médico no es una promesa: es la resta de su
+         propio horario. La semana tiene 168 horas y su consultorio abre unas
+         treinta y tantas. El resto, el teléfono suena en un cuarto vacío.
+
+         La rejilla se dibuja con `turnoSinCubrir`, la misma función que usa
+         la agenda — no con números escritos a mano aquí. Un número inventado
+         en un HTML es una promesa; uno calculado del dato real es un hecho. -->
+    <div class="turno">
+      <div class="turno-dicho">
+        <h3>La semana tiene <b>168 horas</b>.</h3>
+        <p id="turno-frase">Tu consultorio abre unas treinta y tantas. Las otras, alguien
+        pregunta y nadie contesta.</p>
+        <div class="turno-clave">
+          <span><i class="c-tu"></i> Estás tú</span>
+          <span><i class="c-bot"></i> Está solo el bot</span>
+        </div>
+        <p class="pista" id="turno-nota">Ejemplo: consultorio de lunes a viernes de 15:00 a
+        21:00 y sábado por la mañana. Al entrar, esta cuenta se hace con <b>tu</b> horario.</p>
+      </div>
+      <div class="turno-rejilla" id="turno-rejilla" aria-hidden="true"></div>
     </div>
 
     <div class="razones">
@@ -1493,6 +1548,7 @@ import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO, IDIOMAS,
 // prompts vive en el servidor y nunca baja al navegador.
 import { CATEGORIAS_SUGERIDAS, POLITICAS_UI, ACCIONES_UI } from './cerebro/catalogos-ui.mjs';
 import { temaSugerido } from './cerebro/temas.mjs';
+import { turnoSinCubrir, rejillaDeLaSemana } from './cerebro/horas.mjs';
 import { SEMILLAS } from './cerebro/semillas.mjs';
 
 const SB_URL  = 'https://gnhndbqbgvtoxhelikcy.supabase.co';
@@ -4098,9 +4154,49 @@ async function ajustarMetodosDeEntrada() {
    ────────────────────────────────────────────────────────────────────── */
 const SECCIONES_CONSOLA = ['negocios','alta','probar','agenda','charlas','solicitudes','soporte','herramientas','super'];
 
+/* Dibuja las 168 horas. Con `horarios` pinta las de ese negocio; sin ellos,
+   un consultorio de tarde como ejemplo — y la nota de abajo dice que es un
+   ejemplo, porque presentar un dato inventado como propio es mentir en la
+   primera pantalla. */
+function pintarTurno(horarios) {
+  const caja = $('#turno-rejilla');
+  if (!caja) return;
+
+  const suyos = horarios && Object.keys(horarios).length ? horarios : null;
+  const ejemplo = {};
+  for (const d of ['lunes','martes','miercoles','jueves','viernes'])
+    ejemplo[d] = { cerrado: false, abre: '15:00', cierra: '21:00' };
+  ejemplo.sabado = { cerrado: false, abre: '09:00', cierra: '13:00' };
+  ejemplo.domingo = { cerrado: true };
+
+  const usar = suyos || ejemplo;
+  const t = turnoSinCubrir(usar);
+  if (t.sinDatos) { caja.closest('.turno')?.classList.add('oculto'); return; }
+  caja.closest('.turno')?.classList.remove('oculto');
+
+  /* La inicial del día debajo de cada columna. Sin ella la rejilla se lee
+     como un gráfico abstracto y hay que explicarla; con ella se entiende
+     sola que son los siete días de una semana. */
+  const INICIAL = { lunes:'L', martes:'M', miercoles:'M', jueves:'J',
+                    viernes:'V', sabado:'S', domingo:'D' };
+  caja.innerHTML = rejillaDeLaSemana(usar).map(d =>
+    `<div class="col">
+       <div class="dia">${d.celdas.map(hay => `<i ${hay ? 'data-tu' : ''}></i>`).join('')}</div>
+       <span class="ini">${INICIAL[d.dia]}</span>
+     </div>`).join('');
+
+  $('#turno-frase').innerHTML = suyos
+    ? `Tu negocio abre <b>${t.abiertas}</b>. Las otras <b>${t.solo}</b>, tu bot es el único despierto.`
+    : `Un consultorio abre unas <b>${t.abiertas}</b>. Las otras <b>${t.solo}</b>, alguien pregunta y nadie contesta.`;
+
+  const nota = $('#turno-nota');
+  if (nota) nota.classList.toggle('oculto', !!suyos);
+}
+
 function modoPortada() {
   document.body.classList.add('sin-cajon');
   cajon(false);
+  pintarTurno(null);
   $('#pestanas').classList.add('oculto');
   $('#banda-acceso').classList.add('oculto');
   SECCIONES_CONSOLA.forEach(v => $('#v-'+v)?.classList.add('oculto'));

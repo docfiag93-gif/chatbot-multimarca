@@ -44,6 +44,7 @@ import {
 import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
 import { huecosLibres, tresOpciones, cualEligio, periodosAOcupacion } from '../servidor/nucleo/agenda.mjs';
+import { turnoSinCubrir, rejillaDeLaSemana } from '../publico/cerebro/horas.mjs';
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
 import { aQuienSeLeContesta } from '../servidor/whatsapp.mjs';
@@ -2181,6 +2182,61 @@ suite('La semilla clínica · lo que NO puede hacer', () => {
   const largas = c.conocimiento.filter(k => k.texto.split(/\s+/).length > 75);
   ok('ninguna entrada es un folleto', largas.length === 0,
      largas.map(k => k.tema).join(', '));
+});
+
+suite('El turno que nadie cubre', () => {
+  /* La semana tiene 168 horas. Este número es el argumento de venta del
+     producto, así que tiene que salir del dato real del negocio y no de una
+     frase escrita a mano en una página. Un número inventado en un HTML no se
+     puede probar; este sí. */
+  const lunesAViernes = {};
+  for (const d of ['lunes','martes','miercoles','jueves','viernes'])
+    lunesAViernes[d] = { cerrado: false, abre: '09:00', cierra: '17:00' };
+  for (const d of ['sabado','domingo']) lunesAViernes[d] = { cerrado: true };
+
+  const t = turnoSinCubrir(lunesAViernes);
+  ok('cinco días de ocho horas son 40', t.abiertas === 40, String(t.abiertas));
+  ok('y quedan 128 sin cubrir', t.solo === 128, String(t.solo));
+  ok('que es el 24% del tiempo', t.porciento === 24, String(t.porciento));
+
+  // El caso de Fernando: consultorio de tarde.
+  const tarde = {};
+  for (const d of ['lunes','martes','miercoles','jueves','viernes'])
+    tarde[d] = { cerrado: false, abre: '15:00', cierra: '21:00' };
+  tarde.sabado = { cerrado: false, abre: '09:00', cierra: '13:00' };
+  tarde.domingo = { cerrado: true };
+  const t2 = turnoSinCubrir(tarde);
+  ok('un consultorio de tarde abre 34 horas', t2.abiertas === 34, String(t2.abiertas));
+  ok('y su bot cubre las otras 134', t2.solo === 134, String(t2.solo));
+
+  /* Farmacia de guardia: 20:00 a 08:00 son DOCE horas cubiertas, aunque el
+     reloj dé la vuelta. Contarlas como negativo daría un número absurdo. */
+  const nocturno = { lunes: { cerrado: false, abre: '20:00', cierra: '08:00' } };
+  ok('un turno que cruza la medianoche cuenta entero',
+     turnoSinCubrir(nocturno).abiertas === 12, String(turnoSinCubrir(nocturno).abiertas));
+
+  /* Sin horarios cargados NO se dice «168 horas solo»: sería vender con un
+     dato que el negocio nunca dio. Se marca y la página decide qué enseñar. */
+  ok('sin horarios se marca en vez de inventar',
+     turnoSinCubrir({}).sinDatos === true && turnoSinCubrir().sinDatos === true);
+
+  ok('un día ilegible cuenta cero, no tumba la cuenta',
+     turnoSinCubrir({ ...lunesAViernes, martes: { cerrado:false, abre:'x', cierra:'y' } })
+       .abiertas === 32);
+
+  ok('un día con la misma hora de abrir y cerrar cuenta cero',
+     turnoSinCubrir({ lunes: { cerrado:false, abre:'09:00', cierra:'09:00' } }).abiertas === 0);
+
+  ok('abrir las 24 horas los 7 días no deja nada sin cubrir', (() => {
+     const siempre = {};
+     for (const d of ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'])
+       siempre[d] = { cerrado: false, abre: '00:00', cierra: '23:59' };
+     const x = turnoSinCubrir(siempre);
+     return x.solo < 1 && x.porciento >= 99;
+  })());
+
+  ok('desglosa por día para poder dibujarlo',
+     t.dias.length === 7 && t.dias[0].horas === 8 && t.dias[6].horas === 0);
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */
