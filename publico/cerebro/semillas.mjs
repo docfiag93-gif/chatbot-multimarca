@@ -192,6 +192,12 @@ export const SEMILLAS = {
       { tema: 'inbody composición corporal',
         texto: 'El InBody 120 mide de qué está hecho tu cuerpo: cuánto es músculo, cuánta grasa y cuánta agua. Se sube descalzo y toma menos de un minuto. Dice mucho más que la báscula: dos personas del mismo peso pueden tener composiciones muy distintas.' },
 
+      /* Qué es un aparato importa menos que para qué le sirve a quien
+         pregunta. «Mide impedancia» no vende nada; «vas a saber si lo que
+         bajaste fue grasa o músculo» sí, y además es cierto. */
+      { tema: 'para qué me sirve el inbody',
+        texto: 'Para saber si lo que bajaste fue grasa o músculo, que la báscula sola no distingue. Y para ponerle número a tus metas y ver si vas hacia allá: repitiéndolo cada cierto tiempo se compara contra ti mismo, no contra una tabla.' },
+
       { tema: 'preparación inbody',
         texto: 'Para que salga confiable: ven en ayuno de 3 a 4 horas, pasa al baño antes, no hagas ejercicio ese día antes del estudio, no te pongas crema en pies ni manos y quítate reloj y joyería. Si traes marcapasos o algún aparato implantado, avísanos antes.' },
 
@@ -203,6 +209,16 @@ export const SEMILLAS = {
 
       { tema: 'electrocardiograma',
         texto: 'El electrocardiograma registra la actividad eléctrica del corazón. Dura unos minutos, no duele y no da toques: solo se pegan unos parches. Ven con ropa fácil de quitar de la cintura para arriba y evita crema en el pecho ese día.' },
+
+      { tema: 'para qué me sirve el electrocardiograma',
+        texto: 'Es la revisión básica del ritmo del corazón: se ve si late parejo y si hay algo que valga la pena mirar con más calma. Se hace aquí mismo, en la consulta, sin mandarte a otro lado ni esperar días por el resultado.' },
+
+      /* Las formas de pago NO se ofrecen: se contestan si las preguntan.
+         Hay un límite abajo que lo fija. La razón que se le da a quien
+         pregunta es la neutral y verdadera: la terminal cobra comisión.
+         Las razones de cada negocio para preferir una u otra son suyas. */
+      { tema: 'formas de pago',
+        texto: 'Efectivo, transferencia o tarjeta. Si vas a pagar con tarjeta avísanos al llegar, para tener lista la terminal.' },
 
       /* ── LO QUE DICEN LAS GUÍAS, TRADUCIDO ── */
       { tema: 'diabetes cómo se diagnostica',
@@ -236,6 +252,26 @@ export const SEMILLAS = {
       { tema: 'qué estudios necesitan ayuno',
         texto: 'Necesitan ayuno de 8 a 12 horas la glucosa y el perfil de lípidos. El InBody, de 3 a 4 horas. La hemoglobina glucosilada, el electrocardiograma y el MAPA no necesitan ayuno. Agua sí puedes tomar. Si tomas medicamento en ayunas, pregúntanos antes de saltártelo.' },
 
+      /* ── LO QUE PREGUNTAN Y HAY QUE SABER CONTESTAR ──
+         El criterio, dicho por el médico: «si preguntan de GLP-1, no se
+         dice dosis, pero se dice QUÉ ES y CÓMO ACTÚA».
+
+         Esa línea separa informar de recetar, y es la correcta. Evadir la
+         pregunta no protege a nadie: quien pregunta ya vio el nombre en
+         redes y va a buscarlo en otro lado, donde nadie le va a decir que
+         eso se valora en consulta. */
+      { tema: 'glp1 medicamentos para bajar de peso',
+        texto: 'Son medicamentos que imitan una hormona que tu propio intestino libera al comer. Hacen que el estómago se vacíe más despacio y que el cerebro registre saciedad antes, así que comes menos sin estar peleando con el hambre. Cuál conviene, si conviene, y en qué dosis, eso se decide en consulta.' },
+
+      { tema: 'sirven los medicamentos para bajar de peso',
+        texto: 'Funcionan, y no son magia. Son una herramienta que acompaña a la alimentación y al movimiento, no los sustituye. También tienen efectos secundarios y no le convienen a todo el mundo. Por eso no se recetan por chat ni por recomendación de un conocido: se valoran.' },
+
+      { tema: 'servicios que ofrecemos',
+        texto: 'Consulta de valoración cardiometabólica, medición de composición corporal con InBody, monitoreo de presión de 24 horas (MAPA) y electrocardiograma. El seguimiento se arma según lo que salga en la primera consulta.' },
+
+      { tema: 'esto sustituye ir al médico',
+        texto: 'No. Aquí te explico qué es cada estudio, cómo prepararte y qué dicen las guías en general. Lo que significan TUS números y qué hacer con ellos es justo lo que se ve en consulta, porque lo mismo no quiere decir lo mismo en dos personas.' },
+
       { tema: 'cada cuánto revisarse',
         texto: 'Depende de cada persona y lo define tu médico en consulta. Como referencia general, quien ya tiene diabetes o presión alta controlada suele revisarse cada tres a seis meses; quien está en prediabetes, al menos una vez al año.' },
     ],
@@ -249,6 +285,9 @@ export const SEMILLAS = {
       'No des dietas ni planes de ejercicio personalizados por chat.',
       'Si te describen un síntoma que preocupa, no lo evalúes: manda a consulta o a urgencias según el caso.',
       'No prometas resultados ni tiempos de mejoría.',
+      /* No es una regla clínica, es de negocio, y por eso está aquí y no en
+         el núcleo: cada negocio decide qué ofrece sin que se lo pidan. */
+      'No menciones las formas de pago si no te preguntan por ellas. Si preguntan, contesta con naturalidad.',
     ],
 
     tono: 'Cercano y claro. Tuteas, frases cortas, sin tecnicismos. Cuando uses una palabra médica, explícala en la misma frase. Nunca alarmas: informas y ofreces la consulta.',

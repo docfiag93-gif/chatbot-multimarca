@@ -537,10 +537,17 @@ await suite('El núcleo no sabe de rubros', async () => {
 
   for (const archivo of NUCLEO) {
     const src = await (await fetch(rutaDe(archivo))).text();
-    // Se ignoran los comentarios que EXPLICAN por qué ya no hay rubros.
-    const codigo = src.split('\n')
-      .filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l))
-      .join('\n');
+    /* Se ignoran los comentarios, que EXPLICAN por qué ya no hay rubros.
+
+       Antes esto filtraba línea por línea las que EMPIEZAN con `//`, `*` o
+       `/*`. Un comentario de bloque de varias líneas se cuela entero salvo
+       la primera, y su texto se contaba como código: la prueba gritaba por
+       una palabra escrita dentro de una explicación. Un guardián que no
+       distingue prosa de código acaba obligando a escribir peor los
+       comentarios para callarlo. */
+    const codigo = src
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\/\/[^\n]*/g, ' ');
     const hit = codigo.match(PROHIBIDO);
     ok(`${archivo} no tiene vocabulario de ningún rubro`, !hit, hit ? 'encontró: ' + hit[0] : '');
   }
@@ -2212,6 +2219,59 @@ suite('La semilla clínica · lo que NO puede hacer', () => {
 
   ok('trae descargo visible', !!c.descargo && /no sustituye/.test(c.descargo));
 
+  /* ── LA LÍNEA ENTRE INFORMAR Y RECETAR ──
+     El criterio lo dio el médico: «si preguntan de GLP-1, no se dice dosis,
+     pero se dice qué es y cómo actúa». Evadir la pregunta no protege a
+     nadie: quien la hace ya vio el nombre en redes y va a buscarlo donde
+     nadie le diga que eso se valora en consulta. */
+  ok('explica qué son los GLP-1 y cómo actúan',
+     /glp1/.test(temas) && /imitan una hormona/.test(K));
+
+  /* Una DOSIS, no cualquier número con unidad. La primera versión de esta
+     prueba marcaba «126 mg/dL» —el umbral de glucosa para diagnosticar
+     diabetes— como si fuera una receta. Un valor de laboratorio explicado es
+     justo lo que este conocimiento existe para dar; lo prohibido es decirle
+     a alguien cuánto tomar. */
+  const pareceDosis = /\b\d+([.,]\d+)?\s?(mg|mcg|ml|ui)\b(?!\s*\/\s*d[lL])/i;
+  ok('pero NO dice ni una dosis',
+     !pareceDosis.test(K) && !/cada \d+ horas|una vez a la semana/i.test(K),
+     'una dosis en un chat es una receta sin consulta: ' + (K.match(pareceDosis)||[''])[0]);
+
+  ok('y la prueba SÍ distingue un umbral de laboratorio de una dosis',
+     !pareceDosis.test('glucosa de 126 mg/dL en ayuno') &&
+     pareceDosis.test('empieza con 0.25 mg y se sube'),
+     'si marcara el umbral, obligaría a borrar justo lo que hay que explicar');
+
+  ok('y remata en que eso se decide en consulta',
+     /se decide en consulta/.test(K));
+
+  ok('dice que funcionan y que no son magia',
+     /funcionan, y no son magia/i.test(K),
+     'ni prometer ni descalificar: las dos cosas mandan al paciente a otro lado');
+
+  // `K` va en minúsculas: compararlo contra «InBody» no encontraba nada.
+  ok('lista los servicios que sí ofrece',
+     /servicios que ofrecemos/.test(temas) && /inbody/.test(K) && /mapa/.test(K));
+
+  ok('y dice en voz alta que no sustituye la consulta',
+     /esto sustituye ir al médico/.test(temas));
+
+  /* Qué ES un aparato importa menos que PARA QUÉ le sirve a quien pregunta.
+     «Mide impedancia» no le dice nada a nadie; «vas a saber si lo que
+     bajaste fue grasa o músculo» sí, y además es cierto. */
+  ok('el InBody dice para qué le sirve al paciente, no solo qué mide',
+     /para qué me sirve el inbody/.test(temas) && /grasa o músculo/.test(K));
+  ok('el electrocardiograma también',
+     /para qué me sirve el electrocardiograma/.test(temas));
+
+  /* Las formas de pago se contestan, no se ofrecen. Es una preferencia de
+     negocio y por eso vive en la semilla, no en el núcleo. */
+  ok('sabe las formas de pago',
+     /formas de pago/.test(temas) && /transferencia/.test(K));
+  ok('pero tiene prohibido ofrecerlas sin que pregunten',
+     /no menciones las formas de pago si no te preguntan/i.test(L),
+     'ofrecerlas de gratis es lo que hace que una charla suene a caja registradora');
+
   // Y que las entradas quepan en una respuesta de chat.
   const largas = c.conocimiento.filter(k => k.texto.split(/\s+/).length > 75);
   ok('ninguna entrada es un folleto', largas.length === 0,
@@ -2327,6 +2387,93 @@ suite('Lo que tu bot atendió con la puerta cerrada', () => {
     siempre[d] = { cerrado: false, abre: '00:00', cierra: '23:59' };
   ok('abierto siempre no tiene conversaciones fuera',
      cuantasFueraDeHorario(['2026-08-28T09:00:00Z','2026-08-29T18:00:00Z'], siempre, MX).fuera === 0);
+});
+
+suite('Cómo trata el bot a quien escribe', () => {
+  /* Fernando lo probó por WhatsApp y dijo lo que hay que oír: «es muy
+     insistente para agendar cita, necesito un trato amable, que el paciente
+     no sienta que es un bot».
+
+     El prompt decía cómo ESCRIBIR —cuántas palabras, cuántas preguntas— y
+     nada de cómo TRATAR. Sin eso, un modelo hace lo que hacen todos:
+     contestar de pasada y cerrar cada mensaje empujando al siguiente paso.
+     Se siente como un vendedor, y quien escribe a un consultorio a las once
+     de la noche no busca que le vendan: busca que le contesten. */
+  const P = construirPrompt({
+    nombre: 'Consultorio', categoria: 'Salud y bienestar',
+    acciones: ['agendar', 'capturar_contacto'],
+    conocimiento: [{ tema: 'costos', texto: 'Primera vez $800.' }],
+  }, [{ rol: 'usuario', texto: '¿cuánto cuesta?' }]);
+
+  ok('le dice que ofrezca la cita UNA SOLA VEZ',
+     /ofrece la cita una sola vez/i.test(P), 'sin esto, insiste en cada turno');
+  ok('y que no insista si no la tomaron',
+     /no vuelvas a ofrecerla/i.test(P));
+  ok('nombra por qué: insistir se siente como un vendedor',
+     /vendedor/i.test(P));
+
+  ok('le prohíbe cerrar TODOS los mensajes con una pregunta',
+     /no cierres todos los mensajes con una pregunta/i.test(P),
+     'es lo que hace que una charla se sienta como un formulario');
+
+  ok('le pide contestar la pregunta PRIMERO y completa',
+     /contesta la pregunta primero/i.test(P));
+
+  ok('le pide reconocer la molestia antes de informar',
+     /reconócela ANTES\s+de\s+informar/i.test(P));
+
+  ok('le pide ajustar el largo a quien escribe',
+     /si escriben corto, contesta corto/i.test(P));
+
+  /* Las dos caras del mismo problema: ni confesar que es un bot ni fingir
+     ser una persona con nombre. Lo primero rompe la conversación; lo segundo
+     es engañar a un paciente. */
+  ok('no confiesa ser un bot ni finge ser una persona',
+     /nunca digas que eres un bot/i.test(P) && /tampoco finjas ser\s+una persona/i.test(P));
+
+  ok('sigue prohibiendo el «como asistente de IA»',
+     /como asistente de IA/i.test(P));
+
+  ok('y sigue con el tope de palabras', /máximo 70 palabras/i.test(P));
+
+  /* ── LOS MOMENTOS QUE NO SON PREGUNTAS ──
+     «Doc, voy demorado» no pide información: pide que alguien diga que no
+     pasa nada. Un bot típico contesta ahí con un menú de opciones, y esa
+     respuesta —correcta, útil, completa— es exactamente la que delata que
+     del otro lado no hay nadie. */
+  ok('sabe qué hacer con un «voy demorado»',
+     /voy demorado/i.test(P) && /aquí le guardamos su lugar/i.test(P),
+     'es el caso que Fernando dio como ejemplo');
+
+  ok('y que ahí NO se reagenda por iniciativa propia',
+     /Nada de reagendar\s+salvo que lo pida/i.test(P));
+
+  ok('un «gracias» se recibe sin vender',
+     /no aproveches para vender/i.test(P));
+
+  ok('un «no puedo ir» va sin reproche', /sin reproche/i.test(P));
+
+  /* Casos concretos y no un «sé cálido» abstracto: lo abstracto produce
+     cortesía de folleto, lo concreto produce la frase que diría una
+     recepcionista. */
+  ok('los casos son concretos, no un «sé cálido» genérico',
+     !/sé cálido|sé empático/i.test(P) && /se disculpan/i.test(P));
+
+  ok('dice los servicios en vez de mandar a preguntar',
+     /qué servicios hay, DILOS/i.test(P));
+  ok('da la dirección si se la piden', /da la dirección y las referencias/i.test(P));
+
+  /* La cédula profesional es pública y quien la pregunta tiene derecho a
+     saberla. Un bot que evade esa pregunta siembra justo la desconfianza
+     que la pregunta venía a resolver. */
+  /* Dice «títulos, licencias, permisos o certificaciones» y NO «cédula
+     profesional»: el núcleo tiene que servirle igual a un abogado y a un
+     taller. Ese vocabulario vive en la semilla del rubro, no aquí — y hay
+     otra prueba, más vieja, que falla si se cuela. */
+  ok('pregunta por credenciales sin vocabulario de un solo rubro',
+     /títulos, licencias, permisos o certificaciones/i.test(P) &&
+     !/cédula/i.test(P) &&
+     /preguntarlo no es\s+desconfianza/i.test(P));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */
