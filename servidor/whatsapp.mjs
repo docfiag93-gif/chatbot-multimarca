@@ -358,6 +358,10 @@ export async function manejar(req, context = {}) {
        Traducidos a lo que hay que HACER, no a lo que pasó. */
     const POR_CODIGO = {
       131030: 'El número de quien escribió NO está en la lista de destinatarios de prueba, en WhatsApp → Configuración de la API → «Para».',
+      131005: 'El token no tiene permiso sobre ESE número. Suele pasar cuando el token se sacó de otra pantalla: genera uno en WhatsApp → Configuración de la API → «Generar token de acceso», que nace con permiso sobre este número, y actualízalo en Cloudflare.',
+      131009: 'Meta rechazó un dato de la petición. Casi siempre el formato del número de destino.',
+      131056: 'Demasiados mensajes al mismo número en poco tiempo.',
+      133010: 'Ese número no está registrado en la cuenta de WhatsApp Business.',
       131026: 'Meta no pudo entregar el mensaje. Suele ser un número mal formado o una cuenta sin WhatsApp.',
       131047: 'Pasaron más de 24 horas desde el último mensaje de esa persona: fuera de esa ventana solo se puede escribir con una plantilla aprobada.',
       131051: 'Ese tipo de mensaje no está permitido para este número.',
