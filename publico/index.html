@@ -343,6 +343,14 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 
 /* El empujón del primer día. Se ve como una nota al margen, no como una
    alarma: no ha pasado nada malo — simplemente todavía no ha pasado nada. */
+/* El cargador de plantillas. Va arriba del formulario de conocimiento porque
+   es un atajo que ahorra media hora de teclear, y hoy no lo encontraba nadie. */
+.plantillas{margin-bottom:16px;padding:14px 16px;border:1px dashed var(--linea);
+  border-radius:11px;background:var(--hundido)}
+.plantillas b{display:block;font-size:14px;margin-bottom:3px}
+.plantillas span{display:block;font-size:13px;color:var(--tenue);line-height:1.5;margin-bottom:10px}
+.plantillas .fila{flex-wrap:wrap;gap:8px}
+
 .empujon{margin-top:14px;padding:16px 18px;border:1px dashed var(--acento);
   border-radius:12px;background:var(--acento-suave);
   display:flex;flex-direction:column;gap:7px;text-align:left}
@@ -1187,6 +1195,12 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
         información de tu negocio.</b> Un tema por renglón: a la izquierda de qué
         trata, a la derecha lo que debe contestar. Lo que no esté aquí, dirá que
         no lo sabe — en vez de inventarlo.</p>
+        <!-- Cargar una plantilla en un negocio que YA EXISTE no se podía:
+             las semillas solo servían para la vista previa, así que quien ya
+             tenía su negocio dado de alta no podía aprovecharlas y le tocaba
+             teclear treinta y seis renglones a mano. -->
+        <div class="plantillas" id="plantillas"></div>
+
         <details class="pista" style="margin-bottom:14px">
           <summary style="cursor:pointer">Ver ejemplos para un consultorio</summary>
           <div style="margin-top:8px;line-height:1.7">
@@ -1854,6 +1868,67 @@ $('#btn-mas-saber').addEventListener('click', () => $('#conocimiento').appendChi
 $('#btn-mas-atrib').addEventListener('click', () => $('#atributos').appendChild(renglonPar('a','Dato (ej. garantía)','Valor')));
 $('#catalogo').appendChild(renglonOferta());
 $('#conocimiento').appendChild(renglonPar('k','Tema (ej. envíos)','Qué debe saber'));
+
+/* ── Cargar una plantilla ──────────────────────────────────────────────
+   Las semillas existían solo para la vista previa: quien ya tenía su
+   negocio dado de alta no podía aprovecharlas y le tocaba teclear treinta
+   y seis renglones a mano.
+
+   REGLA: se AGREGA, nunca se reemplaza. Nadie debería perder lo que
+   escribió por apretar un botón que dice «cargar». Y no se repite lo que
+   ya está: cargar dos veces no debe dejar todo duplicado. */
+function pintarPlantillas() {
+  const caja = $('#plantillas');
+  if (!caja) return;
+  const conTemas = Object.entries(SEMILLAS).filter(([, s]) => (s.conocimiento || []).length);
+  if (!conTemas.length) { caja.classList.add('oculto'); return; }
+
+  caja.innerHTML = `<b>¿Empezamos con una plantilla?</b>
+    <span>Trae los temas más preguntados de ese giro, ya redactados. Se
+    <b>agregan</b> a lo que ya tengas — no se borra nada — y después los
+    editas como quieras.</span>
+    <div class="fila">${conTemas.map(([id, s]) =>
+      `<button type="button" class="btn sec chico" data-plantilla="${esc(id)}">
+        ${esc(s.nombre)} · ${(s.conocimiento||[]).length} temas</button>`).join('')}</div>`;
+
+  $$('#plantillas [data-plantilla]').forEach(b => b.addEventListener('click', () => {
+    const s = SEMILLAS[b.dataset.plantilla];
+    if (!s) return;
+
+    // Lo que ya está escrito, para no repetirlo.
+    const yaEstan = new Set([...$('#conocimiento').children]
+      .map(d => (d.querySelector('.k-a')?.value || '').trim().toLowerCase())
+      .filter(Boolean));
+
+    let puestos = 0;
+    for (const k of (s.conocimiento || [])) {
+      if (yaEstan.has(String(k.tema).trim().toLowerCase())) continue;
+      $('#conocimiento').appendChild(renglonPar('k', 'Tema', 'Qué debe saber',
+        { a: k.tema, b: k.texto }));
+      puestos++;
+    }
+
+    /* Los límites también, que son la MITAD del valor de una plantilla
+       clínica: sin ellos el conocimiento va suelto y el bot puede usar una
+       cifra de las guías para decirle a alguien lo que tiene.
+
+       El asistente de alta no tiene campo para límites —se conservan
+       aparte, en `extrasDelNegocio`— así que se agregan ahí, sin repetir
+       los que ya estén. */
+    const yaHay = (extrasDelNegocio.limites || []);
+    const vistos = new Set(yaHay.map(l => String(l).trim().toLowerCase()));
+    const nuevos = (s.limites || []).filter(l => !vistos.has(String(l).trim().toLowerCase()));
+    if (nuevos.length) extrasDelNegocio.limites = [...yaHay, ...nuevos];
+
+    const antes = b.textContent;
+    b.textContent = puestos || nuevos.length
+      ? `✓ ${puestos} temas` + (nuevos.length ? ` y ${nuevos.length} reglas` : '') + ' agregados'
+      : '✓ ya los tenías todos';
+    setTimeout(() => { b.textContent = antes; }, 2400);
+    refrescarPrevio();
+  }));
+}
+pintarPlantillas();
 
 /* ── horarios ─────────────────────────────────────────────────────────
    Siete renglones, uno por día, todos a la vista. De aquí sale lo que el

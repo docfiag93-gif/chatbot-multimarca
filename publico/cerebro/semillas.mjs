@@ -179,13 +179,13 @@ export const SEMILLAS = {
   cardiometabolico: {
     ejemplo: true,
     slug: 'salud-cardiometabolica',
-    nombre: 'Consultorio de salud cardiometabólica',
+    nombre: 'Consultorio de urgencias y salud cardiometabólica',
     categoria: 'Salud y bienestar',
     politicas: ['urgencias-clinicas'],
     acciones: ['agendar', 'capturar_contacto'],
     saludo: 'Hola. Te puedo explicar los estudios, cómo prepararte y agendar tu cita. ¿En qué te ayudo?',
     descargo: 'Esta información es general y no sustituye una consulta. No damos diagnósticos ni ajustamos medicamentos por chat.',
-    sugerencias: ['¿Cómo me preparo para el InBody?', '¿Qué es el MAPA?', 'Quiero agendar'],
+    sugerencias: ['¿Qué se atiende aquí?', '¿Cómo me preparo para el InBody?', 'Quiero agendar'],
 
     conocimiento: [
       /* ── LOS ESTUDIOS QUE SE HACEN AQUÍ ── */
@@ -246,6 +246,33 @@ export const SEMILLAS = {
         texto: 'Azúcar, presión, peso, colesterol e hígado no son cinco problemas sueltos: son el mismo problema visto por cinco ventanas. Por eso aquí se revisan juntos. Mover uno suele mover los demás, y en la buena dirección.' },
 
       /* ── LA CONSULTA ── */
+      /* ── LO QUE HACE UN URGENCIÓLOGO EN CONSULTORIO ──
+         La distinción más útil que puede dar este bot, y que solo un
+         urgenciólogo sabe escribir: qué SÍ se resuelve aquí y qué va
+         derecho al hospital. Con eso, alguien deja de perder una hora
+         viniendo a que lo manden a otro lado — o deja de esperar sentado
+         algo que no podía esperar. */
+      { tema: 'qué se atiende aquí y qué no',
+        texto: 'Aquí se atiende lo que se resuelve en consultorio: curaciones, suturas y retiro de puntos, quemaduras pequeñas, aplicación de medicamentos, nebulizaciones, y valoración de cuadros que no ponen en riesgo la vida. Lo que necesita hospital —dolor de pecho, dificultad para respirar, sangrado que no para, golpe en la cabeza con pérdida del conocimiento— se va directo a urgencias, no aquí.' },
+
+      { tema: 'curaciones y suturas',
+        texto: 'Se hacen curaciones, suturas de heridas limpias, retiro de puntos y revisión de heridas que no van bien. Si la herida es profunda, no deja de sangrar, o fue por mordedura o algo oxidado, avísalo al escribir: puede que convenga que te valoren de inmediato.' },
+
+      { tema: 'certificados médicos',
+        texto: 'Se expiden certificados médicos de salud, para escuela, trabajo o trámite. Trae identificación y menciona para qué lo necesitas, porque el formato cambia según quién lo pide. Se entrega el mismo día de la consulta.' },
+
+      { tema: 'valoración prequirúrgica',
+        texto: 'Es la revisión que piden antes de una cirugía para saber si el riesgo es aceptable. Trae los estudios que te haya pedido tu cirujano y la lista de todo lo que tomas. Si aún no te piden estudios, aquí se te dice cuáles.' },
+
+      { tema: 'aplicación de medicamentos e inyecciones',
+        texto: 'Se aplican medicamentos indicados por un médico, intramusculares o intravenosos. Hay que traer la receta y el medicamento. No se aplica nada sin indicación de por medio, aunque ya te lo hayan puesto antes.' },
+
+      { tema: 'atención después de urgencias',
+        texto: 'Si saliste de urgencias o de una hospitalización, aquí se puede dar el seguimiento: revisar cómo vas, ajustar lo que quedó pendiente y checar los estudios de control. Trae la hoja de alta, que ahí viene lo que se hizo.' },
+
+      { tema: 'horarios y guardias',
+        texto: 'La consulta es en el horario publicado. Fuera de ese horario el chat sigue tomando tus datos y te contactamos en cuanto se pueda. Si es algo que no puede esperar, no esperes respuesta aquí: ve a urgencias.' },
+
       { tema: 'primera consulta qué traer',
         texto: 'Trae tus estudios de los últimos seis meses aunque parezcan viejos, y la lista de TODO lo que tomas: medicamentos, suplementos, herbolaria y lo que te recomendó alguien. Si mides tu presión o tu azúcar en casa, trae también esos registros.' },
 
