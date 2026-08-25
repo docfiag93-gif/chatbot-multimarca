@@ -1,4 +1,33 @@
-# Dónde quedamos · 23 de agosto de 2026
+# Dónde quedamos · 25 de agosto de 2026
+
+## 🔜 Lo único que de verdad te bloquea
+
+Tres cosas, en orden. Todo lo demás puede esperar.
+
+**1 · Tu domicilio fiscal en el aviso de privacidad.**
+Es el ÚNICO hueco que queda en `publico/aviso-privacidad.html` — búscalo, está
+marcado en amarillo. Calle, número, colonia, municipio, estado y C.P.
+Sin esto no se puede publicar la app en Meta, y sin publicar la app tus
+pacientes reales no pueden escribirle al bot: hoy solo funcionan los cinco
+números de prueba.
+
+**2 · El token permanente de WhatsApp.**
+El que da el panel de Meta dura HORAS, no días. Ya se venció dos veces. El
+permanente se saca en la configuración del negocio, como «usuario del sistema»,
+y no caduca. Mientras no esté, el bot se queda mudo cada tarde sin avisar.
+
+**3 · Los datos reales de tu consultorio.**
+Precios, horarios y tratamientos siguen siendo ficticios. Negocios → Editar →
+pasos 4 y 5.
+
+### Y una que NO te bloquea, para que no te agobie
+
+El **abogado** que revise el aviso de privacidad hace falta cuando empieces a
+VENDERLE a colegas —ahí te vuelves encargado de datos de terceros—, no para
+operar tu propio consultorio. Puedes arrancar y arreglarlo en paralelo.
+
+---
+
 
 ## ✅ Funcionando en producción
 
