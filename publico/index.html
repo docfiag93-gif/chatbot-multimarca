@@ -1815,6 +1815,10 @@ function secretosDe(p) {
          para lo que no la tiene, y así no hace falta una migración. */
       proveedores: p.proveedores && p.proveedores.length ? p.proveedores : (e.proveedores || []),
       zonaHoraria: p.zonaHoraria || e.zonaHoraria || 'America/Mexico_City',
+      // Cuándo dejar de insistir y ofrecer una persona. Estaba especificado
+      // desde el primer día y no se guardaba en ninguna parte, así que la
+      // función no podía existir. Ya existe.
+      escalamiento: p.escalamiento || e.escalamiento || {},
     },
   };
 }

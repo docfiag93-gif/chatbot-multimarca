@@ -45,6 +45,7 @@ import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/di
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from '../servidor/nucleo/agenda.mjs';
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
+import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
 import { temaSugerido } from '../publico/cerebro/temas.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
@@ -1563,19 +1564,23 @@ await suite('El camino de ESCRITURA · que lo escrito llegue a la base', async (
     const plano = t => t.toLowerCase().replace(/_/g, '');
     const llegan = new Set([...deColumna, ...enBulto, ...porOtraVia].map(plano));
 
-    /* Deuda A LA VISTA, no barrida bajo la alfombra. `escalamiento` describe
-       una función que no existe —pasar a un humano tras N fallos— y por eso
-       no llega a la base: no hay nada que guardar todavía. Va en su propia
-       lista y no en la de «por otra vía» a propósito: esa diría que está
-       resuelto, y esta dice lo que es. Cuando se construya, sale de aquí. */
-    const especificadoSinConstruir = new Set(['escalamiento']);
+    /* Deuda A LA VISTA. Aquí vivía `escalamiento`: una función especificada
+       en el perfil desde el primer día que NO EXISTÍA, y que por eso no
+       tenía nada que guardar. Ya se construyó (escalar.mjs), ya se guarda, y
+       por eso salió de esta lista.
+
+       La lista sigue existiendo, vacía, y con una prueba que falla si vuelve
+       a llenarse. No es celo: es que este renglón es el único lugar del
+       proyecto donde una promesa incumplida tiene que declararse en voz
+       alta. Una lista de excepciones que crece en silencio es una alfombra. */
+    const especificadoSinConstruir = new Set([]);
 
     const huerfanos = [...produce].filter(k =>
       !llegan.has(plano(k)) && !especificadoSinConstruir.has(k));
 
-    ok('la deuda declarada sigue siendo UNA sola cosa',
-       especificadoSinConstruir.size === 1,
-       'ya son ' + especificadoSinConstruir.size + ': se está usando de alfombra');
+    ok('no queda ninguna función prometida sin construir',
+       especificadoSinConstruir.size === 0,
+       'quedan ' + especificadoSinConstruir.size + ': ' + [...especificadoSinConstruir].join(', '));
 
     ok('nada de lo que el formulario recoge se pierde al guardar',
        huerfanos.length === 0, 'no llegan a la base: ' + huerfanos.join(', '));
@@ -1650,6 +1655,88 @@ suite('WhatsApp · el estado de en medio es el peligroso', () => {
   ok('reporta las tres por separado',
      p.responde === true && p.verifica === false && p.firma === false,
      JSON.stringify(p));
+});
+
+suite('Escalamiento · dejar de insistir', () => {
+  const negocio = {
+    captura: { activa: true },
+    contactos: { consultorio: { whatsapp: '55' } },
+    escalamiento: { activo: true, tras: 2, mensaje: '¿Te paso con una persona?' },
+  };
+
+  ok('la primera vez que no sabe, NO escala',
+     decidirEscalar({ marca: negocio, fallosPrevios: 0 }) === null,
+     'escalar al primer tropiezo sería insufrible');
+
+  const seg = decidirEscalar({ marca: negocio, fallosPrevios: 1 });
+  ok('la segunda sí', seg?.corte === 'escalamiento', String(seg?.corte));
+  ok('y dice lo que el negocio escribió', seg.texto === '¿Te paso con una persona?');
+  ok('y ofrece tomar los datos', seg.accion === 'capturar_contacto');
+  ok('y reporta cuántas van', seg.tras === 2, String(seg?.tras));
+
+  ok('el negocio puede subir el número',
+     decidirEscalar({ marca: { ...negocio, escalamiento: { tras: 4 } }, fallosPrevios: 2 }) === null &&
+     decidirEscalar({ marca: { ...negocio, escalamiento: { tras: 4 } }, fallosPrevios: 3 })?.corte === 'escalamiento');
+
+  ok('y puede apagarlo del todo',
+     decidirEscalar({ marca: { ...negocio, escalamiento: { activo: false } }, fallosPrevios: 9 }) === null);
+
+  ok('sin escalamiento configurado, usa 2 por omisión',
+     decidirEscalar({ marca: { captura: { activa: true } }, fallosPrevios: 0 }) === null &&
+     decidirEscalar({ marca: { captura: { activa: true } }, fallosPrevios: 1 })?.corte === 'escalamiento');
+
+  // Sin forma de tomar datos ni contacto publicado, ofrecer «te paso con
+  // alguien» sería una promesa vacía.
+  const pelado = decidirEscalar({ marca: { escalamiento: { tras: 1 } }, fallosPrevios: 0 });
+  ok('sin captura ni contacto, no promete un humano que no existe',
+     pelado.accion === 'ninguna', pelado.accion);
+});
+
+suite('¿Está abierto? · lo que NO se sabe no se afirma', () => {
+  const lunes10 = new Date('2026-08-24T10:00:00');   // lunes
+  const lunes23 = new Date('2026-08-24T23:00:00');
+  const horario = { lunes: { cerrado: false, abre: '09:00', cierra: '14:00' } };
+
+  ok('dentro del horario, abierto',  abiertoAhora(horario, lunes10) === true);
+  ok('fuera del horario, cerrado',   abiertoAhora(horario, lunes23) === false);
+  ok('un día marcado cerrado, cerrado',
+     abiertoAhora({ lunes: { cerrado: true } }, lunes10) === false);
+
+  /* La distinción que importa: NO SABER no es lo mismo que estar cerrado.
+     Si no se sabe y se dijera «ahorita no hay quien te atienda», sería una
+     afirmación sobre el negocio de otro, hecha a un cliente suyo, sin
+     fundamento. Ante la duda se calla. */
+  ok('sin horarios cargados: no se sabe (null)',  abiertoAhora(undefined, lunes10) === null);
+  ok('sin ese día cargado: no se sabe',           abiertoAhora({}, lunes10) === null);
+  ok('con una hora ilegible: no se sabe',
+     abiertoAhora({ lunes: { cerrado: false, abre: 'temprano', cierra: '14:00' } }, lunes10) === null);
+  ok('con una hora imposible: no se sabe',
+     abiertoAhora({ lunes: { cerrado: false, abre: '25:00', cierra: '99:99' } }, lunes10) === null);
+
+  // Bares, farmacias de guardia: 22:00 a 02:00 cruza la medianoche.
+  const nocturno = { lunes: { cerrado: false, abre: '22:00', cierra: '02:00' } };
+  ok('un horario que cruza la medianoche funciona',
+     abiertoAhora(nocturno, lunes23) === true &&
+     abiertoAhora(nocturno, new Date('2026-08-24T01:00:00')) === true &&
+     abiertoAhora(nocturno, new Date('2026-08-24T15:00:00')) === false);
+
+  // Y el mensaje de fuera de horario solo se usa cuando SE SABE que está
+  // cerrado. Nunca por no saber.
+  const conNocturno = {
+    captura: { activa: true },
+    escalamiento: { tras: 1, mensaje: 'de día', fueraDeHorario: 'de noche' },
+  };
+  ok('cerrado y con mensaje propio: usa el de la noche',
+     decidirEscalar({ marca: { ...conNocturno, horarios: horario },
+                      fallosPrevios: 0, ahora: lunes23 }).texto === 'de noche');
+
+  ok('abierto: usa el normal',
+     decidirEscalar({ marca: { ...conNocturno, horarios: horario },
+                      fallosPrevios: 0, ahora: lunes10 }).texto === 'de día');
+
+  ok('SIN SABER: usa el normal, no el de la noche',
+     decidirEscalar({ marca: conNocturno, fallosPrevios: 0, ahora: lunes23 }).texto === 'de día',
+     'decir «no hay nadie» sin saberlo es inventar sobre el negocio de otro');
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

@@ -23,9 +23,10 @@ import { revisarAnclaje, pulir, respuestaSinDato }
 import { enviarEvento } from './nucleo/enlaces.mjs';
 import { servicio } from './nucleo/datos.mjs';
 import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar, recogerHumanos,
-         huecosOcupados, apartarCita, esSuPropioBot, apuntarMensaje }
+         huecosOcupados, apartarCita, esSuPropioBot, apuntarMensaje, vecesQueNoSupo }
   from './nucleo/datos.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from './nucleo/agenda.mjs';
+import { decidirEscalar } from './nucleo/escalar.mjs';
 
 // ── Freno de mano ───────────────────────────────────────────────────────
 // Este endpoint es público y anónimo: cualquiera con la URL puede quemar la
@@ -416,6 +417,22 @@ export async function manejar(req, context) {
     if (!anclaje.anclado) {
       const seguro = respuestaSinDato(marca, anclaje.inventadas);
       salida = { ...seguro, via, anclaje: 'degradado' };
+
+      /* ── Dejar de insistir ────────────────────────────────────────────
+         El bot acaba de admitir que no tiene el dato. Si ya lo había hecho
+         antes en esta misma conversación, seguir contestando lo mismo no es
+         prudencia: es gastarle el tiempo a alguien que ya entendió que aquí
+         no va a encontrar lo que busca. La tercera vez no vuelve a
+         preguntar — se va.
+
+         Se consulta la base SOLO en este punto, cuando el turno de ahora ya
+         falló. Las conversaciones que van bien no pagan ese viaje. */
+      const fallos = await vecesQueNoSupo({ empresaId: marca.id, sesion });
+      const paso = decidirEscalar({ marca, fallosPrevios: fallos });
+      if (paso) {
+        const { corte: _c, tras, ...r } = paso;
+        salida = { ...r, via, anclaje: 'degradado', escalado: tras };
+      }
     } else {
       salida = {
         texto,

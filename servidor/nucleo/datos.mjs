@@ -467,6 +467,34 @@ export async function moverCita({ empresaId, id, estado }) {
 }
 
 
+/**
+ * Cuántas veces YA tuvo el bot que decir «no tengo ese dato» en esta misma
+ * conversación.
+ *
+ * Se pregunta a la base y no se lleva en memoria porque cada turno es una
+ * llamada distinta, y puede caer en una copia distinta de la función. La
+ * conversación vive en la base; la memoria de la función no.
+ *
+ * Solo se llama cuando el turno de AHORA también falló, así que no le
+ * agrega un viaje a las conversaciones que van bien.
+ */
+export async function vecesQueNoSupo({ empresaId, sesion }) {
+  const sb = servicio();
+  if (!sb || !empresaId || !sesion) return 0;
+  try {
+    const filas = await sb.seleccionar('conversaciones', 'id',
+      `empresa_id=eq.${empresaId}&sesion=eq.${encodeURIComponent(sesion)}` +
+      '&sin_dato=is.true&limit=20');
+    return Array.isArray(filas) ? filas.length : 0;
+  } catch (e) {
+    // Sin cuenta, no se escala. Es la dirección segura: escalar de más
+    // manda a alguien con una persona sin necesidad; escalar de menos deja
+    // al bot contestando como siempre, que es lo que ya hacía.
+    return 0;
+  }
+}
+
+
 /* ══════════════════════════════════════════════════════════════════════
    EL TOPE DEL DÍA
 
