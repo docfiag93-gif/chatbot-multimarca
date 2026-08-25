@@ -114,6 +114,39 @@ export const MENSAJE_URGENCIA = {
 };
 
 /**
+ * Lo que el negocio agrega DESPUÉS del mensaje de urgencia.
+ *
+ * ── EL INVARIANTE, Y NO SE NEGOCIA ──
+ * El 911 va PRIMERO y SIEMPRE. Lo del médico va después, y NUNCA en lugar
+ * de. Un teléfono particular no sustituye a un servicio de emergencias: no
+ * tiene ambulancia, puede estar en quirófano, puede estar dormido. Si
+ * alguna vez alguien invierte este orden «porque el doctor prefiere que le
+ * marquen a él», habrá convertido una instrucción de urgencia en una lista
+ * de espera.
+ *
+ * Sirve igual a un urgenciólogo, a un intensivista o a un internista: lo
+ * que cambia es lo que cada uno cargó, no el código.
+ *
+ * En riesgo suicida NO se agrega nada: ese mensaje ya trae la Línea de la
+ * Vida, y sumarle un consultorio diluye el número que de verdad importa.
+ */
+export function colaDelNegocio(perfil, motivo) {
+  if (motivo === 'riesgo suicida') return '';
+
+  const c = perfil?.contactos || {};
+  const u = c.urgencias || {};
+  const tel = String(u.telefono || u.whatsapp || '').trim();
+  const donde = String(u.etiqueta || '').trim();
+  if (!tel && !donde) return '';
+
+  let cola = '\n\n';
+  if (tel && donde) cola += `Ya que vayas en camino, avísanos al **${tel}**: ${donde}.`;
+  else if (tel)     cola += `Ya que vayas en camino, avísanos al **${tel}** para darte seguimiento.`;
+  else              cola += `${donde}`;
+  return cola;
+}
+
+/**
  * Revisa el texto del paciente contra todas las banderas.
  * Devuelve null si está limpio, o { motivo, mensaje } si hay que cortar.
  */

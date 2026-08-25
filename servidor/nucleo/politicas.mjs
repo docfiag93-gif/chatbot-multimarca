@@ -20,7 +20,7 @@
 //  una entrada aquí y aparece sola en el panel.
 // ════════════════════════════════════════════════════════════════════════
 
-import { revisarBanderas } from './seguridad.mjs';
+import { revisarBanderas, colaDelNegocio } from './seguridad.mjs';
 
 export const POLITICAS = {
 
@@ -33,11 +33,11 @@ export const POLITICAS = {
     aviso: 'Actívala solo si tu negocio atiende temas de salud. Es una decisión con consecuencias: revisa el texto que recibe la persona.',
     intercepta: true,
 
-    interceptar(texto) {
+    interceptar(texto, perfil) {
       const bandera = revisarBanderas(texto);
       if (!bandera) return null;
       return {
-        texto: bandera.mensaje,
+        texto: bandera.mensaje + colaDelNegocio(perfil, bandera.motivo),
         sugerencias: [],
         accion: 'derivar_humano',
         urgencia: true,
@@ -133,7 +133,7 @@ export function interceptar(perfil, texto) {
   for (const id of activas) {
     const p = POLITICAS[id];
     if (!p?.intercepta || typeof p.interceptar !== 'function') continue;
-    const r = p.interceptar(texto);
+    const r = p.interceptar(texto, perfil);
     if (r) return { ...r, politica: id };
   }
   return null;

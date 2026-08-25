@@ -2476,6 +2476,57 @@ suite('Cómo trata el bot a quien escribe', () => {
      /preguntarlo no es\s+desconfianza/i.test(P));
 });
 
+suite('El 911 primero, el médico después · nunca al revés', () => {
+  const clinica = {
+    nombre: 'Consultorio', politicas: ['urgencias-clinicas'],
+    contactos: { urgencias: { telefono: '961 123 4567',
+                              etiqueta: 'te podemos recibir en el Hospital Xamaipak' } },
+  };
+  const r = respuestaInmediata(clinica, 'me duele el pecho y me falta el aire');
+
+  ok('la urgencia sigue cortando', r?.urgencia === true);
+  ok('el 911 aparece', /911/.test(r.texto));
+  ok('y el teléfono del médico también', /961 123 4567/.test(r.texto));
+  ok('y dónde lo pueden recibir', /Hospital Xamaipak/.test(r.texto));
+
+  /* ── EL INVARIANTE ──
+     Un teléfono particular no sustituye a un servicio de emergencias: no
+     tiene ambulancia, puede estar en quirófano, puede estar dormido. El
+     orden en el texto ES la instrucción. */
+  ok('el 911 va ANTES que el teléfono del médico',
+     r.texto.indexOf('911') < r.texto.indexOf('961 123 4567'),
+     'invertirlo convierte una instrucción de urgencia en una lista de espera');
+
+  ok('y el médico va como «ya que vayas en camino», no como alternativa',
+     /ya que vayas en camino/i.test(r.texto),
+     'no es «o llámame a mí»: es «ve, y de paso avísame»');
+
+  /* Sin datos cargados no se inventa un teléfono ni una promesa de recibir
+     a nadie. El mensaje del 911 se queda solo, que ya es correcto. */
+  const pelado = respuestaInmediata(
+    { nombre: 'X', politicas: ['urgencias-clinicas'] }, 'no puedo respirar');
+  ok('sin datos cargados no inventa a dónde ir',
+     /911/.test(pelado.texto) && !/avísanos/i.test(pelado.texto));
+
+  /* En riesgo suicida NO se agrega el consultorio: ese mensaje ya trae la
+     Línea de la Vida, y sumarle un teléfono más diluye el que importa. */
+  const suicida = respuestaInmediata(clinica, 'ya no quiero vivir');
+  ok('el riesgo suicida conserva la Línea de la Vida',
+     /800 911 2000/.test(suicida.texto));
+  ok('y NO se le agrega el consultorio',
+     !/961 123 4567/.test(suicida.texto),
+     'un teléfono de más diluye el único que hay que marcar ahí');
+
+  /* Sirve igual a un intensivista o a un internista: lo que cambia es lo que
+     cada uno cargó, no el código. */
+  const interna = respuestaInmediata({
+    nombre: 'Medicina interna', politicas: ['urgencias-clinicas'],
+    contactos: { urgencias: { telefono: '961 000 1111' } },
+  }, 'me duele el pecho');
+  ok('funciona igual para cualquier especialidad',
+     /961 000 1111/.test(interna.texto) && /911/.test(interna.texto));
+});
+
 /* ── pintar ─────────────────────────────────────────────────────────── */
 const total = suites.reduce((n, s) => n + s.casos.length, 0);
 const fallos = suites.reduce((n, s) => n + s.casos.filter(c => !c.pasa).length, 0);
