@@ -341,6 +341,17 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
 .pasos button[data-listo] .n{background:var(--ok);color:#fff}
 
+/* El empujón del primer día. Se ve como una nota al margen, no como una
+   alarma: no ha pasado nada malo — simplemente todavía no ha pasado nada. */
+.empujon{margin-top:14px;padding:16px 18px;border:1px dashed var(--acento);
+  border-radius:12px;background:var(--acento-suave);
+  display:flex;flex-direction:column;gap:7px;text-align:left}
+.empujon b{font-size:14.5px}
+.empujon span{font-size:13.2px;color:var(--tenue);line-height:1.55}
+.empujon code{font-size:12.5px;word-break:break-all;background:var(--panel);
+  padding:8px 10px;border-radius:7px}
+.empujon .fila{margin-top:4px}
+
 /* El momento en que nace un bot. Es la única pantalla de todo el producto
    que da una buena noticia sin condiciones, y se ve distinta a propósito.
    Lo demás del panel informa; esta felicita y dice qué sigue. */
@@ -3615,6 +3626,42 @@ async function cargarCharlas() {
   }
 }
 
+/* El empujón del primer día.
+   Un colega termina de configurar su bot, entra a Charlas, y lee «aquí va a
+   aparecer lo que la gente le escriba». Correcto, y sin salida: ¿cómo lo
+   encuentra la gente? Ese es el momento exacto en que alguien piensa «lo
+   configuré y no pasó nada» y no vuelve.
+
+   Se enseña SOLO cuando de verdad nunca ha pasado nada. Si ya hubo
+   conversaciones y la lista está vacía por un filtro, este texto sería una
+   lección sobre algo que ya sabe hacer. */
+function empujonPrimerDia() {
+  const mio = negociosVisibles().find(n => n.id && !n.ejemplo);
+  if (!mio) return '';
+  const liga = location.origin + '/chat.html?marca=' + encodeURIComponent(mio.slug);
+  return `<div class="empujon">
+    <b>¿Ya compartiste tu liga?</b>
+    <span>Tu asistente está listo, pero nadie puede escribirle si no sabe que existe.
+    Ponla en tu perfil de Instagram, en tu firma de correo, o mándala por WhatsApp.</span>
+    <code>${esc(liga)}</code>
+    <div class="fila">
+      <button class="btn chico" data-empujon="copiar" data-liga="${esc(liga)}">Copiar liga</button>
+      <button class="btn sec chico" data-empujon="qr" data-slug="${esc(mio.slug)}">Ver mi QR</button>
+    </div>
+  </div>`;
+}
+
+/* Los dos botones del empujón viven donde se pinte: se atienden por
+   delegación para no re-enganchar oyentes en cada repintado. */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-empujon]');
+  if (!b) return;
+  if (b.dataset.empujon === 'qr') { mostrarQR(b.dataset.slug); return; }
+  const antes = b.textContent;
+  b.textContent = (await copiarTexto(b.dataset.liga)) ? '✓ Copiada' : 'Cópiala tú ↑';
+  setTimeout(() => { b.textContent = antes; }, 2000);
+});
+
 function pintarCharlas() {
   const caja = $('#lista-charlas');
   const soloUrg = $('#solo-urgencias').checked;
@@ -3624,7 +3671,8 @@ function pintarCharlas() {
       <h3>${soloUrg ? 'Ninguna urgencia' : 'Todavía no hay conversaciones'}</h3>
       <p>${soloUrg
         ? 'El bot no ha cortado ninguna charla por regla clínica.'
-        : 'Aquí va a aparecer lo que la gente le escriba al bot.'}</p></div>`;
+        : 'Aquí va a aparecer lo que la gente le escriba al bot.'}</p></div>` +
+      (soloUrg ? '' : empujonPrimerDia());
     return;
   }
 
@@ -3902,7 +3950,8 @@ function pintarSolicitudes() {
       <h3>${soloPendientes ? 'Nadie está esperando' : 'Todavía no hay solicitudes'}</h3>
       <p>${soloPendientes
         ? 'Todas las solicitudes están atendidas.'
-        : 'Aquí van a aparecer las personas que dejen sus datos en el chat.'}</p></div>`;
+        : 'Aquí van a aparecer las personas que dejen sus datos en el chat.'}</p></div>` +
+      (soloPendientes ? '' : empujonPrimerDia());
     return;
   }
 
