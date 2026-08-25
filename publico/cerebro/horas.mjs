@@ -88,3 +88,51 @@ export function rejillaDeLaSemana(horarios = {}) {
     return { dia, celdas };
   });
 }
+
+/**
+ * Cuántas de esas conversaciones llegaron con el negocio CERRADO.
+ *
+ * La portada dice «134 horas nadie contesta» como argumento. Esto lo dice
+ * como hecho consumado, con los datos del propio negocio: no «podrías estar
+ * perdiendo clientes», sino «doce personas te escribieron cuando estabas
+ * cerrado y tu bot las atendió».
+ *
+ * Es la misma frase en los dos lados de la venta: antes de comprar es una
+ * promesa, después es un recibo.
+ *
+ * `fechas` son instantes ISO tal como los guarda la base. Se traducen a la
+ * hora de pared del negocio antes de comparar: una conversación de las 23:00
+ * en Tuxtla llega a la base como las 05:00 del día siguiente en UTC, y
+ * compararla sin traducir la contaría en el día equivocado.
+ */
+export function cuantasFueraDeHorario(fechas, horarios = {}, zonaHoraria = 'America/Mexico_City') {
+  const rejilla = rejillaDeLaSemana(horarios);
+  // Sin horarios cargados no se puede saber qué es «fuera»: se devuelve nulo
+  // en vez de cero. Cero diría «no pasó nunca», y lo cierto es «no se sabe».
+  if (!rejilla.some(d => d.celdas.some(Boolean))) return null;
+
+  const porDia = Object.fromEntries(rejilla.map(d => [d.dia, d.celdas]));
+  let fuera = 0, dentro = 0;
+
+  for (const f of (Array.isArray(fechas) ? fechas : [])) {
+    const d = new Date(f);
+    if (isNaN(d)) continue;
+    let p;
+    try {
+      p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: zonaHoraria, hour12: false, weekday: 'long', hour: '2-digit',
+      }).formatToParts(d).reduce((a, x) => (a[x.type] = x.value, a), {});
+    } catch (e) { continue; }
+
+    const DIA = { monday:'lunes', tuesday:'martes', wednesday:'miercoles',
+                  thursday:'jueves', friday:'viernes', saturday:'sabado', sunday:'domingo' };
+    const dia = DIA[String(p.weekday || '').toLowerCase()];
+    const h = Number(p.hour === '24' ? '00' : p.hour);
+    if (!dia || !Number.isFinite(h)) continue;
+
+    (porDia[dia]?.[h] ? () => dentro++ : () => fuera++)();
+  }
+
+  const total = fuera + dentro;
+  return { fuera, dentro, total, porciento: total ? Math.round((fuera / total) * 100) : 0 };
+}

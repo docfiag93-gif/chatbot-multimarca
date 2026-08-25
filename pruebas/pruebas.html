@@ -44,7 +44,7 @@ import {
 import { revisarEntorno, explicarFallo, probarBase } from '../servidor/nucleo/diagnostico.mjs';
 import { respuestaInmediata, decidirSinIA } from '../servidor/nucleo/cerebro.mjs';
 import { huecosLibres, tresOpciones, cualEligio, periodosAOcupacion } from '../servidor/nucleo/agenda.mjs';
-import { turnoSinCubrir, rejillaDeLaSemana } from '../publico/cerebro/horas.mjs';
+import { turnoSinCubrir, rejillaDeLaSemana, cuantasFueraDeHorario } from '../publico/cerebro/horas.mjs';
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
 import { aQuienSeLeContesta } from '../servidor/whatsapp.mjs';
@@ -2271,6 +2271,62 @@ suite('El turno que nadie cubre', () => {
 
   ok('desglosa por día para poder dibujarlo',
      t.dias.length === 7 && t.dias[0].horas === 8 && t.dias[6].horas === 0);
+});
+
+suite('Lo que tu bot atendió con la puerta cerrada', () => {
+  /* La portada dice «134 horas nadie contesta» como promesa. Esto lo dice
+     como recibo, con los datos del propio negocio. Es la misma frase en los
+     dos lados de la venta. */
+  const MX = 'America/Mexico_City';
+  const tarde = {};
+  for (const d of ['lunes','martes','miercoles','jueves','viernes'])
+    tarde[d] = { cerrado: false, abre: '15:00', cierra: '21:00' };
+  tarde.sabado = { cerrado: true }; tarde.domingo = { cerrado: true };
+
+  /* Jueves 27 de agosto de 2026 en Tuxtla. Ojo con las horas: UTC va SEIS
+     adelante, así que las 23:00 del jueves allá son las 05:00 del viernes
+     aquí. Comparar sin traducir contaría en el día equivocado. */
+  const r = cuantasFueraDeHorario([
+    '2026-08-27T22:00:00Z',   // jueves 16:00 → ABIERTO
+    '2026-08-28T02:00:00Z',   // jueves 20:00 → ABIERTO
+    '2026-08-28T05:00:00Z',   // jueves 23:00 → cerrado
+    '2026-08-28T09:00:00Z',   // viernes 03:00 → cerrado (la madrugada de Fernando)
+    '2026-08-29T18:00:00Z',   // sábado 12:00 → cerrado (no abre sábados)
+  ], tarde, MX);
+
+  ok('cuenta bien las de fuera', r.fuera === 3, JSON.stringify(r));
+  ok('y las de dentro', r.dentro === 2, JSON.stringify(r));
+  ok('y el porcentaje', r.porciento === 60, String(r.porciento));
+
+  /* El caso que da nombre a todo esto: las tres de la mañana. Sin traducir
+     el huso, esa conversación caería en el día anterior y podría contarse
+     como dentro del horario. */
+  const madrugada = cuantasFueraDeHorario(['2026-08-28T09:00:00Z'], tarde, MX);
+  ok('una de las tres de la mañana cuenta como fuera', madrugada.fuera === 1);
+
+  /* Sin horarios NO se devuelve cero: cero diría «nunca pasó», y lo cierto
+     es «no se sabe». Presentar un no-sé como un cero es la forma educada de
+     mentir con datos. */
+  ok('sin horarios devuelve nulo, no cero',
+     cuantasFueraDeHorario(['2026-08-28T09:00:00Z'], {}, MX) === null,
+     'un cero diría «nunca pasó»; lo cierto es «no se sabe»');
+
+  ok('sin conversaciones da cero de cero',
+     cuantasFueraDeHorario([], tarde, MX).total === 0);
+
+  ok('las fechas rotas se ignoran en vez de tumbar la cuenta',
+     cuantasFueraDeHorario(['no es fecha', null, '2026-08-28T09:00:00Z'], tarde, MX).fuera === 1);
+
+  ok('una zona horaria inventada no truena',
+     cuantasFueraDeHorario(['2026-08-28T09:00:00Z'], tarde, 'Marte/Olimpo').total === 0);
+
+  /* Un negocio abierto las 24 horas no tiene «fuera». Si saliera un número
+     mayor que cero ahí, el cálculo estaría mal en todos los demás casos. */
+  const siempre = {};
+  for (const d of ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'])
+    siempre[d] = { cerrado: false, abre: '00:00', cierra: '23:59' };
+  ok('abierto siempre no tiene conversaciones fuera',
+     cuantasFueraDeHorario(['2026-08-28T09:00:00Z','2026-08-29T18:00:00Z'], siempre, MX).fuera === 0);
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

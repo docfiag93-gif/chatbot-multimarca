@@ -341,6 +341,17 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 .pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
 .pasos button[data-listo] .n{background:var(--ok);color:#fff}
 
+/* El recibo del turno cubierto. Verde y con la cifra grande a la izquierda:
+   es la única tarjeta del tablero que trae buenas noticias, y en una pantalla
+   hecha de pendientes eso merece verse distinto. */
+.recibo{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:14px;
+  border:1px solid var(--ok);border-radius:13px;background:var(--ok-suave)}
+.recibo .cifra{font-size:38px;font-weight:800;color:var(--ok);line-height:1;flex:none}
+.recibo .dice{display:flex;flex-direction:column;gap:3px;min-width:0}
+.recibo .dice b{font-size:15px}
+.recibo .dice span{font-size:13.2px;color:var(--tenue);line-height:1.5}
+@media (max-width:520px){ .recibo{flex-direction:column;align-items:flex-start;gap:10px} }
+
 /* La rejilla de 168 horas. Siete columnas —una por día— de veinticuatro
    celdas. No lleva números ni ejes: lo que tiene que entenderse de un
    vistazo, sin leer, es la proporción entre el bloque de horas en que estás
@@ -3148,6 +3159,30 @@ async function cargarTablero() {
       : `<div class="cola vacia"><span class="num">✓</span>
            <span class="txt"><b>Nada pendiente</b>
            <span>Nadie espera respuesta y el bot está contestando bien.</span></span></div>`;
+
+    /* ── EL RECIBO ──
+       La portada le prometió a este médico que su bot cubriría las horas en
+       que él no está. Esto le enseña que lo hizo, con sus propios datos.
+
+       Se pinta solo si HAY conversaciones fuera de horario. Un «0 atendidas
+       con el consultorio cerrado» no es una buena noticia ni una mala: es
+       ruido, y ocupa el lugar de algo que sí importa. */
+    const cerrado = m.cerrado;
+    const recibo = (cerrado && cerrado.fuera > 0) ? `
+      <div class="recibo">
+        <div class="cifra">${cerrado.fuera}</div>
+        <div class="dice">
+          <b>${cerrado.fuera === 1 ? 'Una conversación que no perdiste'
+                                   : cerrado.fuera + ' conversaciones que no perdiste'}</b>
+          <span>Llegaron con tu negocio cerrado. Sin el bot, esas personas
+          habrían escrito y nadie habría contestado.</span>
+        </div>
+      </div>` : '';
+
+    // Se borra el anterior antes de poner el nuevo: `beforebegin` inserta,
+    // no reemplaza, y sin esto cada repintado dejaría un recibo más.
+    document.querySelectorAll('.recibo').forEach(x => x.remove());
+    if (recibo) tab.insertAdjacentHTML('beforebegin', recibo);
 
     tab.innerHTML = `
       <div class="metrica"><div class="n">${m.conversaciones ?? 0}</div><div class="r">conversaciones</div></div>

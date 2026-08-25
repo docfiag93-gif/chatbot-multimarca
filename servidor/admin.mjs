@@ -27,6 +27,7 @@ import { catalogoDePoliticas } from './nucleo/politicas.mjs';
 import { catalogoDeAcciones } from './nucleo/acciones.mjs';
 import { preguntar } from './nucleo/proveedores.mjs';
 import { responderComoHumano, citasDe, moverCita, fallosDeAviso, consumoDe } from './nucleo/datos.mjs';
+import { cuantasFueraDeHorario } from '../publico/cerebro/horas.mjs';
 import { SEMILLAS } from '../publico/cerebro/semillas.mjs';
 
 const URL_SB   = env('SUPABASE_URL');
@@ -433,8 +434,13 @@ export async function manejar(req, context) {
       // ── números para el tablero ───────────────────────────────────────
       case 'metricas': {
         const filtro = datos.empresa_id ? `&empresa_id=eq.${datos.empresa_id}` : '';
+        const idEmpresa = datos.empresa_id || yo.empresa_id || null;
+
         const [conv, urg, lead, sinDato, porConfirmar] = await Promise.all([
-          sb.seleccionar('conversaciones', 'id', `limit=1000${filtro}`),
+          // `created_at` viaja para poder contar cuántas llegaron con el
+          // negocio cerrado. Es el número que convierte la promesa de la
+          // portada en un recibo.
+          sb.seleccionar('conversaciones', 'id,created_at', `limit=1000${filtro}`),
           sb.seleccionar('conversaciones', 'id,motivo_urgencia,created_at', `urgencia=is.true&limit=200${filtro}`),
           sb.seleccionar('leads', 'id,atendido', `limit=1000${filtro}`),
           // Las veces que el bot tuvo que decir «no tengo ese dato». Es la
@@ -452,7 +458,6 @@ export async function manejar(req, context) {
            Se pide solo cuando hay UNA empresa de por medio. El superadmin
            mirando la plataforma entera no tiene un consumo propio que
            enseñar, y sumar los de todos no querría decir nada. */
-        const idEmpresa = datos.empresa_id || yo.empresa_id || null;
         let cuota = null;
         if (idEmpresa) {
           const e = (await sb.seleccionar('empresas', 'plan,tope_diario,perfil_cifrado',
@@ -476,8 +481,31 @@ export async function manejar(req, context) {
           }
         }
 
+        /* Cuántas llegaron con el negocio CERRADO.
+           Se calcula AQUÍ y no en el navegador por dos razones: los horarios
+           viven cifrados en el perfil y solo el servidor tiene la llave; y
+           mandarle mil fechas al panel para que cuente sería regalar el
+           calendario de actividad de un consultorio a cualquiera que mire la
+           red. Viaja el resultado, no los datos. */
+        let cerrado = null;
+        if (idEmpresa) {
+          try {
+            const f = (await sb.seleccionar('empresas', 'perfil_cifrado',
+                                            `id=eq.${idEmpresa}&limit=1`))?.[0];
+            const perfil = f?.perfil_cifrado
+              ? await descifrar(MAESTRA, idEmpresa, f.perfil_cifrado) : null;
+            if (perfil?.horarios) {
+              cerrado = cuantasFueraDeHorario(
+                conv.map(c => c.created_at).filter(Boolean),
+                perfil.horarios,
+                perfil.zonaHoraria || 'America/Mexico_City');
+            }
+          } catch (e) { cerrado = null; }   // sin horarios legibles no se inventa nada
+        }
+
         return json({
           conversaciones: conv.length,
+          cerrado,
           urgencias: urg.length,
           urgenciasRecientes: urg.slice(0, 10),
           leads: lead.length,
