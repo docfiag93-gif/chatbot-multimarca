@@ -560,13 +560,26 @@ suite('Semillas separadas del núcleo', () => {
   ok('cada semilla tiene categoría propia',
      new Set(Object.values(SEMILLAS).map(s => s.categoria)).size >= 3);
 
-  // Solo la de salud enciende la política clínica.
-  const conClinica = Object.entries(SEMILLAS)
-    .filter(([, s]) => (s.politicas || []).includes('urgencias-clinicas')).map(([k]) => k);
-  ok('solo un ejemplo enciende la política clínica', conClinica.length === 1);
-  ok('los demás ejemplos no la heredan',
-     slugs.filter(k => k !== conClinica[0])
-          .every(k => !(SEMILLAS[k].politicas || []).includes('urgencias-clinicas')));
+  /* La política clínica la encienden las semillas de SALUD, y solo ellas.
+     Antes esto decía «solo una semilla la enciende», que era un atajo: la
+     intención nunca fue que hubiera una sola de salud, sino que una
+     cafetería no herede protocolo de urgencias. El atajo se rompió el día
+     que llegó una segunda semilla clínica legítima — que es justo cuando un
+     test escrito con un proxy en vez de con su intención se cae solo. */
+  const esDeSalud   = s => /salud|bienestar|clínic|medic/i.test(s.categoria || '');
+  const tieneClinica = s => (s.politicas || []).includes('urgencias-clinicas');
+
+  ok('sigue habiendo al menos una semilla de salud',
+     Object.values(SEMILLAS).some(esDeSalud));
+
+  ok('toda semilla de salud enciende la política clínica',
+     Object.entries(SEMILLAS).filter(([, s]) => esDeSalud(s)).every(([, s]) => tieneClinica(s)),
+     Object.entries(SEMILLAS).filter(([, s]) => esDeSalud(s) && !tieneClinica(s)).map(([k]) => k).join(', '));
+
+  ok('y NINGUNA que no lo sea la hereda',
+     Object.entries(SEMILLAS).filter(([, s]) => !esDeSalud(s)).every(([, s]) => !tieneClinica(s)),
+     'una cafetería con protocolo de urgencias mandaría al 911 por un dolor de cabeza: ' +
+     Object.entries(SEMILLAS).filter(([, s]) => !esDeSalud(s) && tieneClinica(s)).map(([k]) => k).join(', '));
 
   ok('cada ejemplo declara sus propias acciones',
      Object.values(SEMILLAS).every(s => Array.isArray(s.acciones) && s.acciones.length));
@@ -2109,6 +2122,65 @@ await suite('El token que se muere sin avisar', async () => {
   ok('vencido es crítico, no un aviso', muerto.gravedad === 'critico');
   ok('y dice exactamente dónde se arregla',
      /Configuración de la API/.test(muerto.arreglo) && /WHATSAPP_TOKEN/.test(muerto.arreglo));
+});
+
+suite('La semilla clínica · lo que NO puede hacer', () => {
+  const c = SEMILLAS.cardiometabolico;
+  ok('existe', !!c && c.slug === 'salud-cardiometabolica');
+
+  /* Sin esta política, «me duele el pecho» llegaría a la IA como cualquier
+     otra pregunta. Con ella, se corta antes y manda al 911. En una semilla
+     de salud es lo primero que hay que comprobar. */
+  ok('trae encendida la política de urgencias',
+     c.politicas.includes('urgencias-clinicas'));
+
+  ok('está marcada como ejemplo, no como negocio real', c.ejemplo === true);
+
+  // ── Los límites, que van al prompt por encima del conocimiento ──
+  const L = c.limites.join(' ').toLowerCase();
+  ok('prohíbe diagnosticar',    /nunca digas que alguien tiene/.test(L));
+  ok('prohíbe interpretar resultados', /nunca interpretes el resultado/.test(L));
+  ok('prohíbe tocar medicamentos', /medicamento/.test(L) && /nunca recomiendes/.test(L));
+  ok('prohíbe dietas personalizadas', /dietas/.test(L));
+  ok('prohíbe prometer resultados', /no prometas resultados/.test(L));
+
+  /* El conocimiento explica QUÉ es un estudio y CÓMO prepararse. En cuanto
+     empiece a decirle a alguien qué tiene, dejó de ser información y pasó a
+     ser consulta — sin médico. */
+  const K = c.conocimiento.map(k => k.texto).join(' ').toLowerCase();
+  ok('el conocimiento no le dice a nadie que TIENE algo',
+     !/\btú tienes\b|\busted tiene\b|\btienes diabetes\b|\btienes hipertensi/.test(K),
+     'una cifra explicada es información; aplicada a quien escribe es diagnóstico');
+
+  ok('no menciona ningún fármaco por nombre',
+     !/metformina|losart|enalapril|atorvastatin|empaglifloz|semaglutid|insulina/.test(K),
+     'nombrar un fármaco invita a preguntar por su dosis');
+
+  ok('no promete resultados', !/vas a bajar|garantizamos|en \d+ (semanas|meses) vas/.test(K));
+
+  // ── Que de verdad sepa contestar lo que preguntan ──
+  const temas = c.conocimiento.map(k => k.tema).join(' ');
+  for (const t of ['inbody', 'mapa', 'electrocardiograma', 'diabetes',
+                   'prediabetes', 'hipertensión', 'hígado graso', 'ayuno'])
+    ok('cubre ' + t, temas.includes(t), temas);
+
+  /* Lo que más preguntan antes de una cita no es la fisiopatología: es «¿voy
+     en ayunas?» y «¿qué llevo?». Si eso falta, el bot va a mandar a preguntar
+     por teléfono justo lo que venía a resolver. */
+  ok('contesta cómo prepararse para cada estudio',
+     ['preparación inbody', 'preparación mapa'].every(t => temas.includes(t)) &&
+     /ayuno de 8 a 12 horas/.test(K));
+
+  ok('avisa del marcapasos en el InBody',
+     /marcapasos|aparato implantado/.test(K),
+     'es la única contraindicación práctica de la bioimpedancia');
+
+  ok('trae descargo visible', !!c.descargo && /no sustituye/.test(c.descargo));
+
+  // Y que las entradas quepan en una respuesta de chat.
+  const largas = c.conocimiento.filter(k => k.texto.split(/\s+/).length > 75);
+  ok('ninguna entrada es un folleto', largas.length === 0,
+     largas.map(k => k.tema).join(', '));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

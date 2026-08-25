@@ -157,6 +157,108 @@ export const SEMILLAS = {
                { id: 'motivo', etiqueta: '¿Qué y cuánto necesitas?', tipo: 'textarea', requerido: true }],
       confirmacion: 'Recibido. Te mandamos la cotización por correo o WhatsApp.' },
   },
+
+  /* ── 4 · Salud cardiometabólica ─────────────────────────────────────
+     Un consultorio real, no una demostración: diabetes, obesidad,
+     hipertensión e hígado graso, con los estudios que de verdad se hacen.
+
+     ── LO QUE ESTE CONOCIMIENTO SÍ HACE ──
+     Explicar QUÉ es un estudio, CÓMO se prepara uno, QUÉ dicen las guías en
+     general, y CUÁNDO no hay que estar en un chat sino en urgencias.
+
+     ── LO QUE NO HACE, Y NO ES NEGOCIABLE ──
+     No diagnostica, no interpreta el resultado de nadie, no ajusta ni
+     sugiere medicamentos. Un valor de laboratorio fuera de rango no
+     significa lo mismo en dos personas distintas, y esa diferencia es
+     exactamente el trabajo del médico. Los `limites` de abajo lo fijan y
+     el prompt los pone por encima de todo lo demás.
+
+     Las cifras son las de uso común en las guías. QUIEN FIRMA ESTO ES EL
+     MÉDICO, no quien lo escribió: hay que revisarlo antes de soltarlo con
+     pacientes reales. */
+  cardiometabolico: {
+    ejemplo: true,
+    slug: 'salud-cardiometabolica',
+    nombre: 'Consultorio de salud cardiometabólica',
+    categoria: 'Salud y bienestar',
+    politicas: ['urgencias-clinicas'],
+    acciones: ['agendar', 'capturar_contacto'],
+    saludo: 'Hola. Te puedo explicar los estudios, cómo prepararte y agendar tu cita. ¿En qué te ayudo?',
+    descargo: 'Esta información es general y no sustituye una consulta. No damos diagnósticos ni ajustamos medicamentos por chat.',
+    sugerencias: ['¿Cómo me preparo para el InBody?', '¿Qué es el MAPA?', 'Quiero agendar'],
+
+    conocimiento: [
+      /* ── LOS ESTUDIOS QUE SE HACEN AQUÍ ── */
+      { tema: 'inbody composición corporal',
+        texto: 'El InBody 120 mide de qué está hecho tu cuerpo: cuánto es músculo, cuánta grasa y cuánta agua. Se sube descalzo y toma menos de un minuto. Dice mucho más que la báscula: dos personas del mismo peso pueden tener composiciones muy distintas.' },
+
+      { tema: 'preparación inbody',
+        texto: 'Para que salga confiable: ven en ayuno de 3 a 4 horas, pasa al baño antes, no hagas ejercicio ese día antes del estudio, no te pongas crema en pies ni manos y quítate reloj y joyería. Si traes marcapasos o algún aparato implantado, avísanos antes.' },
+
+      { tema: 'mapa monitoreo presión',
+        texto: 'El MAPA es un aparatito que mide tu presión cada cierto rato durante 24 horas, mientras haces tu vida normal. Sirve porque la presión en el consultorio miente en los dos sentidos: sube por los nervios de estar ahí, o se ve bien y de noche está alta.' },
+
+      { tema: 'preparación mapa',
+        texto: 'Haz tu día normal, incluido trabajo y dormir. Cuando el aparato empiece a apretar, deja el brazo quieto y colgando. Lleva un diario simple: a qué hora comiste, tomaste medicamento, hiciste ejercicio y te dormiste. No te bañes con él puesto.' },
+
+      { tema: 'electrocardiograma',
+        texto: 'El electrocardiograma registra la actividad eléctrica del corazón. Dura unos minutos, no duele y no da toques: solo se pegan unos parches. Ven con ropa fácil de quitar de la cintura para arriba y evita crema en el pecho ese día.' },
+
+      /* ── LO QUE DICEN LAS GUÍAS, TRADUCIDO ── */
+      { tema: 'diabetes cómo se diagnostica',
+        texto: 'Las guías usan cuatro caminos: hemoglobina glucosilada de 6.5% o más; glucosa en ayuno de 126 mg/dL o más; glucosa de 200 o más dos horas después de una carga de azúcar; o una glucosa al azar de 200 o más con síntomas. Salvo el último, se confirma repitiendo la prueba.' },
+
+      { tema: 'prediabetes',
+        texto: 'Es la antesala, y la buena noticia es que ahí todavía se puede dar marcha atrás. Los rangos que usan las guías: hemoglobina glucosilada entre 5.7 y 6.4%, glucosa en ayuno entre 100 y 125, o entre 140 y 199 dos horas después de la carga.' },
+
+      { tema: 'hemoglobina glucosilada',
+        texto: 'La hemoglobina glucosilada, o A1c, es el promedio de tu azúcar de los últimos dos a tres meses. Por eso es tan útil: no la puedes arreglar comiendo bien los tres días antes. No necesitas ayuno para ese estudio.' },
+
+      { tema: 'hipertensión cifras',
+        texto: 'En el consultorio se suele hablar de presión alta desde 140/90, aunque varias guías bajan el umbral a 130/80. Con MAPA los números son distintos y más bajos: se toma como alta un promedio de 24 horas de 130/80 o más, o de 135/85 o más durante el día.' },
+
+      { tema: 'presión de noche',
+        texto: 'Lo normal es que la presión baje mientras duermes. Cuando no baja, el riesgo para el corazón y el riñón es mayor aunque la del día se vea bien. Eso solo se ve con MAPA, nunca con una toma en el consultorio.' },
+
+      { tema: 'obesidad más allá del peso',
+        texto: 'El índice de masa corporal es un primer filtro, no un diagnóstico: no distingue músculo de grasa ni dice dónde está esa grasa. Por eso aquí se mide composición corporal y cintura. La grasa alrededor del abdomen es la que más pesa en el riesgo del corazón.' },
+
+      { tema: 'hígado graso',
+        texto: 'Es grasa acumulada en el hígado. Desde 2023 se llama enfermedad hepática esteatósica asociada a disfunción metabólica, y el cambio de nombre importa: reconoce que casi siempre viene acompañada de sobrepeso, azúcar alta, presión alta o colesterol alterado. Casi nunca da síntomas al principio.' },
+
+      { tema: 'riesgo cardiometabólico',
+        texto: 'Azúcar, presión, peso, colesterol e hígado no son cinco problemas sueltos: son el mismo problema visto por cinco ventanas. Por eso aquí se revisan juntos. Mover uno suele mover los demás, y en la buena dirección.' },
+
+      /* ── LA CONSULTA ── */
+      { tema: 'primera consulta qué traer',
+        texto: 'Trae tus estudios de los últimos seis meses aunque parezcan viejos, y la lista de TODO lo que tomas: medicamentos, suplementos, herbolaria y lo que te recomendó alguien. Si mides tu presión o tu azúcar en casa, trae también esos registros.' },
+
+      { tema: 'qué estudios necesitan ayuno',
+        texto: 'Necesitan ayuno de 8 a 12 horas la glucosa y el perfil de lípidos. El InBody, de 3 a 4 horas. La hemoglobina glucosilada, el electrocardiograma y el MAPA no necesitan ayuno. Agua sí puedes tomar. Si tomas medicamento en ayunas, pregúntanos antes de saltártelo.' },
+
+      { tema: 'cada cuánto revisarse',
+        texto: 'Depende de cada persona y lo define tu médico en consulta. Como referencia general, quien ya tiene diabetes o presión alta controlada suele revisarse cada tres a seis meses; quien está en prediabetes, al menos una vez al año.' },
+    ],
+
+    /* Estos límites van al prompt POR ENCIMA del conocimiento. Si el modelo
+       tiene una cifra a la mano y una prohibición, gana la prohibición. */
+    limites: [
+      'Nunca digas que alguien TIENE una enfermedad. Las cifras de las guías son para entender un estudio, no para diagnosticar a quien escribe.',
+      'Nunca interpretes el resultado de nadie. Un valor fuera de rango no significa lo mismo en dos personas, y esa diferencia es la consulta.',
+      'Nunca recomiendes, ajustes ni suspendas un medicamento, ni siquiera un suplemento. Tampoco digas que algo se puede dejar.',
+      'No des dietas ni planes de ejercicio personalizados por chat.',
+      'Si te describen un síntoma que preocupa, no lo evalúes: manda a consulta o a urgencias según el caso.',
+      'No prometas resultados ni tiempos de mejoría.',
+    ],
+
+    tono: 'Cercano y claro. Tuteas, frases cortas, sin tecnicismos. Cuando uses una palabra médica, explícala en la misma frase. Nunca alarmas: informas y ofreces la consulta.',
+
+    captura: { activa: true, titulo: 'Solicitar cita',
+      campos: [{ id: 'nombre', etiqueta: 'Tu nombre', tipo: 'text', requerido: true },
+               { id: 'telefono', etiqueta: 'WhatsApp', tipo: 'tel', requerido: true },
+               { id: 'motivo', etiqueta: '¿Qué te gustaría revisar?', tipo: 'textarea', requerido: false }],
+      confirmacion: 'Gracias. Te contactamos para confirmar día y hora.' },
+  },
 };
 
 /** Los identificadores de las semillas, para poder distinguirlas de lo real. */
