@@ -305,6 +305,32 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
 /* ── asistente de alta ── */
 .pasos{display:flex;gap:5px;overflow-x:auto;padding-bottom:12px;margin-bottom:18px;
   border-bottom:1px solid var(--linea)}
+
+/* En celular la fila de siete pasos medía 753px dentro de 305 visibles: cinco
+   quedaban fuera de la pantalla y el último se cortaba a media palabra
+   («Comportamient…»). Una barra de progreso que no deja ver cuánto falta es
+   peor que ninguna: quien la mira no sabe si va empezando o terminando.
+
+   Así que en pantalla chica se cambia el mecanismo, no el tamaño de la letra:
+   se esconde la fila y se dice en palabras. «Paso 3 de 7 · Oferta» cabe
+   siempre, se lee de un vistazo, y dice las dos cosas que importan —dónde vas
+   y cuánto falta— que la fila cortada no decía ninguna. */
+.pasos-corto{display:none}
+/* El corte no es un número redondo elegido a ojo: la fila de siete pasos
+   mide 753px de contenido, y con el margen de la hoja y el relleno de la
+   tarjeta necesita cerca de 900 para caber sin cortarse. Puesto en 620 —que
+   fue el primer intento— una tablet de 768 seguía mostrando la fila rota. */
+@media (max-width:900px){
+  .pasos{display:none}
+  .pasos-corto{display:block;margin-bottom:16px}
+  .pasos-corto .cual{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .pasos-corto .num{font-size:12px;font-weight:700;color:var(--tenue);
+    text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+  .pasos-corto .nombre{font-size:16px;font-weight:700;color:var(--tinta)}
+  .pasos-corto .riel{height:5px;border-radius:99px;background:var(--linea);overflow:hidden}
+  .pasos-corto .riel i{display:block;height:100%;background:var(--acento);
+    border-radius:99px;transition:width .3s ease}
+}
 .pasos button{background:none;border:0;padding:7px 11px;border-radius:7px;font-size:12.8px;
   color:var(--tenue);cursor:pointer;white-space:nowrap;font-family:inherit;font-weight:600;
   display:flex;align-items:center;gap:6px}
@@ -314,6 +340,15 @@ textarea{resize:vertical;min-height:88px;line-height:1.55}
   display:grid;place-items:center;font-size:10.5px}
 .pasos button[data-on] .n{background:var(--acento);color:var(--acento-tinta)}
 .pasos button[data-listo] .n{background:var(--ok);color:#fff}
+
+.slug-listo{display:flex;align-items:center;gap:10px;padding:11px 13px;
+  background:var(--hundido);border:1px solid var(--linea);border-radius:9px}
+/* Que se lea ENTERO, aunque ocupe dos renglones. Cortado con puntos
+   suspensivos se veía más limpio y servía menos: este texto a veces hay que
+   copiarlo, y no se puede copiar lo que no se ve. */
+.slug-listo code{background:none;padding:0;font-size:14px;color:var(--tinta);
+  word-break:break-all;line-height:1.4}
+.slug-listo .enlace{margin-left:auto;flex:none;font-size:13px}
 
 .paso{display:none}
 .paso[data-on]{display:block}
@@ -946,6 +981,11 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
   <section id="v-alta" class="oculto">
     <div class="tarjeta">
       <div class="pasos" id="pasos" role="tablist"></div>
+      <!-- Lo mismo dicho en palabras, para pantalla chica. Ver .pasos-corto. -->
+      <div class="pasos-corto" id="pasos-corto" aria-hidden="true">
+        <div class="cual"><span class="num" id="pc-num"></span><span class="nombre" id="pc-nombre"></span></div>
+        <div class="riel"><i id="pc-riel"></i></div>
+      </div>
       <div id="alta-msg"></div>
 
       <!-- 1 · básicos -->
@@ -956,9 +996,22 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
         <div class="rejilla">
           <div class="campo"><label for="f-nombre">Nombre del negocio *</label>
             <input id="f-nombre" placeholder="Taller El Piñón"></div>
-          <div class="campo"><label for="f-slug">Identificador corto *</label>
-            <input id="f-slug" placeholder="taller-pinon">
-            <p class="pista">Va en la etiqueta que se pega en el sitio.</p></div>
+          <!-- Este campo se llena SOLO desde el nombre, y aun así se pedía
+               como obligatorio, con el mismo peso visual que el nombre del
+               negocio y una etiqueta que nadie fuera de esto entiende
+               («identificador corto», «la etiqueta que se pega en el sitio»).
+               Pedirle a alguien que llene lo que el sistema ya sabe es la
+               forma más rápida de que abandone un formulario.
+               Ahora se muestra lo que quedó, y se abre solo si lo pide. -->
+          <div class="campo" id="campo-slug">
+            <label for="f-slug">Su dirección en internet</label>
+            <div class="slug-listo" id="slug-listo">
+              <code id="slug-eco">taller-pinon</code>
+              <button type="button" class="enlace" id="btn-cambiar-slug">cambiar</button>
+            </div>
+            <input id="f-slug" class="oculto" placeholder="taller-pinon">
+            <p class="pista">Se arma solo con el nombre. Solo letras, números y guiones.</p>
+          </div>
           <div class="campo"><label for="f-cat">Giro</label>
             <select id="f-cat"></select></div>
           <div class="campo oculto" id="campo-cat-otro"><label for="f-cat-otro">Escribe tu giro</label>
@@ -1517,9 +1570,30 @@ $('#f-cat').addEventListener('change', () => {
 
 // El identificador se propone solo, pero se puede escribir a mano.
 let slugTocado = false;
-$('#f-slug').addEventListener('input', () => { slugTocado = true; });
+$('#f-slug').addEventListener('input', () => { slugTocado = true; ecoDelSlug(); });
+
+/* El identificador se deriva del nombre y casi nadie necesita tocarlo. Antes
+   se pedía como un campo obligatorio más, con el mismo peso visual que el
+   nombre del negocio: alguien que llega a llenar esto ve dos casillas y no
+   sabe que la segunda ya está resuelta.
+
+   Ahora se ENSEÑA lo que quedó y se abre solo si lo piden. La regla detrás es
+   la misma que ordena el resto de la consola: no le pidas a nadie lo que ya
+   sabes, pero tampoco se lo escondas. */
+function ecoDelSlug() {
+  const eco = $('#slug-eco'), campo = $('#f-slug');
+  if (!eco || !campo) return;
+  eco.textContent = campo.value || aSlug($('#f-nombre').value) || '—';
+}
+$('#btn-cambiar-slug')?.addEventListener('click', () => {
+  $('#slug-listo').classList.add('oculto');
+  $('#f-slug').classList.remove('oculto');
+  $('#f-slug').focus();
+  $('#f-slug').select();
+});
 $('#f-nombre').addEventListener('input', () => {
   if (!slugTocado) $('#f-slug').value = aSlug($('#f-nombre').value);
+  ecoDelSlug();
   refrescarPrevio();
 });
 ['f-saludo','f-primario','f-acento','f-avatar','f-desc','f-cat','f-cat-otro','f-sug']
@@ -1565,6 +1639,13 @@ function pintarPaso() {
     b.toggleAttribute('data-listo', v.indexOf(PASOS[i]) < lugar);
   });
   $$('.paso').forEach(p => p.toggleAttribute('data-on', p.dataset.paso === PASOS[pasoActual].id));
+
+  /* Lo mismo, en palabras, para la pantalla chica. Se calcula sobre los pasos
+     VISIBLES: un dueño que no ve el paso de plataforma no debe leer «paso 3
+     de 7» y contar solo seis. */
+  $('#pc-num').textContent = `Paso ${lugar + 1} de ${v.length}`;
+  $('#pc-nombre').textContent = PASOS[pasoActual].rot;
+  $('#pc-riel').style.width = Math.round(((lugar + 1) / v.length) * 100) + '%';
   $('#btn-atras').disabled = vecino(-1) === null;
   $('#btn-siguiente').textContent = vecino(1) === null ? 'Publicar' : 'Siguiente →';
   if (PASOS[pasoActual].id === 'previo') refrescarPrevio();
