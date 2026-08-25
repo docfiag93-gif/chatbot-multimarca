@@ -47,6 +47,7 @@ import { huecosLibres, tresOpciones, cualEligio, periodosAOcupacion } from '../s
 import { TOPES, topeDe, estadoDeCuota, respuestaPorTope } from '../servidor/nucleo/cuota.mjs';
 import { decidirEscalar, abiertoAhora } from '../servidor/nucleo/escalar.mjs';
 import { aQuienSeLeContesta } from '../servidor/whatsapp.mjs';
+import { revisarToken, queHacerConElToken } from '../servidor/nucleo/whatsapp-salud.mjs';
 import { temaSugerido, palabrasClave, parecido, agruparPreguntas } from '../publico/cerebro/temas.mjs';
 import { cifrar, descifrar, generarLlaveMaestra } from '../publico/cerebro/cifrado.mjs';
 import { normalizarPerfil, perfilPublico, revisarPerfil, aSlug, NEUTRO } from '../publico/cerebro/perfil.mjs';
@@ -2049,6 +2050,65 @@ suite('De la hora de Google a la hora de tu consultorio', () => {
   ok('de punta a punta: Google dice ocupado y el bot no lo ofrece',
      !libres.some(h => ['16:00','16:30','17:00'].includes(h)) && libres.includes('17:30'),
      libres.join(' '));
+});
+
+await suite('El token que se muere sin avisar', async () => {
+  const AHORA = 1_800_000_000_000;
+  const enHoras = h => Math.floor((AHORA + h * 3_600_000) / 1000);
+  const meta = (cuerpo, ok = true) => async () => ({ ok, json: async () => cuerpo });
+
+  const r = async (cuerpo, ok = true) =>
+    revisarToken({ token: 'T', ahora: AHORA, traer: meta(cuerpo, ok) });
+
+  ok('un token de 20 horas está vigente',
+     (await r({ data: { is_valid: true, expires_at: enHoras(20) } })).estado === 'vigente');
+
+  ok('uno de 3 horas está por vencer',
+     (await r({ data: { is_valid: true, expires_at: enHoras(3) } })).estado === 'por_vencer');
+
+  ok('uno ya pasado está vencido',
+     (await r({ data: { is_valid: true, expires_at: enHoras(-1) } })).estado === 'vencido');
+
+  ok('Meta diciendo que no vale se cree',
+     (await r({ data: { is_valid: false } })).estado === 'vencido');
+
+  /* `expires_at: 0` es como Meta dice «este no vence». Es el que se quiere
+     tener, y por eso NO genera ningún aviso. */
+  ok('uno permanente no molesta',
+     (await r({ data: { is_valid: true, expires_at: 0 } })).estado === 'permanente' &&
+     queHacerConElToken({ estado: 'permanente' }) === null);
+
+  ok('dice cuántas horas quedan',
+     (await r({ data: { is_valid: true, expires_at: enHoras(5) } })).horas === 5);
+
+  /* La dirección segura importa: si la consulta falla, NO se dice que el
+     token murió. Mandar a alguien a rotar una credencial que servía, en
+     medio de una jornada, es peor que callarse. */
+  ok('sin respuesta de Meta NO se declara vencido',
+     (await r({}, false)).estado === 'desconocido');
+  ok('una respuesta rara tampoco',
+     (await r({ sin: 'datos' })).estado === 'desconocido');
+  ok('si truena la red tampoco',
+     (await revisarToken({ token: 'T', traer: async () => { throw new Error('sin red'); } }))
+       .estado === 'desconocido');
+  ok('sin token no inventa nada',
+     (await revisarToken({})).estado === 'desconocido');
+  ok('y «desconocido» no genera aviso',
+     queHacerConElToken({ estado: 'desconocido' }) === null &&
+     queHacerConElToken({ estado: 'vigente' }) === null);
+
+  // Lo que se le dice al dueño
+  const aviso = queHacerConElToken({ estado: 'por_vencer', horas: 3.4 });
+  ok('avisa antes con las horas exactas', /3 horas/.test(aviso.titulo), aviso.titulo);
+  ok('y explica que fallará EN SILENCIO',
+     /sin avisar/.test(aviso.detalle) && /se seguirá viendo bien/.test(aviso.detalle));
+  ok('con menos de una hora no dice «0 horas»',
+     /menos de 1 hora/.test(queHacerConElToken({ estado:'por_vencer', horas:0.4 }).titulo));
+
+  const muerto = queHacerConElToken({ estado: 'vencido' });
+  ok('vencido es crítico, no un aviso', muerto.gravedad === 'critico');
+  ok('y dice exactamente dónde se arregla',
+     /Configuración de la API/.test(muerto.arreglo) && /WHATSAPP_TOKEN/.test(muerto.arreglo));
 });
 
 /* ── pintar ─────────────────────────────────────────────────────────── */

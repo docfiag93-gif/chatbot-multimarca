@@ -27,6 +27,7 @@ import { resolverMarca, configPublica, guardarConversacion, guardarLead, avisar,
   from './nucleo/datos.mjs';
 import { huecosLibres, tresOpciones, cualEligio } from './nucleo/agenda.mjs';
 import { decidirEscalar } from './nucleo/escalar.mjs';
+import { revisarToken, queHacerConElToken } from './nucleo/whatsapp-salud.mjs';
 
 // ── Freno de mano ───────────────────────────────────────────────────────
 // Este endpoint es público y anónimo: cualquiera con la URL puede quemar la
@@ -80,6 +81,22 @@ export async function manejar(req, context) {
     const prueba = d.capacidades.base ? await probarBase(servicio()) : null;
     const problemas = [...d.problemas];
 
+    /* Cuánto le queda al token de WhatsApp. Meta no avisa cuando vence: el
+       bot simplemente deja de contestar y todo lo demás se ve verde. Es la
+       peor forma de fallar que tiene este producto, y la única que se puede
+       anticipar preguntándole a Meta —cosa que nadie hacía. */
+    let saludToken = null;
+    if (d.whatsapp?.responde) {
+      saludToken = await revisarToken({
+        token: env('WHATSAPP_TOKEN'),
+        appSecret: env('WHATSAPP_APP_SECRET'),
+        appId: env('WHATSAPP_APP_ID'),
+      });
+      const queHacer = queHacerConElToken(saludToken);
+      if (queHacer) problemas.unshift({ clave: 'token_whatsapp', ...queHacer,
+                                        variables: ['WHATSAPP_TOKEN'] });
+    }
+
     if (prueba && !prueba.lee) {
       problemas.unshift({
         gravedad: 'critico',
@@ -128,6 +145,7 @@ export async function manejar(req, context) {
          dos horas de haberlo escrito. Por eso abajo hay una prueba que
          compara lo que se calcula contra lo que se entrega. */
       whatsapp: d.whatsapp,
+      tokenWhatsapp: saludToken,
       problemas,
     });
   }
