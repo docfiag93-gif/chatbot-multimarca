@@ -379,6 +379,23 @@ tr:last-child td{border-bottom:0}
 .sin-servidor .btn-ir{display:inline-block;margin-top:10px;clear:both;background:#fff;color:var(--mal);
   padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:13.5px}
 
+/* La lista de variables. Era un bloque de texto muerto que había que
+   comparar a ojo contra Cloudflare; ahora dice cuáles YA están. */
+.variables{display:flex;flex-direction:column;gap:2px;font-family:ui-monospace,Menlo,monospace;
+  font-size:13px;margin-top:10px}
+.variables .v{display:flex;align-items:baseline;gap:9px;padding:5px 8px;border-radius:6px}
+.variables .v.hay{background:var(--ok-suave)}
+.variables .v.no{background:var(--hundido)}
+.variables .v .marca{width:14px;flex:none;text-align:center}
+.variables .v.hay .marca{color:var(--ok)}
+.variables .v.no  .marca{color:var(--tenue)}
+.variables .v .n{font-weight:600}
+.variables .v .para{font-family:inherit;color:var(--tenue);font-size:12px;
+  margin-left:auto;text-align:right;max-width:52%}
+.variables h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--tenue);margin:14px 0 4px;font-family:system-ui,sans-serif}
+.variables h4:first-child{margin-top:0}
+
 /* La barrita del consumo del día. Va dentro de la tarjeta del número
    porque «47» no dice nada y «47 de 200» apenas: lo que se lee de un
    vistazo es cuánto falta para que se acabe. */
@@ -1308,13 +1325,9 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
     </div>
     <div class="tarjeta">
       <h2 class="sec">Variables que necesita Cloudflare</h2>
-      <pre>CHATBOT_CLAVE          # la de arriba
-SUPABASE_URL
-SUPABASE_ANON_KEY
-SUPABASE_SERVICE_KEY
-GEMINI_API_KEY
-GROQ_API_KEY
-RESEND_API_KEY         # para los avisos</pre>
+      <p class="pista">Verde = ya está puesta en el servidor. Se consulta en vivo,
+      y <b>nunca muestra el valor</b>: solo si existe o no.</p>
+      <div id="lista-variables"><p class="pista">Consultando…</p></div>
     </div>
   </section>
 
@@ -2352,6 +2365,41 @@ fetchReal('/api/bot?ping=1').then(r=>r.json()).then(d => {
     '</div>';
 
   $('#estado').innerHTML = filas + wa + (probs || '<div class="aviso ok">Todo configurado.</div>');
+
+  /* La lista de variables, en vivo.
+     Antes era un bloque de texto fijo que había que comparar a ojo contra el
+     panel de Cloudflare, y no incluía las tres de WhatsApp — o sea que quien
+     fuera a buscar la lista ahí, que es donde uno la busca, no las encontraba.
+
+     Se muestra si CADA UNA existe, nunca su valor. Un panel que enseña
+     secretos para «ayudar» es un panel que los filtra por la espalda de quien
+     lo mira. */
+  const c = d.capacidades || {}, ws = d.whatsapp || {};
+  const grupos = [
+    ['Sin esto no funciona', [
+      ['SUPABASE_URL',         c.base || c.panel, 'la dirección de tu base'],
+      ['SUPABASE_SERVICE_KEY', c.base,            'la llave SECRETA, no la publicable'],
+      ['SUPABASE_ANON_KEY',    c.panel,           'para que se pueda entrar al panel'],
+      ['CHATBOT_CLAVE',        c.cifrado,         'cifra conversaciones y datos'],
+    ]],
+    ['Para que el bot conteste', Object.entries(d.proveedores || {})
+      .map(([n, hay]) => [n.toUpperCase() + '_API_KEY', hay, 'proveedor de IA'])],
+    ['Opcionales', [
+      ['RESEND_API_KEY',        c.correo,     'sin esto los avisos no salen'],
+      ['WHATSAPP_VERIFY_TOKEN', ws.verifica,  'el apretón de manos con Meta'],
+      ['WHATSAPP_TOKEN',        ws.responde,  'con qué contesta en WhatsApp'],
+      ['WHATSAPP_APP_SECRET',   ws.firma,     'comprueba que quien llama es Meta'],
+    ]],
+  ];
+
+  const caja = $('#lista-variables');
+  if (caja) caja.innerHTML = '<div class="variables">' + grupos.map(([titulo, vars]) =>
+    `<h4>${esc(titulo)}</h4>` + vars.map(([n, hay, para]) =>
+      `<div class="v ${hay ? 'hay' : 'no'}">
+         <span class="marca">${hay ? '●' : '○'}</span>
+         <span class="n">${esc(n)}</span>
+         <span class="para">${esc(para)}</span>
+       </div>`).join('')).join('') + '</div>';
 }).catch(() => {
   /* No hay servidor detrás de esta página.
      El mensaje que había aquí decía «la consola se ve, pero el asistente no
