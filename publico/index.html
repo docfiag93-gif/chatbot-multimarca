@@ -2367,8 +2367,12 @@ function tarjetaNegocio(n) {
     <div class="pies">
       <span class="placa ${placa}">${esc(estado)}</span>
       ${n.ejemplo?'<span class="placa info">ejemplo</span>':''}
-      ${(n.politicas||[]).length?`<span class="placa ojo">${(n.politicas||[]).length} regla(s)</span>`:''}
-      <span class="placa"><code>${esc(n.slug)}</code></span>
+      ${(n.politicas||[]).length?`<span class="placa ojo">${(n.politicas||[]).length===1
+          ? 'una regla propia' : (n.politicas||[]).length + ' reglas propias'}</span>`:''}
+      <!-- El identificador solo le sirve a quien administra la plataforma y
+           lleva veinte negocios en pantalla. Para un médico con el suyo es
+           ruido ocupando el lugar de algo que sí le dice cómo va. -->
+      ${yo?.esSuper ? `<span class="placa"><code>${esc(n.slug)}</code></span>` : ''}
     </div>
     ${enLinea && n.id && !n.ejemplo ? interruptorDe(n) : ''}
     <div class="acciones-neg">${accionesDe(n, estado)}</div>
@@ -2392,8 +2396,13 @@ function accionesDe(n, estado) {
     b.push(`<button class="btn chico" data-hacer="editar" data-id="${esc(n.id)}">Editar</button>`);
   }
   b.push(`<button class="btn sec chico" data-hacer="probar" data-slug="${esc(n.slug)}">Probar</button>`);
-  b.push(`<button class="btn fantasma chico" data-hacer="copiar" data-slug="${esc(n.slug)}">Copiar código</button>`);
+  /* Copiar LA LIGA va antes que copiar el código, y no es un detalle de
+     orden: la tarjeta ofrecía el fragmento para pegar en una página web —el
+     camino del programador— y no ofrecía la liga, que es lo que un médico
+     usa todos los días para mandarla por WhatsApp o ponerla en su perfil. */
+  b.push(`<button class="btn fantasma chico" data-hacer="copiarliga" data-slug="${esc(n.slug)}">Copiar liga</button>`);
   b.push(`<button class="btn fantasma chico" data-hacer="qr" data-slug="${esc(n.slug)}">QR</button>`);
+  b.push(`<button class="btn fantasma chico" data-hacer="copiar" data-slug="${esc(n.slug)}">Código web</button>`);
   if (enLinea && n.id && !n.ejemplo) {
     b.push(`<button class="btn fantasma chico" data-hacer="whatsapp" data-id="${esc(n.id)}">${
       n.whatsapp_id ? '✓ WhatsApp' : 'WhatsApp'}</button>`);
@@ -2476,8 +2485,11 @@ $('#lista-negocios').addEventListener('click', async (ev) => {
   if (hacer === 'plan')     { mostrarPlan(id); return; }
 
 
-  if (hacer === 'copiar') {
-    const ok = await copiarTexto(fragmentoDe(slug));
+  if (hacer === 'copiar' || hacer === 'copiarliga') {
+    const texto = hacer === 'copiarliga'
+      ? location.origin + '/chat.html?marca=' + encodeURIComponent(slug)
+      : fragmentoDe(slug);
+    const ok = await copiarTexto(texto);
     const antes = b.textContent;
     b.classList.toggle('hecho', ok);
     b.textContent = ok ? '✓ Copiado' : 'No se pudo copiar';
