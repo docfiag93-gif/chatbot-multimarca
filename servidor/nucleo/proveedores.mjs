@@ -26,7 +26,21 @@ const GROQ      = 'https://api.groq.com/openai/v1';
 const ANTHROPIC = 'https://api.anthropic.com/v1';
 const OPENAI    = 'https://api.openai.com/v1';
 
-export const ORDEN_POR_OMISION = 'gemini,groq';
+/* Groq primero, Gemini de respaldo.
+ *
+ * Estaba al revés, y medido en producción el 10 de noviembre la llave de
+ * Gemini llevaba la cuota agotada: 429 en el 100% de las peticiones, con
+ * «You exceeded your current quota». Un proveedor que falla siempre y va
+ * primero no es un respaldo — es un peaje: dos viajes y cerca de un segundo
+ * de espera en CADA mensaje, antes de llegar al que sí contesta.
+ *
+ * Esto no arregla la cuota de Gemini, que es de la llave y no del código.
+ * Lo que hace es que el día que vuelva, Gemini sea lo que un respaldo debe
+ * ser: lo que atrapa la caída del primero, no lo que la provoca.
+ *
+ * `BOT_ORDEN` en el entorno y el orden propio de la marca siguen ganando
+ * sobre esto. */
+export const ORDEN_POR_OMISION = 'groq,gemini';
 
 // Tiempo máximo por intento. Corto a propósito: si un proveedor no contestó
 // en 15 s, esperar más no mejora la respuesta, solo retrasa el respaldo que

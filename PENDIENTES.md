@@ -179,3 +179,94 @@ Documentos: `claude.ai/code/artifact/fc46b79a-880d-4322-826d-b5a7d13f3900`
 - **Los comandos con `curl` van en la Terminal del Mac, NO en Supabase.**
 
 **276 pruebas** pasan. Todo subido y desplegado.
+
+---
+
+# 10 de noviembre · lo que se encontró y lo que falta
+
+## Lo que estaba roto y ya no
+
+**La base de datos estaba PAUSADA.** El plan gratuito de Supabase la apaga
+sola a los 7 días sin uso, y la última vez que se tocó fue el 25 de agosto.
+Eso es por qué «no contestaba»: no es que contestara mal, es que no tenía de
+dónde leer tu consultorio. Ya está despierta.
+
+⚠️ **Va a volver a pasar.** Cada vez que dejes el proyecto más de una semana
+sin que nadie le escriba, la base se apaga. Dos salidas: entrar al panel una
+vez por semana, o pasar Supabase a plan de paga.
+
+**El bot decía que no tenías WhatsApp.** Verificado en vivo: preguntándole
+por tu WhatsApp —que sí estaba cargado— contestaba «Lo siento, no tenemos
+WhatsApp. Puede llamarnos al (phone)». El prompt le ordenaba «ofrece el
+contacto» y ningún bloque le pasaba cuál era. Arreglado.
+
+**El número viejo estaba dando la cara.** `9616552222` era lo que el bot
+repartía a los pacientes. Cambiado a `529611166263` en la base, verificado
+en producción.
+
+**1 de cada 8 pacientes veía «se me trabó la conexión».** Tres fallas
+encadenadas en la elección del modelo de Groq. Ahora 10 de 10. El detalle
+está en los commits del 10 de noviembre.
+
+**La cola de urgencia nunca había salido.** `seguridad.mjs` la lee de
+`contactos.urgencias` y el formulario no tenía ese campo. Ya lo tiene, y
+quedó puesto tu número. Verificado: ante un dolor de pecho manda al 911 y
+DESPUÉS dice «ya que vayas en camino, avísanos al 529611166263».
+
+**El botón de pánico.** Ahora vive en el pie del cajón, visible en todas las
+pantallas, y silencia todos tus negocios de una. Antes eran tres botones de
+11 px dentro de la tarjeta.
+
+## Lo que falta, y es tuyo
+
+**1 · La llave de Gemini tiene la cuota agotada.** 429 en el 100% de las
+peticiones: «You exceeded your current quota». Hoy no aporta nada. Groq
+aguanta solo, pero sin respaldo: el día que Groq tosa, no hay segundo.
+Saca una llave nueva en `aistudio.google.com/apikey` y actualiza
+`GEMINI_API_KEY` en Cloudflare.
+
+**2 · El token de WhatsApp está muerto otra vez.** El ping dice
+`tokenWhatsapp: meta_400`. Los del panel de Meta duran HORAS. El permanente
+se saca como «usuario del sistema» en la configuración del portafolio
+comercial, y no caduca. Mientras no esté, WhatsApp no contesta.
+
+**3 · `RESEND_API_KEY` no está, y esto es lo más grave de la lista.**
+Las urgencias se guardan pero NADIE te avisa. Un dolor de pecho a las 2 de
+la mañana queda en la base y tú te enteras cuando abras el panel. Llave
+gratis en `resend.com`.
+
+**4 · Tu domicilio fiscal en el aviso de privacidad.** Sigue siendo el único
+hueco, y sin publicar la app en Meta tus pacientes reales no pueden
+escribirle al bot: hoy solo funcionan los cinco números de prueba.
+
+**5 · Los datos reales del consultorio.** Precios y horarios siguen siendo
+ficticios. Negocios → Editar → pasos 4 y 5.
+
+## Facebook, Instagram y TikTok
+
+Lo que se puede y lo que no, sin adornos.
+
+**Messenger e Instagram DM: se puede, y reusa casi todo lo que ya está.**
+Llegan por el mismo webhook de Meta que ya existe y ya valida firma; lo que
+cambia es la forma del sobre (`entry[].messaging[]` en vez de
+`entry[].changes[].value.messages[]`) y el endpoint para contestar. El
+cerebro, el anclaje, las banderas de urgencia y el interruptor se usan tal
+cual. Son unas 150 líneas.
+
+**Pero no se puede encender hoy**, y no por el código: hace falta que Meta
+apruebe los permisos `pages_messaging` e `instagram_manage_messages`, y eso
+pasa por App Review, que pide la app publicada, que pide el aviso de
+privacidad completo. O sea: el punto 4 de arriba.
+
+**TikTok: no.** No hay API pública de mensajes directos para cuentas de
+negocio. No es que falte configurarla — no existe. Lo que sí se puede es
+poner el enlace del chat en la bio.
+
+**Y esto funciona HOY, sin pedirle permiso a nadie:** el enlace del widget
+en la bio de las tres redes.
+
+    https://chatbot-multimarca.pages.dev/chat.html?marca=consultorio-dr-fernandoisa
+
+Cero aprobaciones, cero tokens, cero espera. Contesta, detecta urgencias,
+manda al 911 y toma datos. Es la jugada que no cuesta nada mientras lo demás
+se resuelve.
