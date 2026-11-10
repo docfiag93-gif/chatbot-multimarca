@@ -964,6 +964,62 @@ await suite('Prender y apagar el bot', async () => {
 /* ══════════════════════════════════════════════════════════════════════
    ·  TELÉFONOS INVENTADOS  ·  el hueco que se coló a producción
    ══════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   EL CONTACTO SÍ LLEGA AL PROMPT
+
+   Encontrado en PRODUCCIÓN el 10 de noviembre, no leyendo código: se le
+   preguntó al consultorio por su WhatsApp —que tenía cargado— y contestó
+   «Lo siento, no tenemos WhatsApp. Puede llamarnos al (phone)...».
+
+   La causa: el prompt llevaba desde siempre la orden «si no tienes el dato,
+   dilo y OFRECE EL CONTACTO», y ningún bloque le pasaba cuál era. No era que
+   el modelo se portara mal; era que se le pedía algo que nunca recibió.
+
+   Estas pruebas valen por lo que separan, no por lo que confirman:
+   un bloque de contactos que se arma bien pero no entra en `construirPrompt`
+   deja al bot exactamente igual de mudo. Por eso TODAS preguntan por el
+   prompt completo y ninguna por la función suelta.
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('El contacto llega al prompt', async () => {
+  const conWa = {
+    nombre: 'Consultorio', categoria: 'Salud y bienestar',
+    contactos: { principal: { whatsapp: '529611166263', etiqueta: 'Escribir por WhatsApp' } },
+  };
+  const P = construirPrompt(conWa, []);
+
+  ok('el número cargado aparece en el prompt', P.includes('529611166263'));
+  ok('se le dice que es WhatsApp',             /WhatsApp 529611166263/.test(P));
+  ok('se le prohíbe negar que hay WhatsApp',   /Nunca digas que el negocio no tiene WhatsApp/.test(P));
+  ok('se le prohíben los huecos de plantilla', /\(phone\)/.test(P));
+
+  // El de urgencias NO se mezcla con el de todos los días: si se repartiera
+  // el mismo para preguntar precios, el teléfono de un infarto suena para
+  // cotizar una consulta.
+  const dos = construirPrompt({
+    nombre: 'Consultorio',
+    contactos: {
+      principal: { whatsapp: '529611166263' },
+      urgencias: { whatsapp: '529612223344', etiqueta: 'te recibimos en el hospital' },
+    },
+  }, []);
+  ok('el de urgencias va rotulado aparte', /Solo para urgencias: WhatsApp 529612223344/.test(dos));
+  ok('el de siempre sigue rotulado aparte', /Para escribir o llamar: WhatsApp 529611166263/.test(dos));
+
+  /* SIN contactos no se calla: se le ORDENA no inventar. Un bloque ausente
+     lo dejaba con la instrucción de ofrecer contacto y nada con qué
+     cumplirla, que es justo el estado que produjo el «(phone)». */
+  const sin = construirPrompt({ nombre: 'Consultorio', contactos: {} }, []);
+  ok('sin contactos se lo dice explícitamente', /NO tiene cargado ningún teléfono/.test(sin));
+  ok('sin contactos le prohíbe inventar uno',   /Nunca te inventes un número/.test(sin));
+  ok('sin contactos no promete un número falso', !/\b\d{10,}\b/.test(sin.split('CÓMO LLEGAR A UNA PERSONA')[1] || ''));
+
+  /* Un objeto de urgencias VACÍO no debe producir un renglón: un rótulo
+     «Solo para urgencias:» sin número detrás es peor que no ponerlo. */
+  const vacio = construirPrompt({
+    nombre: 'X', contactos: { principal: { whatsapp: '529611166263' }, urgencias: {} } }, []);
+  ok('urgencias vacío no deja un rótulo huérfano', !/Solo para urgencias/.test(vacio));
+});
+
 await suite('Teléfonos inventados', async () => {
   const consultorio = {
     nombre: 'Consultorio', categoria: 'Salud y bienestar',

@@ -144,6 +144,29 @@ body:not(.sin-cajon) .hoja{margin-left:246px;max-width:calc(1120px + 246px)}
 .estado-bot.apagado b{color:var(--mal)}
 .estado-bot.mezcla  .punto{background:var(--tenue)}
 
+/* El botón de pánico. Vive DENTRO del indicador de estado, en el pie del
+   cajón, así que está en pantalla en todas las secciones y no hay que
+   buscar el negocio para callarlo.
+
+   Ocupa el ancho completo y no va junto al texto: cuando hay que apretarlo
+   es porque el bot le está contestando mal a alguien, y en ese momento un
+   botón de 11 px al lado de una etiqueta es un botón que no se encuentra. */
+/* Un campo opcional tiene que decirlo en la etiqueta. Si no, quien llena el
+   formulario se detiene a buscar el dato creyendo que es obligatorio. */
+.opcional{font-weight:500;color:var(--tenue);font-size:.88em}
+
+.estado-bot{flex-wrap:wrap}
+.estado-bot .panico{flex-basis:100%;margin-top:9px;min-height:36px;font-size:12.5px;
+  font-weight:650;border-radius:9px;cursor:pointer;border:1px solid;
+  transition:background .14s,color .14s}
+.estado-bot .panico[disabled]{opacity:.55;cursor:wait}
+/* Callar es destructivo-ish y va en rojo; revivir es la vuelta a la normalidad
+   y va en verde. El mismo botón con dos caras, nunca las dos a la vez. */
+.estado-bot .panico.callar{background:var(--mal-suave);border-color:var(--mal);color:var(--mal)}
+.estado-bot .panico.callar:hover:not([disabled]){background:var(--mal);color:#fff}
+.estado-bot .panico.revivir{background:var(--ok-suave);border-color:var(--ok);color:var(--ok)}
+.estado-bot .panico.revivir:hover:not([disabled]){background:var(--ok);color:#fff}
+
 /* En una columna de 246 px, un correo y un rol no caben en la misma línea
    que un botón: el texto se partía en cuatro renglones y «Salir» quedaba
    encajado en medio. Van apilados, y los dos recortados. */
@@ -1235,9 +1258,38 @@ pre{background:var(--hundido);padding:13px;border-radius:9px;overflow-x:auto;
           <label for="f-contacto">Número al que mandar a quien pida hablar con una persona</label>
           <input id="f-contacto" placeholder="521961XXXXXXX" inputmode="tel">
           <p class="pista">Con lada de país y sin espacios ni guiones: <code>52</code>
-          + <code>1</code> + tus diez dígitos. Para Tuxtla queda
-          <code>521961</code> y los siete restantes. No hace falta nada de Meta:
-          el botón abre el WhatsApp de quien te escribe, con su pregunta ya redactada.</p>
+          y tus diez dígitos. Para Tuxtla queda <code>52961</code> y los siete
+          restantes. No hace falta nada de Meta: el botón abre el WhatsApp de
+          quien te escribe, con su pregunta ya redactada.</p>
+        </div>
+
+        <!-- ── EL CONTACTO DE URGENCIAS ─────────────────────────────────────
+             Esto no es un campo más. `seguridad.mjs` lo lee desde hace meses
+             para armar la cola del mensaje de urgencia —«ya que vayas en
+             camino, avísanos al…»— y el formulario nunca lo tuvo, así que esa
+             cola no le ha salido a nadie jamás.
+
+             Va SEPARADO del de arriba a propósito. Si fuera el mismo número,
+             el bot repartiría el de urgencias para preguntar precios, y el
+             de precios para un infarto. Son dos puertas distintas y el
+             prompt las trata distinto.
+
+             Y va DESPUÉS del 911, nunca en su lugar: ese orden está fijo en
+             el código y no se puede cambiar desde aquí. -->
+        <h3 style="margin-top:26px">Si alguien tiene una urgencia</h3>
+        <div class="campo" style="margin-bottom:6px">
+          <label for="f-urgencias">Tu número para urgencias <span class="opcional">(opcional)</span></label>
+          <input id="f-urgencias" placeholder="52961XXXXXXX" inputmode="tel">
+          <p class="pista">El bot <b>siempre</b> manda primero al <b>911</b>. Esto se
+          agrega después: «ya que vayas en camino, avísanos al…». Déjalo vacío si
+          no quieres que te marquen fuera de consulta.</p>
+        </div>
+        <div class="campo">
+          <label for="f-urgencias-donde">Dónde puedes recibirlo <span class="opcional">(opcional)</span></label>
+          <input id="f-urgencias-donde" placeholder="te recibimos en Hospital Xamaipak o Aranda" maxlength="90">
+          <p class="pista">Una frase corta, en minúsculas, que cierre la oración
+          «avísanos al 961 …: <i>te recibimos en…</i>». Nada de criterios médicos
+          aquí: eso no se le entrega al paciente.</p>
         </div>
 
         <h3 style="margin-top:26px">Horarios de atención</h3>
@@ -2005,6 +2057,36 @@ $('#politicas').innerHTML = POLITICAS_UI.map(p => `
     </span></label>`).join('');
 $$('.ac,.po').forEach(i => i.addEventListener('change', refrescarPrevio));
 
+/**
+ * Los contactos, armados desde los dos campos del paso de comportamiento.
+ *
+ * Se limpian los dígitos aquí y no al guardar en el servidor porque el que
+ * los teclea es quien tiene que ver el resultado: un número con espacios se
+ * guardaba tal cual y el enlace de WhatsApp salía roto sin decir por qué.
+ *
+ * `urgencias` solo se crea si hay ALGO que poner. Una llave con el objeto
+ * vacío haría que `colaDelNegocio` la encontrara, no sacara ni teléfono ni
+ * lugar, y devolviera cadena vacía: el mismo resultado, con un viaje de más
+ * y una fila en la base que parece configurada y no lo está.
+ */
+function armarContactos() {
+  const soloDigitos = (v) => String(v || '').replace(/\D/g, '');
+  const c = {};
+
+  const wa = soloDigitos($('#f-contacto').value);
+  if (wa) c.principal = { whatsapp: wa, etiqueta: 'Escribir por WhatsApp' };
+
+  const urgTel   = soloDigitos($('#f-urgencias').value);
+  const urgDonde = String($('#f-urgencias-donde').value || '').trim().slice(0, 90);
+  if (urgTel || urgDonde) {
+    c.urgencias = {};
+    if (urgTel)   c.urgencias.whatsapp = urgTel;
+    if (urgDonde) c.urgencias.etiqueta = urgDonde;
+  }
+
+  return c;
+}
+
 /* ── juntar el perfil desde el formulario ─────────────────────────── */
 function perfilDelFormulario() {
   const cat = $('#f-cat').value === 'Otro' ? $('#f-cat-otro').value : $('#f-cat').value;
@@ -2037,8 +2119,7 @@ function perfilDelFormulario() {
       .filter(([k,v]) => k && v)),
     acciones: $$('.ac').filter(i=>i.checked||i.disabled).map(i=>i.value),
     politicas: $$('.po').filter(i=>i.checked).map(i=>i.value),
-    contactos: $('#f-contacto').value
-      ? { principal: { whatsapp: $('#f-contacto').value, etiqueta: 'Escribir por WhatsApp' } } : {},
+    contactos: armarContactos(),
     horarios: horariosDelFormulario(),
     duracionCita: +$('#f-duracion').value || 30,
     proveedores: $('#f-orden')?.value ? $('#f-orden').value.split(',') : [],
@@ -2336,6 +2417,9 @@ function llenarFormulario(p) {
   const wa = (p.contactos || {}).principal?.whatsapp
           || Object.values(p.contactos || {})[0]?.whatsapp || '';
   $('#f-contacto').value = wa;
+  const urg = (p.contactos || {}).urgencias || {};
+  $('#f-urgencias').value       = urg.telefono || urg.whatsapp || '';
+  $('#f-urgencias-donde').value = urg.etiqueta || '';
 
   llenarHorarios(p.horarios || {});
   $('#f-duracion').value = String(p.duracionCita || 30);
@@ -4533,9 +4617,77 @@ function pintarPieLateral() {
   }[clase];
 
   caja.className = 'estado-bot ' + clase;
+
+  /* El botón dice lo que VA A PASAR, no en qué estado estás: el estado ya lo
+     dice el texto de arriba. Un botón rotulado con el estado actual es el
+     error clásico de los interruptores y hace que la gente lo apriete al
+     revés justo cuando no puede equivocarse.
+
+     «Silenciar» y no «Apagar»: apagado deja a quien escribe sin nada y esa
+     persona no vuelve. Recados sigue tomando el teléfono de quien llegó, que
+     es lo que de verdad no se quiere perder mientras el bot está castigado. */
+  const callados = propios.filter(n => (n.modo || 'activo') !== 'activo');
+  const boton = callados.length
+    ? `<button class="panico revivir" id="btn-panico" data-hacia="activo">
+         ${callados.length === propios.length ? 'Reactivar el bot' : 'Reactivar todos'}
+       </button>`
+    : `<button class="panico callar" id="btn-panico" data-hacia="recados">
+         Silenciar${propios.length > 1 ? ' todos' : ''} ahora
+       </button>`;
+
   caja.innerHTML = `<span class="punto"></span><div><b>${esc(texto[0])}</b>
-    <small>${esc(texto[1])}</small></div>`;
+    <small>${esc(texto[1])}</small></div>` + boton;
 }
+
+/* ── EL BOTÓN DE PÁNICO ────────────────────────────────────────────────────
+ *
+ * Un oyente en el documento y no en el botón: `pintarPieLateral` rehace ese
+ * HTML en cada repintado, y un oyente colgado del botón se iría con él.
+ *
+ * Silenciar pregunta; reactivar no. No es simetría mal hecha: callar al bot
+ * mientras un paciente escribe tiene costo, y apretarlo sin querer en el
+ * celular es fácil. Revivirlo es volver a lo normal.
+ *
+ * Y va negocio por negocio a propósito, sin endpoint nuevo que haga el lote:
+ * `empresas.modo` ya existe, ya está auditado y ya comprueba permisos. Un
+ * endpoint «cambiar todos» tendría que repetir esas tres cosas, y el día que
+ * una se repita mal es el día que alguien calla el bot de otro cliente.
+ */
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('#btn-panico');
+  if (!b) return;
+
+  const hacia  = b.dataset.hacia;
+  const propios = negociosVisibles().filter(n => n.id && !n.ejemplo);
+  const tocan   = propios.filter(n => (n.modo || 'activo') !== hacia);
+  if (!tocan.length) return;
+
+  if (hacia === 'recados' && !confirm(
+        'El bot deja de contestar por su cuenta' +
+        (tocan.length > 1 ? ' en ' + tocan.length + ' negocios' : '') +
+        '.\n\nSigue tomando nombre y teléfono de quien escriba, y te avisa. ' +
+        'Lo reactivas desde el mismo botón.')) return;
+
+  b.disabled = true;
+  b.textContent = hacia === 'recados' ? 'Silenciando…' : 'Reactivando…';
+
+  /* Se cambia uno por uno y se apunta cuál falló. Si se diera por bueno el
+     lote entero porque «la llamada no tronó», el dueño se iría tranquilo con
+     un bot todavía hablando. */
+  const fallaron = [];
+  for (const n of tocan) {
+    try { await api('empresas.modo', { id: n.id, modo: hacia }); n.modo = hacia; }
+    catch (e) { fallaron.push(n.nombre); }
+  }
+
+  pintarNegocios();
+  pintarPieLateral();
+
+  if (fallaron.length) {
+    alert('No se pudo cambiar: ' + fallaron.join(', ') +
+          '.\nAbre la tarjeta del negocio y usa el interruptor de ahí.');
+  }
+});
 
 function modoConsola({ demostracion = false } = {}) {
   document.body.classList.remove('sin-cajon');

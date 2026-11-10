@@ -85,6 +85,78 @@ function bloqueConocimiento(p) {
     p.conocimiento.map(k => `### ${k.tema}\n${k.texto}`).join('\n\n');
 }
 
+/* ── CÓMO LLEGAR A UNA PERSONA ────────────────────────────────────────────
+ *
+ * Esto faltaba, y fallaba del peor modo posible.
+ *
+ * El prompt lleva desde el principio una instrucción que dice «si no tienes
+ * el dato, dilo y OFRECE EL CONTACTO». Pero ningún bloque le pasaba cuál es
+ * el contacto. Al modelo se le estaba pidiendo entregar algo que nunca
+ * recibió, y un modelo al que le pides un dato que no tiene no se calla:
+ * rellena. Verificado en producción el 10 de noviembre, preguntándole al
+ * consultorio por su WhatsApp —que SÍ tiene cargado—:
+ *
+ *   «Lo siento, no tenemos WhatsApp. Puede llamarnos al (phone)...»
+ *
+ * Las dos mitades son graves y por razones distintas. «No tenemos WhatsApp»
+ * es falso y le cierra la puerta a un paciente que ya quería escribir. Y
+ * «(phone)» es un hueco de plantilla saliendo tal cual a la pantalla de una
+ * persona.
+ *
+ * Ninguna de las dos la atrapa el anclaje, y es importante entender por qué
+ * antes de confiar en él para lo que no es: el anclaje compara DATOS que el
+ * bot afirma contra los datos cargados. «(phone)» no trae ni un dígito, así
+ * que la regla de teléfonos no lo mira; y «no tenemos WhatsApp» no afirma un
+ * dato, NIEGA uno. El anclaje atrapa al bot inventando; no lo atrapa
+ * desmintiendo al negocio. Para eso no hay red: hay que pasarle el dato.
+ *
+ * Va DESPUÉS del conocimiento y ANTES de los límites, en el mismo lugar
+ * donde el modelo ya está buscando con qué cerrar.
+ */
+function bloqueContactos(p) {
+  const c = p.contactos || {};
+  const lineas = [];
+
+  /* El orden importa: `principal` primero. Si un negocio cargó también un
+     contacto de urgencias, ese NO es el que se ofrece cuando alguien
+     pregunta cómo escribirles — se ofrece solo cuando hay una urgencia, y de
+     eso se encarga `seguridad.mjs` con su propia regla. Mezclarlos aquí
+     haría que el bot repartiera el número de urgencias para preguntar
+     precios. */
+  const etiquetas = { principal: 'Para escribir o llamar', urgencias: 'Solo para urgencias' };
+  for (const clave of ['principal', 'urgencias']) {
+    const v = c[clave];
+    if (!v || typeof v !== 'object') continue;
+    const vias = [];
+    if (v.whatsapp) vias.push(`WhatsApp ${v.whatsapp}`);
+    if (v.telefono) vias.push(`teléfono ${v.telefono}`);
+    if (v.correo)   vias.push(`correo ${v.correo}`);
+    if (!vias.length) continue;
+    lineas.push(`- ${etiquetas[clave]}: ${vias.join(', ')}`);
+  }
+
+  /* Sin contactos cargados NO se devuelve un bloque vacío: se devuelve una
+     orden explícita de no inventar. Es la diferencia entre callar y mentir.
+     Un bloque ausente deja al modelo con la instrucción de «ofrece el
+     contacto» y nada con qué cumplirla, que es justo el estado que produjo
+     el «(phone)». */
+  if (!lineas.length) {
+    return `CÓMO LLEGAR A UNA PERSONA
+Este negocio NO tiene cargado ningún teléfono, WhatsApp ni correo.
+- Nunca te inventes un número, un correo ni un enlace. Ni de ejemplo.
+- Nunca escribas huecos de plantilla como (phone), [teléfono] o XXXX.
+- Si alguien pide cómo contactar, di que por aquí mismo le tomas sus datos
+  y que le contestan en cuanto puedan. Nada más.`;
+  }
+
+  return `CÓMO LLEGAR A UNA PERSONA
+Estas son las ÚNICAS formas de contacto que tiene este negocio:
+${lineas.join('\n')}
+- Si preguntan cómo contactarlos, da el de arriba, tal cual, con sus dígitos.
+- Nunca digas que el negocio no tiene WhatsApp o teléfono si aquí hay uno.
+- Nunca te inventes otro número ni escribas huecos como (phone) o [teléfono].`;
+}
+
 function bloqueAtributos(p) {
   const claves = Object.keys(p.atributos || {});
   if (!claves.length) return '';
@@ -121,6 +193,10 @@ export function construirPrompt(perfil, mensajes) {
     bloqueCatalogo(p),
     bloqueHorarios(p),
     bloqueUbicaciones(p),
+    // Va aquí y no al final: es con lo que el modelo cierra cuando NO sabe
+    // algo, y lo que no sabe lo descubre justo después de leer el catálogo,
+    // los horarios y las ubicaciones.
+    bloqueContactos(p),
     bloqueAtributos(p),
 
     limites.length ? `LO QUE NO HACES\n${limites.map(l => `- ${l}`).join('\n')}` : '',
