@@ -180,6 +180,100 @@ suite('Llaves por marca · aislamiento', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════
+   EL MODELO GUARDADO, Y EL 400 QUE NO SE OLVIDABA
+
+   Medido en producción el 10 de noviembre: 1 de cada 8 mensajes moría, y
+   siempre con `groq 400`. Parecía azar por petición y no lo era — era azar
+   por ISOLATE.
+
+   Dos fallas que se sumaban:
+
+   1. El modelo se elegía con `[0]` de la lista tal como la devolvió Groq, y
+      ese orden no está garantizado. Cada isolate de Cloudflare tiene su
+      propia caché de módulo, así que a cada uno le podía quedar un modelo
+      distinto.
+
+   2. La caché se olvidaba en 404 y 429, pero NO en 400 — que es justo el
+      código con que Groq rechaza un modelo que ya no existe. El modelo malo
+      se quedaba las seis horas del TTL, y todo lo que cayera en ese isolate
+      moría igual. Gemini ya lo hacía bien con [400, 404, 429]; esta era la
+      única lista a la que le faltaba un número.
+   ══════════════════════════════════════════════════════════════════════ */
+await suite('El modelo de Groq se elige igual siempre', async () => {
+  const envQ = entornoDe({ BOT_ORDEN: 'groq', GROQ_API_KEY: 'q1' });
+
+  /* La MISMA lista en dos órdenes distintos tiene que dar el mismo modelo.
+     Si no, dos copias del worker eligen distinto y el bot funciona para
+     unos y no para otros. */
+  const elegirCon = async (orden) => {
+    _limpiarCacheModelos();
+    let usado = null;
+    globalThis.fetch = (url, o = {}) => {
+      const u = String(url);
+      if (u.includes('groq.com/openai/v1/models'))
+        return Promise.resolve(new Response(JSON.stringify({ data: orden.map(id => ({ id })) })));
+      if (u.includes('groq.com')) {
+        usado = JSON.parse(o.body).model;
+        return Promise.resolve(new Response(JSON.stringify(RESP_GROQ(CUERPO))));
+      }
+      return Promise.resolve(new Response('{}', { status: 404 }));
+    };
+    await preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 });
+    return usado;
+  };
+
+  const a = await elegirCon(['llama-3.1-8b-instant', 'llama-3.3-8b-instant']);
+  const b = await elegirCon(['llama-3.3-8b-instant', 'llama-3.1-8b-instant']);
+  ok('el orden de la lista no cambia el modelo elegido', a === b, a + ' vs ' + b);
+  ok('y el elegido es uno de los de la lista',
+     ['llama-3.1-8b-instant', 'llama-3.3-8b-instant'].includes(a), String(a));
+
+  /* El 400 tiene que TIRAR la caché. Se mide por el número de veces que se
+     pide la lista de modelos: si la segunda petición vuelve a pedirla, la
+     caché se olvidó. Si no, el modelo malo sigue ahí.
+
+     Se cuenta la petición a /models y no el modelo del cuerpo a propósito:
+     con un solo modelo en la lista el reintento usaría el mismo nombre, y
+     una prueba que mirara el nombre aprobaría igual con la caché sucia. */
+  _limpiarCacheModelos();
+  let listas = 0;
+  globalThis.fetch = (url) => {
+    const u = String(url);
+    if (u.includes('groq.com/openai/v1/models')) {
+      listas++;
+      return Promise.resolve(new Response(JSON.stringify(LISTA_GROQ)));
+    }
+    if (u.includes('groq.com'))
+      return Promise.resolve(new Response('model_decommissioned', { status: 400 }));
+    return Promise.resolve(new Response('{}', { status: 404 }));
+  };
+  await lanza(() => preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 }));
+  await lanza(() => preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 }));
+  ok('un 400 tira el modelo guardado y se vuelve a pedir la lista',
+     listas === 2, 'se pidió ' + listas + ' veces');
+
+  /* Y al revés: un 503 NO debe tirar la caché. Un pico pasajero del
+     proveedor no dice nada malo del modelo, y volver a pedir la lista en
+     cada hipo le suma un viaje a cada mensaje. */
+  _limpiarCacheModelos();
+  let listas5 = 0;
+  globalThis.fetch = (url) => {
+    const u = String(url);
+    if (u.includes('groq.com/openai/v1/models')) {
+      listas5++;
+      return Promise.resolve(new Response(JSON.stringify(LISTA_GROQ)));
+    }
+    if (u.includes('groq.com')) return Promise.resolve(new Response('caido', { status: 503 }));
+    return Promise.resolve(new Response('{}', { status: 404 }));
+  };
+  await lanza(() => preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 }));
+  await lanza(() => preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 }));
+  ok('un 503 NO tira el modelo guardado', listas5 === 1, 'se pidió ' + listas5 + ' veces');
+
+  restaurarFetch();
+});
+
+/* ══════════════════════════════════════════════════════════════════════
    3 · RESPALDO Y REINTENTO
    ══════════════════════════════════════════════════════════════════════ */
 await suite('Respaldo y reintento', async () => {

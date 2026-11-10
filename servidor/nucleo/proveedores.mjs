@@ -205,10 +205,25 @@ async function modeloGroq(key, ms) {
 
   const utiles = data.filter(m => !/whisper|tts|guard|vision/i.test(m.id || ''));
   if (!utiles.length) throw new ErrorProveedor('la llave no tiene modelos de texto disponibles', { estado: 403 });
-  // Un "instant"/8b alcanza de sobra para atender una consulta y deja los
-  // modelos grandes libres para lo que sí los necesite.
+
+  /* El modelo se elegía con `[0]` de la lista tal como la devolvió Groq, y
+     ese orden NO está garantizado. Cada isolate de Cloudflare tiene su
+     propia caché de módulo, así que dos isolates pedían la lista, les
+     llegaba en distinto orden, y cada uno se quedaba con un modelo distinto
+     durante las seis horas del TTL.
+
+     Medido en producción el 10 de noviembre: 1 de cada 8 mensajes moría, y
+     siempre con `groq 400`. No era azar por petición — era azar por
+     isolate: el que había guardado un modelo que ya no existe fallaba
+     SIEMPRE, y el que guardó uno bueno funcionaba SIEMPRE.
+
+     Se ordena por nombre antes de elegir. Un empate resuelto igual en todas
+     las copias vale más que cualquier heurística: un bot que falla para una
+     de cada ocho personas es indistinguible de uno roto, y mucho más difícil
+     de diagnosticar. */
   const rapido = utiles.filter(m => /instant|8b/i.test(m.id));
-  const elegido = (rapido.length ? rapido : utiles)[0].id;
+  const elegido = (rapido.length ? rapido : utiles)
+    .map(m => m.id).sort()[0];
   guardar('groq', key, elegido);
   return elegido;
 }
@@ -227,7 +242,15 @@ async function groq(key, prompt, ms) {
   }, ms);
 
   if (!r.ok) {
-    if ([404, 429].includes(r.status)) olvidar('groq', key);
+    /* El 400 faltaba, y era el que más dolía. Groq contesta 400 cuando el
+       modelo del cuerpo ya no existe o no admite `response_format`. Sin
+       olvidarlo, el modelo malo se quedaba en la caché las seis horas del
+       TTL y TODAS las peticiones que cayeran en ese isolate morían igual.
+
+       Gemini ya lo hacía bien —su lista es [400, 404, 429]— y esta era la
+       única que no. Una inconsistencia de un número entre dos funciones
+       hermanas, y costaba uno de cada ocho pacientes. */
+    if ([400, 404, 429].includes(r.status)) olvidar('groq', key);
     await fallar(r, 'groq');
   }
   const j = await r.json();

@@ -578,9 +578,10 @@ export async function manejar(req, context) {
                error de un proveedor puede traer el prompt de vuelta, y el
                prompt lleva dentro el catálogo y los horarios del negocio. */
             intentos: (f.intentos || []).slice(0, 6).map(i => ({
-              proveedor: i.proveedor || i.via || null,
+              proveedor: i.proveedor || null,
+              vuelta: i.vuelta ?? null,
               estado: i.estado ?? null,
-              razon: String(i.razon || i.mensaje || '').slice(0, 160),
+              razon: String(i.detalle || '').slice(0, 160),
             })),
           },
         });
