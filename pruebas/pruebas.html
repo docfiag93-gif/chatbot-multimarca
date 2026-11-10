@@ -254,9 +254,24 @@ await suite('El modelo de Groq se elige igual siempre', async () => {
   /* Y si el preferido no está, se cae al siguiente escalón en vez de a lo
      que haya quedado primero. Esto es lo que hace que sobreviva al día que
      Groq retire un modelo. */
-  const sinEl70 = await elegirCon(['gemma2-9b-it', 'qwen-2.5-32b']);
-  ok('sin llama, baja al siguiente escalón conocido', sinEl70 === 'qwen-2.5-32b',
+  const sinEl70 = await elegirCon(['qwen-2.5-32b', 'gemma2-9b-it']);
+  ok('sin llama, baja al siguiente escalón conocido', sinEl70 === 'gemma2-9b-it',
      String(sinEl70));
+
+  /* EL NOMBRE CON PREFIJO. Groq pasó a nombrar sus modelos
+     `meta-llama/llama-4-...`, y los patrones estaban anclados con `^`: no
+     encontraban ningún llama y la cadena se caía hasta qwen, que tiene el
+     límite de peticiones más chico. Medido en producción como `groq 429
+     Rate limit reached for model qwen/qwen3.8-27b`.
+
+     Esta prueba falla con los anclajes puestos, que es justo lo que no
+     tenía la versión anterior. */
+  const conPrefijo = await elegirCon(['qwen/qwen3.8-27b', 'meta-llama/llama-4-scout-17b-16e-instruct']);
+  ok('un llama con prefijo de proveedor sí se reconoce',
+     conPrefijo === 'meta-llama/llama-4-scout-17b-16e-instruct', String(conPrefijo));
+
+  ok('y qwen queda de último recurso, no de primero',
+     (await elegirCon(['qwen/qwen3.8-27b', 'gemma2-9b-it'])) === 'gemma2-9b-it');
 
   /* El 400 tiene que TIRAR la caché. Se mide por el número de veces que se
      pide la lista de modelos: si la segunda petición vuelve a pedirla, la

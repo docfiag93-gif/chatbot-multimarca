@@ -231,14 +231,23 @@ async function modeloGroq(key, ms) {
      El filtro viejo era /instant|8b/, y ya no encontraba nada: Groq cambió
      su catálogo. Un filtro que deja de encontrar no avisa — simplemente
      empieza a devolver cualquier cosa. */
+  /* Los patrones NO van anclados con `^`, y esa es la parte que ya falló una
+     vez: Groq pasó a nombrar sus modelos con prefijo de proveedor
+     —`meta-llama/llama-4-scout-17b-16e-instruct`— y un `/^llama/` no
+     encuentra ninguno. Medido en producción: con los anclajes puestos, la
+     cadena se caía hasta `qwen/qwen3.8-27b`, que tiene un límite de
+     peticiones chico, y devolvía 429.
+
+     Se ordena de más capaz a menos dentro de lo barato. El 70b primero
+     porque es el que mejor contesta en español sin costar como un grande. */
   const ESCALONES = [
-    /^llama-3\.3-70b/i,      // el bueno de la casa, y barato
+    /llama-3\.3-70b/i,       // el bueno de la casa, y barato
     /llama.*instant/i,
-    /^llama-3\.1-8b/i,
-    /^llama/i,
-    /^qwen/i,
-    /^gemma/i,
+    /llama-3\.1-8b/i,
+    /llama/i,                // cualquier llama, con prefijo o sin él
+    /gemma/i,
     /mixtral/i,
+    /qwen/i,                 // último: su límite de peticiones es el más chico
   ];
   const ids = utiles.map(m => m.id).filter(Boolean);
   let elegido = null;
