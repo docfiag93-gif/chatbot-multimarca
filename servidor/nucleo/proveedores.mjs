@@ -366,7 +366,11 @@ async function openai(key, prompt, ms) {
     }),
   }, ms);
   if (!r.ok) {
-    if ([404, 429].includes(r.status)) olvidar('openai', key);
+    // El 400 va en la lista por la misma razón que en Groq: es el código con
+    // que se rechaza un modelo que ya no existe, y sin olvidarlo el modelo
+    // malo se queda en la caché las seis horas del TTL. Era el mismo bug,
+    // copiado, en la función de al lado.
+    if ([400, 404, 429].includes(r.status)) olvidar('openai', key);
     await fallar(r, 'openai');
   }
   const j = await r.json();

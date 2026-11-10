@@ -270,3 +270,69 @@ en la bio de las tres redes.
 Cero aprobaciones, cero tokens, cero espera. Contesta, detecta urgencias,
 manda al 911 y toma datos. Es la jugada que no cuesta nada mientras lo demás
 se resuelve.
+
+
+---
+
+# Pagar la llave de Anthropic · lo que hay que hacer
+
+Fernando lo pidió el 10 de noviembre: «si no pagaremos el api key de
+Anthropic, ya que sí me urge que quede al millón».
+
+**No hay que programar nada.** El proveedor ya está escrito, probado y en el
+catálogo (`proveedores.mjs`, `claude: { variable: 'ANTHROPIC_API_KEY' }`).
+El ping de hoy dice `claude: false` por una sola razón: falta la llave.
+
+## Los tres pasos, y los tres son tuyos
+
+Yo no toco llaves ni contraseñas. Nunca, ni con autorización — es la única
+cosa de este proyecto que no hago.
+
+**1 · Saca la llave y ponle saldo.**
+`https://console.anthropic.com` → API keys → Create key. El saldo se carga
+en Billing; con 20 dólares te alcanza para miles de conversaciones de
+consultorio, porque cada respuesta son unos cientos de palabras.
+
+**2 · Métela en Cloudflare.**
+`https://dash.cloudflare.com` → Workers & Pages → **chatbot-multimarca** →
+Settings → **Variables and Secrets** → Add.
+
+    Nombre:  ANTHROPIC_API_KEY
+    Tipo:    Secreto          ← secreto, no texto
+    Valor:   la llave que acabas de sacar
+
+**3 · Ponlo de primero en la fila.** En la misma pantalla, otra variable:
+
+    Nombre:  BOT_ORDEN
+    Tipo:    Texto
+    Valor:   claude,groq,gemini
+
+Eso deja a Claude contestando, Groq como respaldo y Gemini de tercero.
+
+**4 · Vuelve a desplegar.** Las variables de Cloudflare NO surten efecto
+hasta el siguiente despliegue. Avísame y lo empujo, o dale a Retry deployment
+en Deployments.
+
+## Para comprobar que quedó
+
+    https://chatbot-multimarca.pages.dev/api/bot?ping=1
+
+Tiene que decir `"claude":true`. Si dice `false`, la variable no está o el
+despliegue no la tomó.
+
+## Lo que esto arregla y lo que no
+
+**Sí arregla:** la calidad de las respuestas sube bastante, y se acaba la
+dependencia de dos cuentas gratis —una con la cuota agotada y la otra con
+límites por minuto— que es lo que hoy tiene al bot colgando de un hilo.
+
+**No arregla:** el token de WhatsApp, el aviso de las urgencias por correo
+(`RESEND_API_KEY`), ni el domicilio fiscal. Esos tres siguen igual y son los
+que de verdad te bloquean para lanzar en redes.
+
+**Y un aviso que vale la pena:** con llave de paga cada mensaje cuesta
+dinero de verdad. El tope por día (`tope_diario`) hoy está en nulo, o sea
+sin tope. Antes de publicar el enlace en Instagram conviene ponerle uno:
+el endpoint del chat es público y anónimo, y una tarde de tráfico raro con
+llave de paga se siente en la tarjeta. El freno de mano por dirección IP
+—30 mensajes cada 10 minutos— ayuda, pero no es un techo de gasto.
