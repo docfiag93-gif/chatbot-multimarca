@@ -203,27 +203,52 @@ async function modeloGroq(key, ms) {
   if (!r.ok) await fallar(r, 'groq/modelos');
   const { data = [] } = await r.json();
 
-  const utiles = data.filter(m => !/whisper|tts|guard|vision/i.test(m.id || ''));
+  /* Lo que NO sirve para atender a alguien en español. `allam` es un modelo
+     de árabe con un límite de peticiones diminuto, y `guard`/`prompt-guard`
+     son clasificadores de seguridad, no modelos de conversación. Estaban
+     entrando a la lista de candidatos. */
+  const utiles = data.filter(m => !/whisper|tts|guard|vision|allam|compound/i.test(m.id || ''));
   if (!utiles.length) throw new ErrorProveedor('la llave no tiene modelos de texto disponibles', { estado: 403 });
 
-  /* El modelo se elegía con `[0]` de la lista tal como la devolvió Groq, y
-     ese orden NO está garantizado. Cada isolate de Cloudflare tiene su
-     propia caché de módulo, así que dos isolates pedían la lista, les
-     llegaba en distinto orden, y cada uno se quedaba con un modelo distinto
-     durante las seis horas del TTL.
+  /* ── CÓMO SE ELIGE, Y POR QUÉ ASÍ ──────────────────────────────────────
+     Antes se tomaba `[0]` de la lista tal como la devolvió Groq, y ese orden
+     NO está garantizado. Cada isolate de Cloudflare tiene su propia caché de
+     módulo, así que a cada uno le quedaba un modelo distinto durante las
+     seis horas del TTL. Medido en producción: 1 de cada 8 mensajes moría con
+     `groq 400`, y no era azar por petición sino por isolate.
 
-     Medido en producción el 10 de noviembre: 1 de cada 8 mensajes moría, y
-     siempre con `groq 400`. No era azar por petición — era azar por
-     isolate: el que había guardado un modelo que ya no existe fallaba
-     SIEMPRE, y el que guardó uno bueno funcionaba SIEMPRE.
+     El primer intento de arreglarlo fue ordenar por nombre. Lo empeoró a 15
+     de 16, y la bitácora dijo por qué en la primera lectura: alfabéticamente
+     `allam-2-7b` le gana a `llama-...`. Determinista, sí; correcto, no.
 
-     Se ordena por nombre antes de elegir. Un empate resuelto igual en todas
-     las copias vale más que cualquier heurística: un bot que falla para una
-     de cada ocho personas es indistinguible de uno roto, y mucho más difícil
-     de diagnosticar. */
-  const rapido = utiles.filter(m => /instant|8b/i.test(m.id));
-  const elegido = (rapido.length ? rapido : utiles)
-    .map(m => m.id).sort()[0];
+     La lección es que «elegir siempre igual» y «elegir bien» son dos
+     requisitos distintos y hacen falta los dos. Por eso ahora hay una lista
+     de PREFERENCIA explícita, y el orden alfabético queda solo de desempate
+     dentro de cada escalón. Una familia conocida por nombre envejece mejor
+     que una heurística: cuando Groq retire un modelo, se cae al siguiente
+     escalón en vez de a lo que haya quedado primero.
+
+     El filtro viejo era /instant|8b/, y ya no encontraba nada: Groq cambió
+     su catálogo. Un filtro que deja de encontrar no avisa — simplemente
+     empieza a devolver cualquier cosa. */
+  const ESCALONES = [
+    /^llama-3\.3-70b/i,      // el bueno de la casa, y barato
+    /llama.*instant/i,
+    /^llama-3\.1-8b/i,
+    /^llama/i,
+    /^qwen/i,
+    /^gemma/i,
+    /mixtral/i,
+  ];
+  const ids = utiles.map(m => m.id).filter(Boolean);
+  let elegido = null;
+  for (const escalon of ESCALONES) {
+    const caben = ids.filter(id => escalon.test(id)).sort();
+    if (caben.length) { elegido = caben[0]; break; }
+  }
+  // Ninguna familia conocida: se toma la primera por orden, que al menos es
+  // la misma en todas las copias.
+  if (!elegido) elegido = ids.slice().sort()[0];
   guardar('groq', key, elegido);
   return elegido;
 }

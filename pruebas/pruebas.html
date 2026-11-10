@@ -218,15 +218,45 @@ await suite('El modelo de Groq se elige igual siempre', async () => {
       }
       return Promise.resolve(new Response('{}', { status: 404 }));
     };
-    await preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 });
+    // Puede lanzar cuando no queda ningún modelo utilizable: ese caso
+    // también es una respuesta y la prueba lo comprueba.
+    try { await preguntar({ prompt: 'x', leerEntorno: envQ, reintentos: 0 }); }
+    catch (e) { /* `usado` se queda en null, que es lo que se afirma */ }
     return usado;
   };
 
-  const a = await elegirCon(['llama-3.1-8b-instant', 'llama-3.3-8b-instant']);
-  const b = await elegirCon(['llama-3.3-8b-instant', 'llama-3.1-8b-instant']);
+  const a = await elegirCon(['llama-3.1-8b-instant', 'llama-3.3-70b-versatile']);
+  const b = await elegirCon(['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']);
   ok('el orden de la lista no cambia el modelo elegido', a === b, a + ' vs ' + b);
   ok('y el elegido es uno de los de la lista',
-     ['llama-3.1-8b-instant', 'llama-3.3-8b-instant'].includes(a), String(a));
+     ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile'].includes(a), String(a));
+
+  /* El primer arreglo ordenó por nombre, y así `allam-2-7b` le ganaba a
+     `llama-...`: es un modelo de árabe con un límite de peticiones diminuto.
+     En producción pasó de fallar 1 de cada 8 a fallar 15 de 16.
+
+     Determinista y correcto son DOS requisitos, no uno. Esta prueba cuida el
+     segundo, y es la que faltaba. */
+  const conAllam = await elegirCon(['allam-2-7b', 'llama-3.3-70b-versatile']);
+  ok('no elige allam aunque gane por orden alfabético',
+     conAllam === 'llama-3.3-70b-versatile', String(conAllam));
+
+  const soloAllam = await elegirCon(['allam-2-7b', 'whisper-large-v3']);
+  ok('si solo quedan modelos descartados, no finge tener uno', soloAllam === null,
+     String(soloAllam));
+
+  /* La preferencia respeta su escalón: con los dos presentes gana el 70b, no
+     el que venga primero ni el más corto de nombre. */
+  const dos = await elegirCon(['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'gemma2-9b-it']);
+  ok('con varios buenos gana el de mayor preferencia',
+     dos === 'llama-3.3-70b-versatile', String(dos));
+
+  /* Y si el preferido no está, se cae al siguiente escalón en vez de a lo
+     que haya quedado primero. Esto es lo que hace que sobreviva al día que
+     Groq retire un modelo. */
+  const sinEl70 = await elegirCon(['gemma2-9b-it', 'qwen-2.5-32b']);
+  ok('sin llama, baja al siguiente escalón conocido', sinEl70 === 'qwen-2.5-32b',
+     String(sinEl70));
 
   /* El 400 tiene que TIRAR la caché. Se mide por el número de veces que se
      pide la lista de modelos: si la segunda petición vuelve a pedirla, la
