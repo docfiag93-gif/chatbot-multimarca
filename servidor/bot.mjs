@@ -544,6 +544,54 @@ export async function manejar(req, context) {
     // un desconocido "falta configurar una API key" le informa que el sitio
     // está a medio montar.
     const f = explicarFallo(e, { hayContacto });
+
+    /* ── POR QUÉ FALLÓ, ANOTADO ───────────────────────────────────────────
+       `explicarFallo` devuelve `intentos`: proveedor por proveedor, con su
+       código HTTP y su razón. Eso es exactamente lo que hace falta para
+       saber si una llave venció, si se agotó la cuota o si el modelo ya no
+       existe — y se estaba tirando aquí mismo, sin escribirlo en ningún
+       lado.
+
+       El síntoma de tirarlo: medido el 10 de noviembre, 1 de cada 8
+       mensajes moría con TODOS_FALLARON y los otros 7 contestaban con
+       `reintentos: 2`, o sea que el primer proveedor de la cadena fallaba
+       SIEMPRE. Desde fuera no había forma de saber cuál ni por qué, y
+       adivinar sobre proveedores de IA es carísimo en tiempo.
+
+       Se anota sin llaves: `proveedores.mjs` ya las limpia de los mensajes
+       antes de ponerlos en `intentos`.
+
+       Y se guarda también la CONVERSACIÓN. Un visitante que recibió «se me
+       trabó la conexión» no dejaba ningún rastro: el dueño no podía saber
+       que lo perdió, ni escribirle. Se marca `sinDato` porque desde el
+       panel es la misma cosa —alguien preguntó y no se le contestó— y es
+       la lista que el dueño ya mira. */
+    enSegundoPlano(context, (async () => {
+      const sb = servicio();
+      if (sb) {
+        await sb.bitacora({
+          empresa_id: marca?.id || null,
+          accion: 'bot.sin_respuesta',
+          detalle: {
+            codigo: f.codigo,
+            /* Solo lo que sirve para arreglarlo. El cuerpo completo del
+               error de un proveedor puede traer el prompt de vuelta, y el
+               prompt lleva dentro el catálogo y los horarios del negocio. */
+            intentos: (f.intentos || []).slice(0, 6).map(i => ({
+              proveedor: i.proveedor || i.via || null,
+              estado: i.estado ?? null,
+              razon: String(i.razon || i.mensaje || '').slice(0, 160),
+            })),
+          },
+        });
+      }
+      await guardarConversacion({
+        empresa: marca, sesion,
+        mensajes: [...mensajes, { rol: 'bot', texto: f.publico }],
+        urgencia: false, via: 'error:' + f.codigo, sinDato: true,
+      });
+    })());
+
     return json({
       texto: f.publico,
       sugerencias: [],
